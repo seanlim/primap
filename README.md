@@ -1,7 +1,3 @@
-This is a professional and comprehensive `README.md` structure tailored for your **Next.js + Supabase** stack, based on the requirements provided in the SRS.
-
----
-
 # Primap 🐒📍
 
 **Primap** is a web-based citizen-science platform designed to streamline primate survey walks in Singapore. Built for the **Raffles’ Banded Langur Working Group (RBLWG)**, it replaces manual spreadsheet workflows with a mobile-first, offline-capable solution for reporting observations of critically endangered species.

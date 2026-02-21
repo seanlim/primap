@@ -14,40 +14,41 @@ export default async function SlotReportPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: slot } = await supabase
-    .from('walk_slots')
-    .select('*, survey_rounds(name)')
-    .eq('id', slotId)
-    .single()
+  // Run all queries in parallel
+  const [slotResult, observationsResult, membersResult, incidentsResult] = await Promise.all([
+    supabase
+      .from('walk_slots')
+      .select('*, survey_rounds(name)')
+      .eq('id', slotId)
+      .single(),
+    supabase
+      .from('observations')
+      .select(`
+        *,
+        profiles:user_id (full_name, email, avatar_url),
+        sightings (*, media:media!media_sighting_id_fkey(*)),
+        media:media!media_observation_id_fkey(*)
+      `)
+      .eq('slot_id', slotId)
+      .order('created_at', { ascending: true }),
+    supabase
+      .from('slot_memberships')
+      .select('user_id, profiles:user_id(full_name, email)')
+      .eq('slot_id', slotId)
+      .eq('status', 'ACTIVE'),
+    supabase
+      .from('incidents')
+      .select('*, profiles:reported_by(full_name, email)')
+      .eq('slot_id', slotId)
+      .order('created_at', { ascending: false }),
+  ])
 
+  const slot = slotResult.data
   if (!slot) notFound()
 
-  // Get all observations for this slot with sightings and media
-  const { data: observations } = await supabase
-    .from('observations')
-    .select(`
-      *,
-      profiles:user_id (full_name, email, avatar_url),
-      sightings (*, media:media!media_sighting_id_fkey(*)),
-      media:media!media_observation_id_fkey(*)
-    `)
-    .eq('slot_id', slotId)
-    .order('created_at', { ascending: true })
-
-  // Get all members of this slot
-  const { data: members } = await supabase
-    .from('slot_memberships')
-    .select('user_id, profiles:user_id(full_name, email)')
-    .eq('slot_id', slotId)
-    .eq('status', 'ACTIVE')
-
-  // Get incidents
-  const { data: incidents } = await supabase
-    .from('incidents')
-    .select('*, profiles:reported_by(full_name, email)')
-    .eq('slot_id', slotId)
-    .order('created_at', { ascending: false })
-
+  const observations = observationsResult.data
+  const members = membersResult.data
+  const incidents = incidentsResult.data
   const round = slot.survey_rounds as unknown as { name: string }
 
   return (

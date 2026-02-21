@@ -14,32 +14,35 @@ export default async function EditReportPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: slot } = await supabase
-    .from('walk_slots')
-    .select('*, survey_rounds(name)')
-    .eq('id', slotId)
-    .single()
+  // Run all queries in parallel
+  const [slotResult, membershipResult, obsResult] = await Promise.all([
+    supabase
+      .from('walk_slots')
+      .select('*, survey_rounds(name)')
+      .eq('id', slotId)
+      .single(),
+    supabase
+      .from('slot_memberships')
+      .select('id')
+      .eq('slot_id', slotId)
+      .eq('user_id', user.id)
+      .eq('status', 'ACTIVE')
+      .single(),
+    supabase
+      .from('observations')
+      .select('*, sightings(*, media:media!media_sighting_id_fkey(*)), media:media!media_observation_id_fkey(*)')
+      .eq('slot_id', slotId)
+      .eq('user_id', user.id)
+      .single(),
+  ])
 
+  const slot = slotResult.data
   if (!slot) notFound()
 
-  // Check if user has membership
-  const { data: membership } = await supabase
-    .from('slot_memberships')
-    .select('id')
-    .eq('slot_id', slotId)
-    .eq('user_id', user.id)
-    .eq('status', 'ACTIVE')
-    .single()
-
+  const membership = membershipResult.data
   if (!membership) redirect('/report')
 
-  // Check for existing observation with sightings and media
-  const { data: existingObs } = await supabase
-    .from('observations')
-    .select('*, sightings(*, media:media!media_sighting_id_fkey(*)), media:media!media_observation_id_fkey(*)')
-    .eq('slot_id', slotId)
-    .eq('user_id', user.id)
-    .single()
+  const existingObs = obsResult.data
 
   // Can't edit submitted observations
   if (existingObs?.status === 'SUBMITTED') {

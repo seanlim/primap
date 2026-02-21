@@ -1,0 +1,53 @@
+'use client'
+
+interface ConfirmationDialogProps {
+  open: boolean
+  title: string
+  message: string
+  confirmLabel?: string
+  cancelLabel?: string
+  destructive?: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}
+
+export function ConfirmationDialog({
+  open,
+  title,
+  message,
+  confirmLabel = 'Confirm',
+  cancelLabel = 'Cancel',
+  destructive = false,
+  onConfirm,
+  onCancel,
+}: ConfirmationDialogProps) {
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="fixed inset-0 bg-black/50" onClick={onCancel} />
+      <div className="relative bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
+        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+        <p className="text-sm text-gray-500 mt-2">{message}</p>
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2.5 px-4 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors text-sm"
+          >
+            {cancelLabel}
+          </button>
+          <button
+            onClick={onConfirm}
+            className={`flex-1 py-2.5 px-4 rounded-xl font-medium transition-colors text-sm text-white ${
+              destructive
+                ? 'bg-red-600 hover:bg-red-700'
+                : 'bg-green-600 hover:bg-green-700'
+            }`}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

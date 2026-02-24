@@ -3,14 +3,14 @@
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { ShieldX } from 'lucide-react'
+import { signOut } from '@/lib/actions/auth-actions'
 
 export default function BlockedPage() {
   const supabase = createClient()
   const router = useRouter()
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
+    await signOut()
   }
 
   return (

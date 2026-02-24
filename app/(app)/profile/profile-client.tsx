@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { LogOut, Check, Pencil } from 'lucide-react'
 import { updateProfile } from '@/lib/actions/profile-actions'
+import { signOut } from '@/lib/actions/auth-actions'
 import { createClient } from '@/lib/supabase/client'
 
 interface Props {
@@ -50,9 +51,7 @@ export function ProfileClient({ profile, stats, walkHistory }: Props) {
   }
 
   const handleSignOut = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/login')
+    await signOut()
   }
 
   const progressPercent = Math.min((stats.reportsSubmitted / stats.requiredWalks) * 100, 100)

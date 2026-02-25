@@ -2,19 +2,44 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { Clock } from 'lucide-react'
+import { Clock, Loader2 } from 'lucide-react'
 import { signOut } from '@/lib/actions/auth-actions'
+import { useState } from 'react'
 
 export default function PendingPage() {
   const supabase = createClient()
   const router = useRouter()
+  const [isLoading, setIsLoading] = useState(false)
 
   const handleSignOut = async () => {
     await signOut()
   }
 
-  const handleRefresh = () => {
-    router.refresh()
+  const handleRefresh = async () => {
+    setIsLoading(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('status')
+          .eq('id', user.id)
+          .single()
+
+        if (profile?.status === 'ACTIVE') {
+          router.push('/')
+          return
+        }
+      }
+      
+      // If not active or error, refresh the page to get latest server data
+      router.refresh()
+    } catch (error) {
+      console.error('Error checking status:', error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -30,13 +55,19 @@ export default function PendingPage() {
         <div className="space-y-3">
           <button
             onClick={handleRefresh}
-            className="w-full bg-green-600 text-white py-3 px-4 rounded-xl hover:bg-green-700 font-medium transition-colors"
+            disabled={isLoading}
+            className="w-full bg-green-600 text-white py-3 px-4 rounded-xl hover:bg-green-700 font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
           >
-            Check Status
+            {isLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              'Check Status'
+            )}
           </button>
           <button
             onClick={handleSignOut}
-            className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-xl hover:bg-gray-200 font-medium transition-colors"
+            disabled={isLoading}
+            className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-xl hover:bg-gray-200 font-medium transition-colors disabled:opacity-50"
           >
             Sign Out
           </button>

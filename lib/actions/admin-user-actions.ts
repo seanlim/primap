@@ -18,14 +18,23 @@ async function requireAdmin() {
   return supabase
 }
 
+import { sendAccountApprovedEmail } from '@/lib/email'
+
 export async function approveUser(userId: string) {
   const supabase = await requireAdmin()
-  const { error } = await supabase
+  const { data: updatedProfile, error } = await supabase
     .from('profiles')
     .update({ status: 'ACTIVE' })
     .eq('id', userId)
+    .select('email, full_name')
+    .single()
 
   if (error) return { error: error.message }
+  
+  if (updatedProfile) {
+    await sendAccountApprovedEmail(updatedProfile.email, updatedProfile.full_name)
+  }
+
   revalidatePath('/admin/users')
   return { success: true }
 }

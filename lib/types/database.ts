@@ -566,3 +566,5 @@ export type Observation = Tables<"observations">
 export type Sighting = Tables<"sightings">
 export type Media = Tables<"media">
 export type Incident = Tables<"incidents">
+export type UserRole = Enums<'user_role'>
+export type UserStatus = Enums<'user_status'>

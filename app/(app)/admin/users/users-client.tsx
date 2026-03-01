@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Search, Users } from 'lucide-react'
@@ -34,6 +34,7 @@ function UsersContent({ users }: { users: UserData[] }) {
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
   const router = useRouter()
   const { showToast } = useToast()
+  const actionInFlightRef = useRef(false)
 
   const filteredUsers = useMemo(() => {
     const byStatus = filter === 'all' ? users : users.filter((u) => u.status === filter)
@@ -64,7 +65,11 @@ function UsersContent({ users }: { users: UserData[] }) {
   }
 
   const runAction = async (action: PendingAction) => {
+    if (actionInFlightRef.current) return
+
+    actionInFlightRef.current = true    
     setLoading(action.userId)
+    setPendingAction(null)
 
     let result: { error?: string }
     switch (action.action) {
@@ -91,13 +96,13 @@ function UsersContent({ users }: { users: UserData[] }) {
     if (result.error) {
       showToast(result.error, 'error')
       setLoading(null)
-      setPendingAction(null)
+      actionInFlightRef.current = false
       return
     }
 
     showToast('User updated successfully.', 'success')
-    setPendingAction(null)
     setLoading(null)
+    actionInFlightRef.current = false
     router.refresh()
   }
 
@@ -230,8 +235,12 @@ function UsersContent({ users }: { users: UserData[] }) {
         message={pendingAction ? labels[pendingAction.action].message(pendingAction.userLabel) : ''}
         confirmLabel={pendingAction ? labels[pendingAction.action].confirm : 'Confirm'}
         destructive={pendingAction ? Boolean(labels[pendingAction.action].destructive) : false}
-        onCancel={() => setPendingAction(null)}
+        onCancel={() => {
+          if (loading) return
+          setPendingAction(null)
+        }}
         onConfirm={() => pendingAction && runAction(pendingAction)}
+        busy={Boolean(loading)}
       />
     </>
   )

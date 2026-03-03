@@ -67,7 +67,7 @@ function UsersContent({ users }: { users: UserData[] }) {
   const runAction = async (action: PendingAction) => {
     if (actionInFlightRef.current) return
 
-    actionInFlightRef.current = true    
+    actionInFlightRef.current = true
     setLoading(action.userId)
     setPendingAction(null)
 

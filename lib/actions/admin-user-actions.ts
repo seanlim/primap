@@ -24,7 +24,7 @@ export async function approveUser(userId: string) {
   const supabase = await requireAdmin()
   const { data: updatedProfile, error } = await supabase
     .from('profiles')
-    .update({ status: 'ACTIVE' })
+    .update({ status: 'ACTIVE', updated_at: new Date().toISOString() })
     .eq('id', userId)
     .select('email, full_name')
     .single()
@@ -43,7 +43,7 @@ export async function rejectUser(userId: string) {
   const supabase = await requireAdmin()
   const { error } = await supabase
     .from('profiles')
-    .update({ status: 'REJECTED' })
+    .update({ status: 'REJECTED', updated_at: new Date().toISOString() })
     .eq('id', userId)
 
   if (error) return { error: error.message }
@@ -55,7 +55,7 @@ export async function disableUser(userId: string) {
   const supabase = await requireAdmin()
   const { error } = await supabase
     .from('profiles')
-    .update({ status: 'DISABLED' })
+    .update({ status: 'DISABLED', updated_at: new Date().toISOString() })
     .eq('id', userId)
 
   if (error) return { error: error.message }
@@ -67,7 +67,7 @@ export async function enableUser(userId: string) {
   const supabase = await requireAdmin()
   const { error } = await supabase
     .from('profiles')
-    .update({ status: 'ACTIVE' })
+    .update({ status: 'ACTIVE', updated_at: new Date().toISOString() })
     .eq('id', userId)
 
   if (error) return { error: error.message }
@@ -79,7 +79,7 @@ export async function setUserRole(userId: string, role: 'ADMIN' | 'VOLUNTEER') {
   const supabase = await requireAdmin()
   const { error } = await supabase
     .from('profiles')
-    .update({ role })
+    .update({ role, updated_at: new Date().toISOString() })
     .eq('id', userId)
 
   if (error) return { error: error.message }

@@ -55,7 +55,7 @@ export async function disableUser(userId: string) {
   const supabase = await requireAdmin()
   const { error } = await supabase
     .from('profiles')
-    .update({ status: 'DISABLED' })
+    .update({ status: 'DISABLED', updated_at: new Date().toISOString() })
     .eq('id', userId)
 
   if (error) return { error: error.message }
@@ -67,7 +67,7 @@ export async function enableUser(userId: string) {
   const supabase = await requireAdmin()
   const { error } = await supabase
     .from('profiles')
-    .update({ status: 'ACTIVE' })
+    .update({ status: 'ACTIVE', updated_at: new Date().toISOString() })
     .eq('id', userId)
 
   if (error) return { error: error.message }
@@ -79,7 +79,7 @@ export async function setUserRole(userId: string, role: 'ADMIN' | 'VOLUNTEER') {
   const supabase = await requireAdmin()
   const { error } = await supabase
     .from('profiles')
-    .update({ role })
+    .update({ role, updated_at: new Date().toISOString() })
     .eq('id', userId)
 
   if (error) return { error: error.message }

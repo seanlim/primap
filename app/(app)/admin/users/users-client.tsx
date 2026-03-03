@@ -71,27 +71,26 @@ function UsersContent({ users }: { users: UserData[] }) {
     setLoading(action.userId)
     setPendingAction(null)
 
-    let result: { error?: string }
-    switch (action.action) {
-      case 'approve':
-        result = await approveUser(action.userId)
-        break
-      case 'reject':
-        result = await rejectUser(action.userId)
-        break
-      case 'disable':
-        result = await disableUser(action.userId)
-        break
-      case 'enable':
-        result = await enableUser(action.userId)
-        break
-      case 'promote':
-        result = await setUserRole(action.userId, 'ADMIN')
-        break
-      case 'demote':
-        result = await setUserRole(action.userId, 'VOLUNTEER')
-        break
-    }
+    const result: { error?: string } = await (async () => {
+      switch (action.action) {
+        case 'approve':
+          return approveUser(action.userId)
+        case 'reject':
+          return rejectUser(action.userId)
+        case 'disable':
+          return disableUser(action.userId)
+        case 'enable':
+          return enableUser(action.userId)
+        case 'promote':
+          return setUserRole(action.userId, 'ADMIN')
+        case 'demote':
+          return setUserRole(action.userId, 'VOLUNTEER')
+        default: {
+          const _exhaustive: never = action.action
+          throw new Error(`Unhandled action: ${_exhaustive}`)
+        }
+      }
+    })()
 
     if (result.error) {
       showToast(result.error, 'error')

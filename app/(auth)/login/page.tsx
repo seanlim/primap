@@ -2,22 +2,7 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { useState } from 'react'
-
-
-function withTimeout<T>(promise: PromiseLike<T>, ms: number, message: string): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(message)), ms)
-    Promise.resolve(promise)
-      .then((value) => {
-        clearTimeout(timer)
-        resolve(value)
-      })
-      .catch((error: unknown) => {
-        clearTimeout(timer)
-        reject(error)
-      })
-  })
-}
+import { withTimeout } from '@/lib/utils/with-timeout'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -59,7 +44,6 @@ export default function LoginPage() {
       }
 
       // Use a hard navigation to avoid stale client state during auth cookie hydration.
-      setLoading(false)
       window.location.assign('/home')
       return
     } catch (err) {

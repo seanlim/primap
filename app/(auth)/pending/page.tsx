@@ -4,22 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Clock, Loader2 } from 'lucide-react'
 import { signOut } from '@/lib/actions/auth-actions'
 import { useState } from 'react'
-
-
-function withTimeout<T>(promise: PromiseLike<T>, ms: number, message: string): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(message)), ms)
-    Promise.resolve(promise)
-      .then((value) => {
-        clearTimeout(timer)
-        resolve(value)
-      })
-      .catch((error: unknown) => {
-        clearTimeout(timer)
-        reject(error)
-      })
-  })
-}
+import { withTimeout } from '@/lib/utils/with-timeout'
 
 export default function PendingPage() {
   const supabase = createClient()
@@ -41,7 +26,7 @@ export default function PendingPage() {
       )
       
       if (user) {
-        const { data: profile }: { data: { status: 'PENDING' | 'ACTIVE' | 'REJECTED' | 'DISABLED' } | null } = await withTimeout(
+        const { data: profile } = await withTimeout(
           supabase
             .from('profiles')
             .select('status')
@@ -52,13 +37,11 @@ export default function PendingPage() {
         )
 
         if (profile?.status === 'ACTIVE') {
-          setIsLoading(false)
           window.location.assign('/home')
           return
         }
 
         if (profile?.status === 'REJECTED' || profile?.status === 'DISABLED') {
-          setIsLoading(false)
           window.location.assign('/blocked')
           return
         }

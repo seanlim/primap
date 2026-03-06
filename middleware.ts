@@ -1,17 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-
-const PUBLIC_PATHS = ['/login', '/auth/callback', '/pending', '/blocked'] as const
-
-function matchesPath(pathname: string, basePath: string) {
-  return pathname === basePath || pathname.startsWith(`${basePath}/`)
-}
-
-function resolveStatusRedirect(status: 'PENDING' | 'REJECTED' | 'DISABLED' | 'ACTIVE') {
-  if (status === 'PENDING') return '/pending'
-  if (status === 'REJECTED' || status === 'DISABLED') return '/blocked'
-  return null
-}
+import { isPublicPath, needsProfileCheck, resolveStatusRedirect } from '@/lib/auth/access-policy'
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -40,17 +29,19 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const pathname = request.nextUrl.pathname
 
-  const isPublicPath = PUBLIC_PATHS.some(p => matchesPath(pathname, p))
+  const requestIsPublicPath = isPublicPath(pathname)
 
   // Unauthenticated users can only access public paths
-  if (!user && !isPublicPath && pathname !== '/') {
+  if (!user && !requestIsPublicPath && pathname !== '/') {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  // Authenticated users on login page should redirect to home
-  if (user && pathname === '/login') {
+  // Authenticated users on login page should redirect to home,
+  // unless they were redirected here due to profile fetch failure.
+  const loginError = request.nextUrl.searchParams.get('error')
+  if (user && pathname === '/login' && loginError !== 'profile_fetch_failed') {
     const url = request.nextUrl.clone()
     url.pathname = '/home'
     return NextResponse.redirect(url)
@@ -58,11 +49,13 @@ export async function middleware(request: NextRequest) {
 
   // Check account status for authenticated users across protected pages
   // and the status landing pages themselves.
-  const needsProfileCheck = user && pathname !== '/' && (
-    !isPublicPath || pathname === '/pending' || pathname === '/blocked'
-  )
+  const profileCheckRequired = needsProfileCheck({
+    hasUser: Boolean(user),
+    pathname,
+    isPublic: requestIsPublicPath,
+  })
 
-  if (needsProfileCheck) {
+  if (profileCheckRequired) {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('status, role')

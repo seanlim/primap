@@ -1,14 +1,28 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
 import { Clock, Loader2 } from 'lucide-react'
 import { signOut } from '@/lib/actions/auth-actions'
 import { useState } from 'react'
 
+
+function withTimeout<T>(promise: PromiseLike<T>, ms: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms)
+    Promise.resolve(promise)
+      .then((value) => {
+        clearTimeout(timer)
+        resolve(value)
+      })
+      .catch((error: unknown) => {
+        clearTimeout(timer)
+        reject(error)
+      })
+  })
+}
+
 export default function PendingPage() {
   const supabase = createClient()
-  const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
 
@@ -20,28 +34,36 @@ export default function PendingPage() {
     setIsLoading(true)
     setStatusMessage('')
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await withTimeout(
+        supabase.auth.getUser(),
+        10000,
+        'Status check timed out. Please try again.'
+      )
       
       if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('status')
-          .eq('id', user.id)
-          .single()
+        const { data: profile }: { data: { status: 'PENDING' | 'ACTIVE' | 'REJECTED' | 'DISABLED' } | null } = await withTimeout(
+          supabase
+            .from('profiles')
+            .select('status')
+            .eq('id', user.id)
+            .single(),
+          10000,
+          'Status check timed out. Please try again.'
+        )
 
         if (profile?.status === 'ACTIVE') {
-          router.replace('/home')
+          setIsLoading(false)
+          window.location.assign('/home')
           return
         }
 
         if (profile?.status === 'REJECTED' || profile?.status === 'DISABLED') {
-          router.replace('/blocked')
+          setIsLoading(false)
+          window.location.assign('/blocked')
           return
         }
       }
       
-      // If still pending, refresh server data and keep user informed
-      router.refresh()
       setStatusMessage('Your account is still pending approval.')
     } catch (error) {
       console.error('Error checking status:', error)

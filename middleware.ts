@@ -46,13 +46,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Only query profile for admin routes or status-gated pages
-  // Skip for regular app pages to reduce latency
-  const needsProfileCheck = user && !isPublicPath && pathname !== '/' && (
-    pathname.startsWith('/admin') ||
-    pathname === '/home' ||
-    pathname === '/pending' ||
-    pathname === '/blocked'
+  // Check account status for authenticated users across protected pages
+  // and the status landing pages themselves.
+  const needsProfileCheck = user && pathname !== '/' && (
+    !isPublicPath || pathname === '/pending' || pathname === '/blocked'
   )
 
   if (needsProfileCheck) {
@@ -62,24 +59,28 @@ export async function middleware(request: NextRequest) {
       .eq('id', user!.id)
       .single()
 
-    if (profile) {
-      if (profile.status === 'PENDING' && pathname !== '/pending') {
-        const url = request.nextUrl.clone()
-        url.pathname = '/pending'
-        return NextResponse.redirect(url)
-      }
+    if (!profile) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/pending'
+      return NextResponse.redirect(url)
+    }
 
-      if ((profile.status === 'REJECTED' || profile.status === 'DISABLED') && pathname !== '/blocked') {
-        const url = request.nextUrl.clone()
-        url.pathname = '/blocked'
-        return NextResponse.redirect(url)
-      }
+    if (profile.status === 'PENDING' && pathname !== '/pending') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/pending'
+      return NextResponse.redirect(url)
+    }
 
-      if (pathname.startsWith('/admin') && profile.role !== 'ADMIN') {
-        const url = request.nextUrl.clone()
-        url.pathname = '/home'
-        return NextResponse.redirect(url)
-      }
+    if ((profile.status === 'REJECTED' || profile.status === 'DISABLED') && pathname !== '/blocked') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/blocked'
+      return NextResponse.redirect(url)
+    }
+
+    if (pathname.startsWith('/admin') && profile.role !== 'ADMIN') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/home'
+      return NextResponse.redirect(url)
     }
   }
 

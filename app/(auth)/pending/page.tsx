@@ -30,12 +30,17 @@ export default function PendingPage() {
           .single()
 
         if (profile?.status === 'ACTIVE') {
-          router.push('/')
+          router.replace('/home')
+          return
+        }
+
+        if (profile?.status === 'REJECTED' || profile?.status === 'DISABLED') {
+          router.replace('/blocked')
           return
         }
       }
       
-      // If not active, refresh the page to get latest server data
+      // If still pending, refresh server data and keep user informed
       router.refresh()
       setStatusMessage('Your account is still pending approval.')
     } catch (error) {

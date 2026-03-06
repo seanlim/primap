@@ -1,7 +1,17 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const PUBLIC_PATHS = ['/login', '/auth/callback', '/pending', '/blocked']
+const PUBLIC_PATHS = ['/login', '/auth/callback', '/pending', '/blocked'] as const
+
+function matchesPath(pathname: string, basePath: string) {
+  return pathname === basePath || pathname.startsWith(`${basePath}/`)
+}
+
+function resolveStatusRedirect(status: 'PENDING' | 'REJECTED' | 'DISABLED' | 'ACTIVE') {
+  if (status === 'PENDING') return '/pending'
+  if (status === 'REJECTED' || status === 'DISABLED') return '/blocked'
+  return null
+}
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -30,7 +40,7 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const pathname = request.nextUrl.pathname
 
-  const isPublicPath = PUBLIC_PATHS.some(p => pathname.startsWith(p))
+  const isPublicPath = PUBLIC_PATHS.some(p => matchesPath(pathname, p))
 
   // Unauthenticated users can only access public paths
   if (!user && !isPublicPath && pathname !== '/') {
@@ -53,11 +63,19 @@ export async function middleware(request: NextRequest) {
   )
 
   if (needsProfileCheck) {
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('status, role')
       .eq('id', user!.id)
       .single()
+
+    if (profileError) {
+      console.error('Failed to fetch profile in middleware:', profileError)
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      url.searchParams.set('error', 'profile_fetch_failed')
+      return NextResponse.redirect(url)
+    }
 
     if (!profile) {
       const url = request.nextUrl.clone()
@@ -65,15 +83,10 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
-    if (profile.status === 'PENDING' && pathname !== '/pending') {
+    const statusRedirect = resolveStatusRedirect(profile.status)
+    if (statusRedirect && pathname !== statusRedirect) {
       const url = request.nextUrl.clone()
-      url.pathname = '/pending'
-      return NextResponse.redirect(url)
-    }
-
-    if ((profile.status === 'REJECTED' || profile.status === 'DISABLED') && pathname !== '/blocked') {
-      const url = request.nextUrl.clone()
-      url.pathname = '/blocked'
+      url.pathname = statusRedirect
       return NextResponse.redirect(url)
     }
 

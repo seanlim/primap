@@ -10,6 +10,7 @@ export default function PendingPage() {
   const supabase = createClient()
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
+  const [statusMessage, setStatusMessage] = useState('')
 
   const handleSignOut = async () => {
     await signOut()
@@ -17,6 +18,7 @@ export default function PendingPage() {
 
   const handleRefresh = async () => {
     setIsLoading(true)
+    setStatusMessage('')
     try {
       const { data: { user } } = await supabase.auth.getUser()
       
@@ -33,10 +35,12 @@ export default function PendingPage() {
         }
       }
       
-      // If not active or error, refresh the page to get latest server data
+      // If not active, refresh the page to get latest server data
       router.refresh()
+      setStatusMessage('Your account is still pending approval.')
     } catch (error) {
       console.error('Error checking status:', error)
+      setStatusMessage('Unable to check status right now. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -53,6 +57,9 @@ export default function PendingPage() {
           Your account is awaiting admin approval. You&apos;ll be able to access Primap once an admin activates your account.
         </p>
         <div className="space-y-3">
+          {statusMessage && (
+            <p className="text-sm text-gray-600">{statusMessage}</p>
+          )}
           <button
             onClick={handleRefresh}
             disabled={isLoading}

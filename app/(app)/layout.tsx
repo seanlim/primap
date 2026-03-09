@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { AppShell } from '@/components/layout/app-shell'
+import { ToastProvider } from '@/components/ui/toast'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,5 +22,9 @@ export default async function AppLayout({
 
   const isAdmin = profile?.role === 'ADMIN'
 
-  return <AppShell isAdmin={isAdmin}>{children}</AppShell>
+  return (
+    <ToastProvider>
+      <AppShell isAdmin={isAdmin}>{children}</AppShell>
+    </ToastProvider>
+  )
 }

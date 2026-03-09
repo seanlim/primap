@@ -30,30 +30,56 @@ function wrapHtml(content: string) {
   `;
 }
 
-export async function sendAccountApprovedEmail(email: string, fullName: string | null) {
+async function sendEmail(to: string, subject: string, html: string) {
   if (!process.env.RESEND_API_KEY) {
     console.warn('RESEND_API_KEY is not set. Skipping email.');
     return;
   }
 
+  try {
+    await resend.emails.send({ from: FROM_EMAIL, to, subject, html });
+  } catch (error) {
+    console.error(`Failed to send email "${subject}" to ${to}:`, error);
+  }
+}
+
+const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://primap.org';
+
+export async function sendAccountApprovedEmail(email: string, fullName: string | null) {
   const name = fullName || 'Volunteer';
-  const html = wrapHtml(`
+  await sendEmail(email, 'Primap Account Approved', wrapHtml(`
     <p>Hi ${name},</p>
     <p>Your volunteer account for Primap has been approved!</p>
     <p>You can now log in and sign up for survey walks.</p>
-    <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://primap.org'}/login" class="button">Log In</a>
-  `);
+    <a href="${APP_URL()}/login" class="button">Log In</a>
+  `));
+}
 
-  try {
-    await resend.emails.send({
-      from: FROM_EMAIL,
-      to: email,
-      subject: 'Primap Account Approved',
-      html,
-    });
-  } catch (error) {
-    console.error('Failed to send account approval email:', error);
-  }
+export async function sendAccountRejectedEmail(email: string, fullName: string | null) {
+  const name = fullName || 'Volunteer';
+  await sendEmail(email, 'Primap Account Update', wrapHtml(`
+    <p>Hi ${name},</p>
+    <p>We regret to inform you that your volunteer account application for Primap was not approved at this time.</p>
+    <p>If you believe this was a mistake, please reach out to the team for further assistance.</p>
+  `));
+}
+
+export async function sendAccountDisabledEmail(email: string, fullName: string | null) {
+  const name = fullName || 'Volunteer';
+  await sendEmail(email, 'Primap Account Disabled', wrapHtml(`
+    <p>Hi ${name},</p>
+    <p>Your Primap account has been disabled by an administrator.</p>
+    <p>If you believe this was a mistake, please contact the admin team for assistance.</p>
+  `));
+}
+
+export async function sendAccountEnabledEmail(email: string, fullName: string | null) {
+  const name = fullName || 'Volunteer';
+  await sendEmail(email, 'Primap Account Re-enabled', wrapHtml(`
+    <p>Hi ${name},</p>
+    <p>Your Primap account has been re-enabled. You can now log in and access the platform again.</p>
+    <a href="${APP_URL()}/login" class="button">Log In</a>
+  `));
 }
 
 export async function sendSlotCancellationEmail(
@@ -61,9 +87,7 @@ export async function sendSlotCancellationEmail(
   slotInfo: { date: string; time: string; location: string },
   cancelledBy: string
 ) {
-  if (!process.env.RESEND_API_KEY || recipients.length === 0) {
-    return;
-  }
+  if (recipients.length === 0) return;
 
   const html = wrapHtml(`
     <p>A volunteer has cancelled their participation in an upcoming walk slot you are also joined in.</p>
@@ -76,22 +100,10 @@ export async function sendSlotCancellationEmail(
     <p>You are still signed up for this slot. If you also need to cancel, please do so as soon as possible.</p>
   `);
 
-  try {
-    // Send individual emails or use bcc to protect privacy if bulk (Resend handles array in 'to' as multiple recipients usually, but better to loop or bcc)
-    // Resend 'to' with array sends to all visible to each other usually? No, Resend sends individual emails if you use batch or separate calls.
-    // Documentation says array in 'to' sends to all of them (like CC). We should send separately or BCC.
-    // For simplicity and privacy, let's send to each.
-    await Promise.all(recipients.map(email => 
-      resend.emails.send({
-        from: FROM_EMAIL,
-        to: email,
-        subject: 'Walk Slot Cancellation Update',
-        html,
-      })
-    ));
-  } catch (error) {
-    console.error('Failed to send cancellation emails:', error);
-  }
+  // Send individually to preserve recipient privacy
+  await Promise.all(recipients.map(email =>
+    sendEmail(email, 'Walk Slot Cancellation Update', html)
+  ));
 }
 
 export async function sendWalkReminderEmail(
@@ -99,10 +111,8 @@ export async function sendWalkReminderEmail(
   name: string | null,
   slotInfo: { date: string; time: string; location: string }
 ) {
-  if (!process.env.RESEND_API_KEY) return;
-
   const displayName = name || 'Volunteer';
-  const html = wrapHtml(`
+  await sendEmail(email, 'Reminder: Upcoming Survey Walk', wrapHtml(`
     <p>Hi ${displayName},</p>
     <p>This is a reminder for your upcoming survey walk tomorrow.</p>
     <div style="background-color: #f0fdf4; padding: 15px; border-radius: 5px; margin: 15px 0; border: 1px solid #bbf7d0;">
@@ -112,17 +122,6 @@ export async function sendWalkReminderEmail(
     </div>
     <p>Please remember to bring your equipment and arrive on time.</p>
     <p>If you cannot make it, please cancel your slot as soon as possible to allow others to join.</p>
-    <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://primap.org'}/walk" class="button">View My Walks</a>
-  `);
-
-  try {
-    await resend.emails.send({
-      from: FROM_EMAIL,
-      to: email,
-      subject: 'Reminder: Upcoming Survey Walk',
-      html,
-    });
-  } catch (error) {
-    console.error('Failed to send reminder email:', error);
-  }
+    <a href="${APP_URL()}/walk" class="button">View My Walks</a>
+  `));
 }

@@ -10,6 +10,7 @@ export default function PendingPage() {
   const supabase = createClient()
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
+  const [statusMessage, setStatusMessage] = useState<string | null>(null)
 
   const handleSignOut = async () => {
     await signOut()
@@ -17,24 +18,29 @@ export default function PendingPage() {
 
   const handleRefresh = async () => {
     setIsLoading(true)
+    setStatusMessage(null)
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      
+
       if (user) {
         const { data: profile } = await supabase
           .from('profiles')
           .select('status')
           .eq('id', user.id)
-          .single()
+          .maybeSingle()
 
         if (profile?.status === 'ACTIVE') {
           router.push('/')
           return
         }
+
+        if (profile?.status === 'REJECTED' || profile?.status === 'DISABLED') {
+          router.push('/blocked')
+          return
+        }
       }
-      
-      // If not active or error, refresh the page to get latest server data
-      router.refresh()
+
+      setStatusMessage('Your account is still pending approval. Please check back later.')
     } catch (error) {
       console.error('Error checking status:', error)
     } finally {
@@ -71,6 +77,11 @@ export default function PendingPage() {
           >
             Sign Out
           </button>
+          {statusMessage && (
+            <p className="text-sm text-yellow-700 bg-yellow-50 rounded-lg p-3">
+              {statusMessage}
+            </p>
+          )}
         </div>
       </div>
     </div>

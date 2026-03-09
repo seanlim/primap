@@ -2,7 +2,12 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { sendAccountApprovedEmail } from '@/lib/email'
+import {
+  sendAccountApprovedEmail,
+  sendAccountRejectedEmail,
+  sendAccountDisabledEmail,
+  sendAccountEnabledEmail,
+} from '@/lib/email'
 
 async function requireAdmin() {
   const supabase = await createClient()
@@ -42,14 +47,19 @@ export async function rejectUser(userId: string) {
   const { supabase, adminId } = await requireAdmin()
   if (userId === adminId) return { error: 'Cannot reject your own account' }
 
-  const { error } = await supabase
+  const { data: updatedProfile, error } = await supabase
     .from('profiles')
     .update({ status: 'REJECTED', updated_at: new Date().toISOString() })
     .eq('id', userId)
-    .select('id')
+    .select('email, full_name')
     .single()
 
   if (error) return { error: error.message }
+
+  if (updatedProfile) {
+    await sendAccountRejectedEmail(updatedProfile.email, updatedProfile.full_name)
+  }
+
   revalidatePath('/admin/users')
   return { success: true }
 }
@@ -58,28 +68,38 @@ export async function disableUser(userId: string) {
   const { supabase, adminId } = await requireAdmin()
   if (userId === adminId) return { error: 'Cannot disable your own account' }
 
-  const { error } = await supabase
+  const { data: updatedProfile, error } = await supabase
     .from('profiles')
     .update({ status: 'DISABLED', updated_at: new Date().toISOString() })
     .eq('id', userId)
-    .select('id')
+    .select('email, full_name')
     .single()
 
   if (error) return { error: error.message }
+
+  if (updatedProfile) {
+    await sendAccountDisabledEmail(updatedProfile.email, updatedProfile.full_name)
+  }
+
   revalidatePath('/admin/users')
   return { success: true }
 }
 
 export async function enableUser(userId: string) {
   const { supabase } = await requireAdmin()
-  const { error } = await supabase
+  const { data: updatedProfile, error } = await supabase
     .from('profiles')
     .update({ status: 'ACTIVE', updated_at: new Date().toISOString() })
     .eq('id', userId)
-    .select('id')
+    .select('email, full_name')
     .single()
 
   if (error) return { error: error.message }
+
+  if (updatedProfile) {
+    await sendAccountEnabledEmail(updatedProfile.email, updatedProfile.full_name)
+  }
+
   revalidatePath('/admin/users')
   return { success: true }
 }

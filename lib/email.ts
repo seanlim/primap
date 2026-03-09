@@ -56,6 +56,81 @@ export async function sendAccountApprovedEmail(email: string, fullName: string |
   }
 }
 
+export async function sendAccountRejectedEmail(email: string, fullName: string | null) {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('RESEND_API_KEY is not set. Skipping email.');
+    return;
+  }
+
+  const name = fullName || 'Volunteer';
+  const html = wrapHtml(`
+    <p>Hi ${name},</p>
+    <p>We regret to inform you that your volunteer account application for Primap was not approved at this time.</p>
+    <p>If you believe this was a mistake, please reach out to the team for further assistance.</p>
+  `);
+
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: 'Primap Account Update',
+      html,
+    });
+  } catch (error) {
+    console.error('Failed to send account rejected email:', error);
+  }
+}
+
+export async function sendAccountDisabledEmail(email: string, fullName: string | null) {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('RESEND_API_KEY is not set. Skipping email.');
+    return;
+  }
+
+  const name = fullName || 'Volunteer';
+  const html = wrapHtml(`
+    <p>Hi ${name},</p>
+    <p>Your Primap account has been disabled by an administrator.</p>
+    <p>If you believe this was a mistake, please contact the admin team for assistance.</p>
+  `);
+
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: 'Primap Account Disabled',
+      html,
+    });
+  } catch (error) {
+    console.error('Failed to send account disabled email:', error);
+  }
+}
+
+export async function sendAccountEnabledEmail(email: string, fullName: string | null) {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('RESEND_API_KEY is not set. Skipping email.');
+    return;
+  }
+
+  const name = fullName || 'Volunteer';
+  const html = wrapHtml(`
+    <p>Hi ${name},</p>
+    <p>Your Primap account has been re-enabled. You can now log in and access the platform again.</p>
+    <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://primap.org'}/login" class="button">Log In</a>
+  `);
+
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: 'Primap Account Re-enabled',
+      html,
+    });
+  } catch (error) {
+    console.error('Failed to send account enabled email:', error);
+  }
+}
+
 export async function sendSlotCancellationEmail(
   recipients: string[],
   slotInfo: { date: string; time: string; location: string },

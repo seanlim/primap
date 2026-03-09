@@ -3,12 +3,13 @@
 import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Search, Users } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, Search, Users } from 'lucide-react'
 import { approveUser, rejectUser, disableUser, enableUser, setUserRole } from '@/lib/actions/admin-user-actions'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { ToastProvider, useToast } from '@/components/ui/toast'
 import { EmptyState } from '@/components/ui/empty-state'
-import type { UserRole, UserStatus } from '@/lib/types/database'
+import type { UserRole } from '@/lib/types/database'
+import type { UserStatus } from '@/lib/auth/access-policy'
 
 interface UserData {
   id: string
@@ -27,7 +28,24 @@ interface PendingAction {
   action: ActionType
 }
 
-function UsersContent({ users }: { users: UserData[] }) {
+interface UsersProps {
+  users: UserData[]
+  currentPage: number
+  totalCount: number
+  pageSize: number
+  statusCounts: Record<UserStatus, number>
+}
+
+const ACTION_LABELS: Record<ActionType, { title: string; message: (name: string) => string; confirm: string; destructive?: boolean }> = {
+  approve: { title: 'Approve account?', message: (name) => `Approve ${name}'s account?`, confirm: 'Approve' },
+  reject: { title: 'Reject account?', message: (name) => `Reject ${name}'s account?`, confirm: 'Reject', destructive: true },
+  disable: { title: 'Disable account?', message: (name) => `Disable ${name}'s account?`, confirm: 'Disable', destructive: true },
+  enable: { title: 'Enable account?', message: (name) => `Enable ${name}'s account?`, confirm: 'Enable' },
+  promote: { title: 'Promote to admin?', message: (name) => `Grant admin role to ${name}?`, confirm: 'Promote' },
+  demote: { title: 'Demote to volunteer?', message: (name) => `Remove admin role from ${name}?`, confirm: 'Demote', destructive: true },
+}
+
+function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts }: UsersProps) {
   const [filter, setFilter] = useState<'all' | UserStatus>('all')
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState<string | null>(null)
@@ -36,10 +54,11 @@ function UsersContent({ users }: { users: UserData[] }) {
   const { showToast } = useToast()
   const actionInFlightRef = useRef(false)
 
+  const totalPages = Math.ceil(totalCount / pageSize)
+
   const filteredUsers = useMemo(() => {
     const byStatus = filter === 'all' ? users : users.filter((u) => u.status === filter)
     const normalized = query.trim().toLowerCase()
-
     if (!normalized) return byStatus
 
     return byStatus.filter((u) =>
@@ -48,21 +67,8 @@ function UsersContent({ users }: { users: UserData[] }) {
     )
   }, [users, filter, query])
 
-  const statusCounts: Record<UserStatus, number> = {
-    PENDING: users.filter((u) => u.status === 'PENDING').length,
-    ACTIVE: users.filter((u) => u.status === 'ACTIVE').length,
-    REJECTED: users.filter((u) => u.status === 'REJECTED').length,
-    DISABLED: users.filter((u) => u.status === 'DISABLED').length,
-  }
-
-  const labels: Record<ActionType, { title: string; message: (name: string) => string; confirm: string; destructive?: boolean }> = {
-    approve: { title: 'Approve account?', message: (name) => `Approve ${name}'s account?`, confirm: 'Approve' },
-    reject: { title: 'Reject account?', message: (name) => `Reject ${name}'s account?`, confirm: 'Reject', destructive: true },
-    disable: { title: 'Disable account?', message: (name) => `Disable ${name}'s account?`, confirm: 'Disable', destructive: true },
-    enable: { title: 'Enable account?', message: (name) => `Enable ${name}'s account?`, confirm: 'Enable' },
-    promote: { title: 'Promote to admin?', message: (name) => `Grant admin role to ${name}?`, confirm: 'Promote' },
-    demote: { title: 'Demote to volunteer?', message: (name) => `Remove admin role from ${name}?`, confirm: 'Demote', destructive: true },
-  }
+  const requestAction = (userId: string, userLabel: string, action: ActionType) =>
+    setPendingAction({ userId, userLabel, action })
 
   const runAction = async (action: PendingAction) => {
     if (actionInFlightRef.current) return
@@ -94,12 +100,10 @@ function UsersContent({ users }: { users: UserData[] }) {
 
     if (result.error) {
       showToast(result.error, 'error')
-      setLoading(null)
-      actionInFlightRef.current = false
-      return
+    } else {
+      showToast('User updated successfully.', 'success')
     }
 
-    showToast('User updated successfully.', 'success')
     setLoading(null)
     actionInFlightRef.current = false
     router.refresh()
@@ -136,7 +140,7 @@ function UsersContent({ users }: { users: UserData[] }) {
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              {value === 'all' ? `All (${users.length})` : `${value} (${statusCounts[value]})`}
+              {value === 'all' ? `All (${totalCount})` : `${value} (${statusCounts[value]})`}
             </button>
           ))}
         </div>
@@ -178,14 +182,14 @@ function UsersContent({ users }: { users: UserData[] }) {
                     {user.status === 'PENDING' && (
                       <>
                         <button
-                          onClick={() => setPendingAction({ userId: user.id, userLabel: user.fullName || user.email, action: 'approve' })}
+                          onClick={() => requestAction(user.id, user.fullName || user.email, 'approve')}
                           disabled={loading === user.id}
                           className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 disabled:opacity-50"
                         >
                           Approve
                         </button>
                         <button
-                          onClick={() => setPendingAction({ userId: user.id, userLabel: user.fullName || user.email, action: 'reject' })}
+                          onClick={() => requestAction(user.id, user.fullName || user.email, 'reject')}
                           disabled={loading === user.id}
                           className="text-xs bg-red-100 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-200 disabled:opacity-50"
                         >
@@ -196,14 +200,14 @@ function UsersContent({ users }: { users: UserData[] }) {
                     {user.status === 'ACTIVE' && (
                       <>
                         <button
-                          onClick={() => setPendingAction({ userId: user.id, userLabel: user.fullName || user.email, action: user.role === 'ADMIN' ? 'demote' : 'promote' })}
+                          onClick={() => requestAction(user.id, user.fullName || user.email, user.role === 'ADMIN' ? 'demote' : 'promote')}
                           disabled={loading === user.id}
                           className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg hover:bg-blue-200 disabled:opacity-50"
                         >
                           {user.role === 'ADMIN' ? 'Demote' : 'Promote'}
                         </button>
                         <button
-                          onClick={() => setPendingAction({ userId: user.id, userLabel: user.fullName || user.email, action: 'disable' })}
+                          onClick={() => requestAction(user.id, user.fullName || user.email, 'disable')}
                           disabled={loading === user.id}
                           className="text-xs bg-red-100 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-200 disabled:opacity-50"
                         >
@@ -213,7 +217,7 @@ function UsersContent({ users }: { users: UserData[] }) {
                     )}
                     {(user.status === 'DISABLED' || user.status === 'REJECTED') && (
                       <button
-                        onClick={() => setPendingAction({ userId: user.id, userLabel: user.fullName || user.email, action: 'enable' })}
+                        onClick={() => requestAction(user.id, user.fullName || user.email, 'enable')}
                         disabled={loading === user.id}
                         className="text-xs bg-green-100 text-green-700 px-3 py-1.5 rounded-lg hover:bg-green-200 disabled:opacity-50"
                       >
@@ -226,14 +230,48 @@ function UsersContent({ users }: { users: UserData[] }) {
             ))}
           </div>
         )}
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between">
+            <Link
+              href={`/admin/users?page=${currentPage - 1}`}
+              className={`flex items-center gap-1 text-sm font-medium px-3 py-2 rounded-lg transition-colors ${
+                currentPage <= 1
+                  ? 'text-gray-300 pointer-events-none'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+              aria-disabled={currentPage <= 1}
+              tabIndex={currentPage <= 1 ? -1 : undefined}
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Previous
+            </Link>
+            <span className="text-sm text-gray-500">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Link
+              href={`/admin/users?page=${currentPage + 1}`}
+              className={`flex items-center gap-1 text-sm font-medium px-3 py-2 rounded-lg transition-colors ${
+                currentPage >= totalPages
+                  ? 'text-gray-300 pointer-events-none'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+              aria-disabled={currentPage >= totalPages}
+              tabIndex={currentPage >= totalPages ? -1 : undefined}
+            >
+              Next
+              <ChevronRight className="w-4 h-4" />
+            </Link>
+          </div>
+        )}
       </div>
 
       <ConfirmationDialog
         open={Boolean(pendingAction)}
-        title={pendingAction ? labels[pendingAction.action].title : ''}
-        message={pendingAction ? labels[pendingAction.action].message(pendingAction.userLabel) : ''}
-        confirmLabel={pendingAction ? labels[pendingAction.action].confirm : 'Confirm'}
-        destructive={pendingAction ? Boolean(labels[pendingAction.action].destructive) : false}
+        title={pendingAction ? ACTION_LABELS[pendingAction.action].title : ''}
+        message={pendingAction ? ACTION_LABELS[pendingAction.action].message(pendingAction.userLabel) : ''}
+        confirmLabel={pendingAction ? ACTION_LABELS[pendingAction.action].confirm : 'Confirm'}
+        destructive={pendingAction ? Boolean(ACTION_LABELS[pendingAction.action].destructive) : false}
         onCancel={() => {
           if (loading) return
           setPendingAction(null)
@@ -245,10 +283,10 @@ function UsersContent({ users }: { users: UserData[] }) {
   )
 }
 
-export function UsersClient({ users }: { users: UserData[] }) {
+export function UsersClient(props: UsersProps) {
   return (
     <ToastProvider>
-      <UsersContent users={users} />
+      <UsersContent {...props} />
     </ToastProvider>
   )
 }

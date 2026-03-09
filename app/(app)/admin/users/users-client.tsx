@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Search, Users } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, Search, Users } from 'lucide-react'
 import { approveUser, rejectUser, disableUser, enableUser, setUserRole } from '@/lib/actions/admin-user-actions'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { ToastProvider, useToast } from '@/components/ui/toast'
@@ -27,7 +27,15 @@ interface PendingAction {
   action: ActionType
 }
 
-function UsersContent({ users }: { users: UserData[] }) {
+interface UsersContentProps {
+  users: UserData[]
+  currentPage: number
+  totalCount: number
+  pageSize: number
+  statusCounts: Record<UserStatus, number>
+}
+
+function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts }: UsersContentProps) {
   const [filter, setFilter] = useState<'all' | UserStatus>('all')
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState<string | null>(null)
@@ -35,6 +43,8 @@ function UsersContent({ users }: { users: UserData[] }) {
   const router = useRouter()
   const { showToast } = useToast()
   const actionInFlightRef = useRef(false)
+
+  const totalPages = Math.ceil(totalCount / pageSize)
 
   const filteredUsers = useMemo(() => {
     const byStatus = filter === 'all' ? users : users.filter((u) => u.status === filter)
@@ -47,13 +57,6 @@ function UsersContent({ users }: { users: UserData[] }) {
       u.email.toLowerCase().includes(normalized)
     )
   }, [users, filter, query])
-
-  const statusCounts: Record<UserStatus, number> = {
-    PENDING: users.filter((u) => u.status === 'PENDING').length,
-    ACTIVE: users.filter((u) => u.status === 'ACTIVE').length,
-    REJECTED: users.filter((u) => u.status === 'REJECTED').length,
-    DISABLED: users.filter((u) => u.status === 'DISABLED').length,
-  }
 
   const labels: Record<ActionType, { title: string; message: (name: string) => string; confirm: string; destructive?: boolean }> = {
     approve: { title: 'Approve account?', message: (name) => `Approve ${name}'s account?`, confirm: 'Approve' },
@@ -136,7 +139,7 @@ function UsersContent({ users }: { users: UserData[] }) {
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              {value === 'all' ? `All (${users.length})` : `${value} (${statusCounts[value]})`}
+              {value === 'all' ? `All (${totalCount})` : `${value} (${statusCounts[value]})`}
             </button>
           ))}
         </div>
@@ -228,6 +231,38 @@ function UsersContent({ users }: { users: UserData[] }) {
         )}
       </div>
 
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-4">
+          <Link
+            href={`/admin/users?page=${currentPage - 1}`}
+            className={`flex items-center gap-1 text-sm font-medium px-3 py-2 rounded-lg transition-colors ${
+              currentPage <= 1
+                ? 'text-gray-300 pointer-events-none'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+            aria-disabled={currentPage <= 1}
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Previous
+          </Link>
+          <span className="text-sm text-gray-500">
+            Page {currentPage} of {totalPages}
+          </span>
+          <Link
+            href={`/admin/users?page=${currentPage + 1}`}
+            className={`flex items-center gap-1 text-sm font-medium px-3 py-2 rounded-lg transition-colors ${
+              currentPage >= totalPages
+                ? 'text-gray-300 pointer-events-none'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+            aria-disabled={currentPage >= totalPages}
+          >
+            Next
+            <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+      )}
+
       <ConfirmationDialog
         open={Boolean(pendingAction)}
         title={pendingAction ? labels[pendingAction.action].title : ''}
@@ -245,10 +280,16 @@ function UsersContent({ users }: { users: UserData[] }) {
   )
 }
 
-export function UsersClient({ users }: { users: UserData[] }) {
+export function UsersClient({ users, currentPage, totalCount, pageSize, statusCounts }: UsersContentProps) {
   return (
     <ToastProvider>
-      <UsersContent users={users} />
+      <UsersContent
+        users={users}
+        currentPage={currentPage}
+        totalCount={totalCount}
+        pageSize={pageSize}
+        statusCounts={statusCounts}
+      />
     </ToastProvider>
   )
 }

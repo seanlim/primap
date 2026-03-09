@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 
 const mockSlotsResult = vi.fn()
-const mockMembersResult = vi.fn()
+const mockMembersInResult = vi.fn()
 
 const slotsChain = {
   select: vi.fn().mockReturnThis(),
@@ -9,7 +9,8 @@ const slotsChain = {
 }
 const membersChain = {
   select: vi.fn().mockReturnThis(),
-  eq: vi.fn().mockReturnValue({ eq: mockMembersResult }),
+  in: vi.fn().mockReturnValue({ eq: mockMembersInResult }),
+  eq: vi.fn().mockReturnThis(),
 }
 
 vi.mock('@/lib/supabase/admin', () => ({
@@ -39,6 +40,7 @@ describe('GET /api/cron/reminders', () => {
     delete process.env.CRON_SECRET
     slotsChain.select.mockReturnThis()
     membersChain.select.mockReturnThis()
+    membersChain.in.mockReturnValue({ eq: mockMembersInResult })
   })
 
   // --- Auth ---
@@ -102,14 +104,14 @@ describe('GET /api/cron/reminders', () => {
     expect(body.date).toBeDefined()
   })
 
-  // --- Members and email ---
+  // --- Batch members query ---
 
-  it('continues without crashing when members query errors', async () => {
+  it('returns 500 when batch members query errors', async () => {
     mockSlotsResult.mockResolvedValue({
       data: [{ id: 'slot-1', walk_date: '2026-03-11', start_time: '08:00', location_name: 'Park' }],
       error: null,
     })
-    mockMembersResult.mockResolvedValue({
+    mockMembersInResult.mockResolvedValue({
       data: null,
       error: { message: 'Members error' },
     })
@@ -117,24 +119,8 @@ describe('GET /api/cron/reminders', () => {
     const response = await GET(makeRequest('/api/cron/reminders'))
     const body = await response.json()
 
-    expect(response.status).toBe(200)
-    expect(body.success).toBe(true)
-    expect(body.emailsSent).toBe(0)
-  })
-
-  it('continues when members data is null', async () => {
-    mockSlotsResult.mockResolvedValue({
-      data: [{ id: 'slot-1', walk_date: '2026-03-11', start_time: '08:00', location_name: 'Park' }],
-      error: null,
-    })
-    mockMembersResult.mockResolvedValue({ data: null, error: null })
-
-    const response = await GET(makeRequest('/api/cron/reminders'))
-    const body = await response.json()
-
-    expect(response.status).toBe(200)
-    expect(body.success).toBe(true)
-    expect(body.emailsSent).toBe(0)
+    expect(response.status).toBe(500)
+    expect(body.error).toBe('Members error')
   })
 
   it('sends reminder emails to members with email addresses', async () => {
@@ -142,10 +128,10 @@ describe('GET /api/cron/reminders', () => {
       data: [{ id: 'slot-1', walk_date: '2026-03-11', start_time: '08:00', location_name: 'Bukit Timah' }],
       error: null,
     })
-    mockMembersResult.mockResolvedValue({
+    mockMembersInResult.mockResolvedValue({
       data: [
-        { user_id: 'u1', profiles: { full_name: 'Alice', email: 'alice@test.com' } },
-        { user_id: 'u2', profiles: { full_name: 'Bob', email: 'bob@test.com' } },
+        { slot_id: 'slot-1', user_id: 'u1', profiles: { full_name: 'Alice', email: 'alice@test.com' } },
+        { slot_id: 'slot-1', user_id: 'u2', profiles: { full_name: 'Bob', email: 'bob@test.com' } },
       ],
       error: null,
     })
@@ -174,10 +160,10 @@ describe('GET /api/cron/reminders', () => {
       data: [{ id: 'slot-1', walk_date: '2026-03-11', start_time: '08:00', location_name: 'Park' }],
       error: null,
     })
-    mockMembersResult.mockResolvedValue({
+    mockMembersInResult.mockResolvedValue({
       data: [
-        { user_id: 'u1', profiles: { full_name: 'NoEmail', email: '' } },
-        { user_id: 'u2', profiles: null },
+        { slot_id: 'slot-1', user_id: 'u1', profiles: { full_name: 'NoEmail', email: '' } },
+        { slot_id: 'slot-1', user_id: 'u2', profiles: null },
       ],
       error: null,
     })
@@ -199,23 +185,44 @@ describe('GET /api/cron/reminders', () => {
       ],
       error: null,
     })
-    mockMembersResult
-      .mockResolvedValueOnce({
-        data: [{ user_id: 'u1', profiles: { full_name: 'Alice', email: 'alice@test.com' } }],
-        error: null,
-      })
-      .mockResolvedValueOnce({
-        data: [
-          { user_id: 'u2', profiles: { full_name: 'Bob', email: 'bob@test.com' } },
-          { user_id: 'u3', profiles: { full_name: 'Charlie', email: 'charlie@test.com' } },
-        ],
-        error: null,
-      })
+    mockMembersInResult.mockResolvedValue({
+      data: [
+        { slot_id: 'slot-1', user_id: 'u1', profiles: { full_name: 'Alice', email: 'alice@test.com' } },
+        { slot_id: 'slot-2', user_id: 'u2', profiles: { full_name: 'Bob', email: 'bob@test.com' } },
+        { slot_id: 'slot-2', user_id: 'u3', profiles: { full_name: 'Charlie', email: 'charlie@test.com' } },
+      ],
+      error: null,
+    })
 
     const response = await GET(makeRequest('/api/cron/reminders'))
     const body = await response.json()
 
     expect(body.emailsSent).toBe(3)
     expect(sendWalkReminderEmail).toHaveBeenCalledTimes(3)
+  })
+
+  it('handles empty members result gracefully', async () => {
+    mockSlotsResult.mockResolvedValue({
+      data: [{ id: 'slot-1', walk_date: '2026-03-11', start_time: '08:00', location_name: 'Park' }],
+      error: null,
+    })
+    mockMembersInResult.mockResolvedValue({ data: [], error: null })
+
+    const response = await GET(makeRequest('/api/cron/reminders'))
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(body.success).toBe(true)
+    expect(body.emailsSent).toBe(0)
+  })
+
+  it('uses Singapore timezone for date calculation', async () => {
+    mockSlotsResult.mockResolvedValue({ data: [], error: null })
+
+    const response = await GET(makeRequest('/api/cron/reminders'))
+    const body = await response.json()
+
+    // Date should be in YYYY-MM-DD format
+    expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 })

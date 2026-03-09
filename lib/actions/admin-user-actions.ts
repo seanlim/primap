@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sendAccountApprovedEmail } from '@/lib/email'
 
 async function requireAdmin() {
   const supabase = await createClient()
@@ -15,13 +16,11 @@ async function requireAdmin() {
     .single()
 
   if (profile?.role !== 'ADMIN') throw new Error('Not authorized')
-  return supabase
+  return { supabase, adminId: user.id }
 }
 
-import { sendAccountApprovedEmail } from '@/lib/email'
-
 export async function approveUser(userId: string) {
-  const supabase = await requireAdmin()
+  const { supabase } = await requireAdmin()
   const { data: updatedProfile, error } = await supabase
     .from('profiles')
     .update({ status: 'ACTIVE', updated_at: new Date().toISOString() })
@@ -30,7 +29,7 @@ export async function approveUser(userId: string) {
     .single()
 
   if (error) return { error: error.message }
-  
+
   if (updatedProfile) {
     await sendAccountApprovedEmail(updatedProfile.email, updatedProfile.full_name)
   }
@@ -40,11 +39,15 @@ export async function approveUser(userId: string) {
 }
 
 export async function rejectUser(userId: string) {
-  const supabase = await requireAdmin()
+  const { supabase, adminId } = await requireAdmin()
+  if (userId === adminId) return { error: 'Cannot reject your own account' }
+
   const { error } = await supabase
     .from('profiles')
     .update({ status: 'REJECTED', updated_at: new Date().toISOString() })
     .eq('id', userId)
+    .select('id')
+    .single()
 
   if (error) return { error: error.message }
   revalidatePath('/admin/users')
@@ -52,11 +55,15 @@ export async function rejectUser(userId: string) {
 }
 
 export async function disableUser(userId: string) {
-  const supabase = await requireAdmin()
+  const { supabase, adminId } = await requireAdmin()
+  if (userId === adminId) return { error: 'Cannot disable your own account' }
+
   const { error } = await supabase
     .from('profiles')
     .update({ status: 'DISABLED', updated_at: new Date().toISOString() })
     .eq('id', userId)
+    .select('id')
+    .single()
 
   if (error) return { error: error.message }
   revalidatePath('/admin/users')
@@ -64,11 +71,13 @@ export async function disableUser(userId: string) {
 }
 
 export async function enableUser(userId: string) {
-  const supabase = await requireAdmin()
+  const { supabase } = await requireAdmin()
   const { error } = await supabase
     .from('profiles')
     .update({ status: 'ACTIVE', updated_at: new Date().toISOString() })
     .eq('id', userId)
+    .select('id')
+    .single()
 
   if (error) return { error: error.message }
   revalidatePath('/admin/users')
@@ -76,11 +85,15 @@ export async function enableUser(userId: string) {
 }
 
 export async function setUserRole(userId: string, role: 'ADMIN' | 'VOLUNTEER') {
-  const supabase = await requireAdmin()
+  const { supabase, adminId } = await requireAdmin()
+  if (userId === adminId && role === 'VOLUNTEER') return { error: 'Cannot demote your own account' }
+
   const { error } = await supabase
     .from('profiles')
     .update({ role, updated_at: new Date().toISOString() })
     .eq('id', userId)
+    .select('id')
+    .single()
 
   if (error) return { error: error.message }
   revalidatePath('/admin/users')

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, AlertTriangle, CheckCircle } from 'lucide-react'
 import { resolveIncident } from '@/lib/actions/admin-round-actions'
+import { formatDate } from '@/lib/utils/format-date'
 
 const TYPE_LABELS: Record<string, string> = {
   INJURED_ANIMAL: 'Injured Animal',
@@ -63,7 +64,7 @@ export function IncidentsClient({ incidents }: { incidents: IncidentData[] }) {
                 <p className="font-medium text-gray-900">{TYPE_LABELS[inc.type] || inc.type}</p>
                 <p className="text-sm text-gray-700 mt-1">{inc.description}</p>
                 <p className="text-xs text-gray-400 mt-2">
-                  {inc.locationName} &middot; {new Date(inc.walkDate).toLocaleDateString('en-SG')}
+                  {inc.locationName} &middot; {formatDate(inc.walkDate)}
                   &middot; by {inc.reportedBy}
                 </p>
                 {inc.resolved && inc.resolvedNotes && (

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Plus } from 'lucide-react'
 import { createRound, updateRoundStatus, deleteRound } from '@/lib/actions/admin-round-actions'
+import { formatDate } from '@/lib/utils/format-date'
 
 interface RoundData {
   id: string
@@ -119,7 +120,7 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
                 <p className="font-semibold text-gray-900">{round.name}</p>
                 {round.description && <p className="text-sm text-gray-500 mt-0.5">{round.description}</p>}
                 <p className="text-xs text-gray-400 mt-1">
-                  {new Date(round.startDate).toLocaleDateString('en-SG')} - {new Date(round.endDate).toLocaleDateString('en-SG')}
+                  {formatDate(round.startDate)} - {formatDate(round.endDate)}
                   &middot; {round.slotCount} slot(s)
                 </p>
               </div>

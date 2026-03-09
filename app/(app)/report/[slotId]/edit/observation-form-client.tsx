@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
+import { formatDate } from '@/lib/utils/format-date'
 import { saveDraft, submitObservation } from '@/lib/actions/observation-actions'
 import { LocationPicker } from '@/components/map/location-picker'
 import { MediaUploader, type MediaItem } from '@/components/report/media-uploader'
@@ -255,9 +256,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
       <div>
         <h1 className="text-xl font-bold text-gray-900">Edit Report</h1>
         <p className="text-sm text-gray-500 mt-1">
-          {slot.locationName} &middot; {new Date(slot.walkDate).toLocaleDateString('en-SG', {
-            day: 'numeric', month: 'short'
-          })}
+          {slot.locationName} &middot; {formatDate(slot.walkDate, 'compact')}
         </p>
       </div>
 

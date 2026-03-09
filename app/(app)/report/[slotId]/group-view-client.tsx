@@ -7,6 +7,7 @@ import { ArrowLeft, ChevronDown, ChevronUp, MapPin, Eye, AlertTriangle, Loader2 
 import { submitObservation } from '@/lib/actions/observation-actions'
 import { reportIncident } from '@/lib/actions/incident-actions'
 import { getSignedMediaUrl } from '@/lib/utils/storage'
+import { formatDate } from '@/lib/utils/format-date'
 
 interface SightingData {
   id: string
@@ -106,9 +107,7 @@ export function GroupViewClient({ slot, observations, members, incidents, curren
         <p className="text-xs text-green-600 font-medium">{slot.roundName}</p>
         <h1 className="text-xl font-bold text-gray-900 mt-1">{slot.locationName}</h1>
         <p className="text-sm text-gray-500 mt-1">
-          {new Date(slot.walkDate).toLocaleDateString('en-SG', {
-            weekday: 'long', day: 'numeric', month: 'long'
-          })} &middot; {slot.startTime.slice(0, 5)} - {slot.endTime.slice(0, 5)}
+          {formatDate(slot.walkDate, 'full')} &middot; {slot.startTime.slice(0, 5)} - {slot.endTime.slice(0, 5)}
         </p>
       </div>
 
@@ -147,7 +146,7 @@ export function GroupViewClient({ slot, observations, members, incidents, curren
             </div>
             {myObservation.status === 'SUBMITTED' && myObservation.submittedAt && (
               <p className="text-xs text-gray-400 mt-0.5">
-                Submitted {new Date(myObservation.submittedAt).toLocaleDateString('en-SG')}
+                Submitted {formatDate(myObservation.submittedAt)}
               </p>
             )}
           </div>
@@ -232,7 +231,7 @@ export function GroupViewClient({ slot, observations, members, incidents, curren
                   </p>
                   <p className="text-sm text-red-700 mt-1">{inc.description}</p>
                   <p className="text-xs text-red-400 mt-2">
-                    Reported by {inc.reportedBy} &middot; {new Date(inc.createdAt).toLocaleDateString('en-SG')}
+                    Reported by {inc.reportedBy} &middot; {formatDate(inc.createdAt)}
                   </p>
                 </div>
               </div>

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import { GroupViewClient } from './group-view-client'
+import type { ProfileNameRef } from '@/lib/types/supabase-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -61,46 +62,55 @@ export default async function SlotReportPage({
         endTime: slot.end_time,
         roundName: round?.name || '',
       }}
-      observations={(observations || []).map(obs => ({
-        id: obs.id,
-        userId: obs.user_id,
-        userName: (obs.profiles as unknown as { full_name: string | null; email: string })?.full_name || (obs.profiles as unknown as { email: string })?.email || 'Unknown',
-        walkCompletion: obs.walk_completion,
-        outcome: obs.outcome,
-        notes: obs.notes,
-        lat: obs.lat,
-        lng: obs.lng,
-        status: obs.status,
-        submittedAt: obs.submitted_at,
-        sightings: ((obs.sightings as unknown as Array<{
-          id: string; species: string; count: string;
-          observed_at: string | null; lat: number; lng: number; notes: string | null;
-          media: Array<{ id: string; file_path: string; file_name: string; media_type: string }>
-        }>) || []).map(s => ({
-          id: s.id,
-          species: s.species,
-          count: s.count,
-          observedAt: s.observed_at,
-          lat: s.lat,
-          lng: s.lng,
-          notes: s.notes,
-          media: s.media || [],
-        })),
-        media: (obs.media as unknown as Array<{ id: string; file_path: string; file_name: string; media_type: string }>) || [],
-      }))}
-      members={(members || []).map(m => ({
-        userId: m.user_id,
-        fullName: (m.profiles as unknown as { full_name: string | null })?.full_name || null,
-        email: (m.profiles as unknown as { email: string })?.email || '',
-      }))}
-      incidents={(incidents || []).map(inc => ({
-        id: inc.id,
-        type: inc.incident_type,
-        description: inc.description,
-        reportedBy: (inc.profiles as unknown as { full_name: string | null; email: string })?.full_name || (inc.profiles as unknown as { email: string })?.email || 'Unknown',
-        createdAt: inc.created_at,
-        resolved: inc.resolved,
-      }))}
+      observations={(observations || []).map(obs => {
+        const profile = obs.profiles as unknown as ProfileNameRef
+        return {
+          id: obs.id,
+          userId: obs.user_id,
+          userName: profile?.full_name || profile?.email || 'Unknown',
+          walkCompletion: obs.walk_completion,
+          outcome: obs.outcome,
+          notes: obs.notes,
+          lat: obs.lat,
+          lng: obs.lng,
+          status: obs.status,
+          submittedAt: obs.submitted_at,
+          sightings: ((obs.sightings as unknown as Array<{
+            id: string; species: string; count: string;
+            observed_at: string | null; lat: number; lng: number; notes: string | null;
+            media: Array<{ id: string; file_path: string; file_name: string; media_type: string }>
+          }>) || []).map(s => ({
+            id: s.id,
+            species: s.species,
+            count: s.count,
+            observedAt: s.observed_at,
+            lat: s.lat,
+            lng: s.lng,
+            notes: s.notes,
+            media: s.media || [],
+          })),
+          media: (obs.media as unknown as Array<{ id: string; file_path: string; file_name: string; media_type: string }>) || [],
+        }
+      })}
+      members={(members || []).map(m => {
+        const profile = m.profiles as unknown as ProfileNameRef
+        return {
+          userId: m.user_id,
+          fullName: profile?.full_name || null,
+          email: profile?.email || '',
+        }
+      })}
+      incidents={(incidents || []).map(inc => {
+        const profile = inc.profiles as unknown as ProfileNameRef
+        return {
+          id: inc.id,
+          type: inc.incident_type,
+          description: inc.description,
+          reportedBy: profile?.full_name || profile?.email || 'Unknown',
+          createdAt: inc.created_at,
+          resolved: inc.resolved,
+        }
+      })}
       currentUserId={user.id}
     />
   )

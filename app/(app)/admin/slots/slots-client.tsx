@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
 import { createSlot, deleteSlot } from '@/lib/actions/admin-round-actions'
+import { formatDate } from '@/lib/utils/format-date'
 
 interface SlotData {
   id: string
@@ -128,7 +129,7 @@ export function SlotsClient({ slots, rounds }: {
             <div>
               <p className="font-medium text-gray-900">{slot.locationName}</p>
               <p className="text-sm text-gray-500">
-                {new Date(slot.walkDate).toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' })}
+                {formatDate(slot.walkDate, 'compact')}
                 &middot; {slot.startTime.slice(0, 5)} - {slot.endTime.slice(0, 5)}
               </p>
               <p className="text-xs text-gray-400 mt-0.5">

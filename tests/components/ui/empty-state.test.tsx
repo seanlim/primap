@@ -2,9 +2,13 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { EmptyState } from '@/components/ui/empty-state'
 
-const MockIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg {...props} data-testid="icon" />
-)
+import type { LucideIcon } from 'lucide-react'
+import React from 'react'
+
+const MockIcon = React.forwardRef<SVGSVGElement, React.SVGProps<SVGSVGElement>>((props, ref) => (
+  <svg {...props} ref={ref} data-testid="icon" />
+)) as unknown as LucideIcon
+MockIcon.displayName = 'MockIcon'
 
 describe('EmptyState', () => {
   it('renders title', () => {

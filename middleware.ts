@@ -46,14 +46,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Only query profile for admin routes or status-gated pages
-  // Skip for regular app pages to reduce latency
-  const needsProfileCheck = user && !isPublicPath && pathname !== '/' && (
-    pathname.startsWith('/admin') ||
-    pathname === '/home' ||
-    pathname === '/pending' ||
-    pathname === '/blocked'
-  )
+  // Check profile status on all authenticated routes
+  const needsProfileCheck = user && !isPublicPath && pathname !== '/'
 
   if (needsProfileCheck) {
     const { data: profile } = await supabase

@@ -108,7 +108,7 @@ export default async function ProfilePage() {
           startTime: slot?.start_time || '',
           roundName: slot?.survey_rounds?.name || '',
           reportStatus: !obs ? 'none' : obs.status as string,
-          sightingCount: obs?.outcome === 'SIGHTED' ? (obs.sightings?.length || 0) : 0,
+          sightingCount: obs?.outcome === 'SIGHTED' ? ((obs.sightings as unknown as { count: number }[])?.[0]?.count || 0) : 0,
         }
       })}
     />

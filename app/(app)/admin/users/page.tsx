@@ -10,24 +10,29 @@ const ALL_STATUSES: UserStatus[] = ['PENDING', 'ACTIVE', 'REJECTED', 'DISABLED']
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>
+  searchParams: Promise<{ page?: string; status?: string }>
 }) {
   const params = await searchParams
   const page = Math.max(1, Number(params.page) || 1)
+  const statusFilter = ALL_STATUSES.includes(params.status as UserStatus)
+    ? (params.status as UserStatus)
+    : null
   const from = (page - 1) * PAGE_SIZE
   const to = from + PAGE_SIZE - 1
 
   const supabase = await createClient()
 
   const [{ data: users }, { count: totalCount }, ...statusResults] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .range(from, to),
-    supabase
-      .from('profiles')
-      .select('id', { count: 'exact', head: true }),
+    (() => {
+      let q = supabase.from('profiles').select('*').order('created_at', { ascending: false })
+      if (statusFilter) q = q.eq('status', statusFilter)
+      return q.range(from, to)
+    })(),
+    (() => {
+      let q = supabase.from('profiles').select('id', { count: 'exact', head: true })
+      if (statusFilter) q = q.eq('status', statusFilter)
+      return q
+    })(),
     ...ALL_STATUSES.map(s =>
       supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('status', s)
     ),
@@ -51,6 +56,7 @@ export default async function AdminUsersPage({
       totalCount={totalCount || 0}
       pageSize={PAGE_SIZE}
       statusCounts={statusCounts}
+      activeFilter={statusFilter}
     />
   )
 }

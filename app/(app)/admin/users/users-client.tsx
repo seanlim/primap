@@ -34,6 +34,7 @@ interface UsersProps {
   totalCount: number
   pageSize: number
   statusCounts: Record<UserStatus, number>
+  activeFilter: UserStatus | null
 }
 
 const ACTION_LABELS: Record<ActionType, { title: string; message: (name: string) => string; confirm: string; destructive?: boolean }> = {
@@ -45,8 +46,8 @@ const ACTION_LABELS: Record<ActionType, { title: string; message: (name: string)
   demote: { title: 'Demote to volunteer?', message: (name) => `Remove admin role from ${name}?`, confirm: 'Demote', destructive: true },
 }
 
-function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts }: UsersProps) {
-  const [filter, setFilter] = useState<'all' | UserStatus>('all')
+function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, activeFilter }: UsersProps) {
+  const filter: 'all' | UserStatus = activeFilter ?? 'all'
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState<string | null>(null)
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
@@ -57,15 +58,14 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts }
   const totalPages = Math.ceil(totalCount / pageSize)
 
   const filteredUsers = useMemo(() => {
-    const byStatus = filter === 'all' ? users : users.filter((u) => u.status === filter)
     const normalized = query.trim().toLowerCase()
-    if (!normalized) return byStatus
+    if (!normalized) return users
 
-    return byStatus.filter((u) =>
+    return users.filter((u) =>
       (u.fullName || '').toLowerCase().includes(normalized) ||
       u.email.toLowerCase().includes(normalized)
     )
-  }, [users, filter, query])
+  }, [users, query])
 
   const requestAction = (userId: string, userLabel: string, action: ActionType) =>
     setPendingAction({ userId, userLabel, action })
@@ -131,17 +131,19 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts }
 
         <div className="flex gap-2 overflow-x-auto">
           {(['all', 'PENDING', 'ACTIVE', 'REJECTED', 'DISABLED'] as const).map((value) => (
-            <button
+            <Link
               key={value}
-              onClick={() => setFilter(value)}
+              href={value === 'all' ? '/admin/users' : `/admin/users?status=${value}`}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
                 filter === value
                   ? 'bg-green-600 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              {value === 'all' ? `All (${totalCount})` : `${value} (${statusCounts[value]})`}
-            </button>
+              {value === 'all'
+                ? `All (${Object.values(statusCounts).reduce((a, b) => a + b, 0)})`
+                : `${value} (${statusCounts[value]})`}
+            </Link>
           ))}
         </div>
 
@@ -234,7 +236,7 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts }
         {totalPages > 1 && (
           <div className="flex items-center justify-between">
             <Link
-              href={`/admin/users?page=${currentPage - 1}`}
+              href={`/admin/users?page=${currentPage - 1}${activeFilter ? `&status=${activeFilter}` : ''}`}
               className={`flex items-center gap-1 text-sm font-medium px-3 py-2 rounded-lg transition-colors ${
                 currentPage <= 1
                   ? 'text-gray-300 pointer-events-none'
@@ -250,7 +252,7 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts }
               Page {currentPage} of {totalPages}
             </span>
             <Link
-              href={`/admin/users?page=${currentPage + 1}`}
+              href={`/admin/users?page=${currentPage + 1}${activeFilter ? `&status=${activeFilter}` : ''}`}
               className={`flex items-center gap-1 text-sm font-medium px-3 py-2 rounded-lg transition-colors ${
                 currentPage >= totalPages
                   ? 'text-gray-300 pointer-events-none'

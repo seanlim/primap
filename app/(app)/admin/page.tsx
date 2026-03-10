@@ -7,33 +7,21 @@ export const dynamic = 'force-dynamic'
 export default async function AdminDashboard() {
   const supabase = await createClient()
 
-  const { count: totalUsers } = await supabase
-    .from('profiles')
-    .select('id', { count: 'exact', head: true })
-
-  const { count: pendingUsers } = await supabase
-    .from('profiles')
-    .select('id', { count: 'exact', head: true })
-    .eq('status', 'PENDING')
-
-  const { count: activeRounds } = await supabase
-    .from('survey_rounds')
-    .select('id', { count: 'exact', head: true })
-    .eq('status', 'OPEN')
-
-  const { count: totalSlots } = await supabase
-    .from('walk_slots')
-    .select('id', { count: 'exact', head: true })
-
-  const { count: totalObservations } = await supabase
-    .from('observations')
-    .select('id', { count: 'exact', head: true })
-    .eq('status', 'SUBMITTED')
-
-  const { count: openIncidents } = await supabase
-    .from('incidents')
-    .select('id', { count: 'exact', head: true })
-    .eq('resolved', false)
+  const [
+    { count: totalUsers },
+    { count: pendingUsers },
+    { count: activeRounds },
+    { count: totalSlots },
+    { count: totalObservations },
+    { count: openIncidents },
+  ] = await Promise.all([
+    supabase.from('profiles').select('id', { count: 'exact', head: true }),
+    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'PENDING'),
+    supabase.from('survey_rounds').select('id', { count: 'exact', head: true }).eq('status', 'OPEN'),
+    supabase.from('walk_slots').select('id', { count: 'exact', head: true }),
+    supabase.from('observations').select('id', { count: 'exact', head: true }).eq('status', 'SUBMITTED'),
+    supabase.from('incidents').select('id', { count: 'exact', head: true }).eq('resolved', false),
+  ])
 
   const cards = [
     { label: 'Users', value: totalUsers || 0, sub: `${pendingUsers || 0} pending`, href: '/admin/users', icon: Users, color: 'bg-blue-50 text-blue-600' },

@@ -1,15 +1,15 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
 import { Clock, Loader2 } from 'lucide-react'
 import { signOut } from '@/lib/actions/auth-actions'
 import { useState } from 'react'
+import { withTimeout } from '@/lib/utils/with-timeout'
 
 export default function PendingPage() {
   const supabase = createClient()
-  const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
+  const [statusMessage, setStatusMessage] = useState('')
 
   const handleSignOut = async () => {
     await signOut()
@@ -17,26 +17,40 @@ export default function PendingPage() {
 
   const handleRefresh = async () => {
     setIsLoading(true)
+    setStatusMessage('')
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await withTimeout(
+        supabase.auth.getUser(),
+        10000,
+        'Status check timed out. Please try again.'
+      )
       
       if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('status')
-          .eq('id', user.id)
-          .single()
+        const { data: profile } = await withTimeout(
+          supabase
+            .from('profiles')
+            .select('status')
+            .eq('id', user.id)
+            .single(),
+          10000,
+          'Status check timed out. Please try again.'
+        )
 
         if (profile?.status === 'ACTIVE') {
-          router.push('/')
+          window.location.assign('/home')
+          return
+        }
+
+        if (profile?.status === 'REJECTED' || profile?.status === 'DISABLED') {
+          window.location.assign('/blocked')
           return
         }
       }
       
-      // If not active or error, refresh the page to get latest server data
-      router.refresh()
+      setStatusMessage('Your account is still pending approval.')
     } catch (error) {
       console.error('Error checking status:', error)
+      setStatusMessage('Unable to check status right now. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -53,6 +67,9 @@ export default function PendingPage() {
           Your account is awaiting admin approval. You&apos;ll be able to access Primap once an admin activates your account.
         </p>
         <div className="space-y-3">
+          {statusMessage && (
+            <p className="text-sm text-gray-600">{statusMessage}</p>
+          )}
           <button
             onClick={handleRefresh}
             disabled={isLoading}

@@ -1,7 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-
-const PUBLIC_PATHS = ['/login', '/auth/callback', '/pending', '/blocked']
+import { isPublicPath, needsProfileCheck, resolveStatusRedirect } from '@/lib/auth/access-policy'
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -30,56 +29,64 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const pathname = request.nextUrl.pathname
 
-  const isPublicPath = PUBLIC_PATHS.some(p => pathname.startsWith(p))
+  const requestIsPublicPath = isPublicPath(pathname)
 
   // Unauthenticated users can only access public paths
-  if (!user && !isPublicPath && pathname !== '/') {
+  if (!user && !requestIsPublicPath && pathname !== '/') {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  // Authenticated users on login page should redirect to home
-  if (user && pathname === '/login') {
+  // Authenticated users on login page should redirect to home,
+  // unless they were redirected here due to profile fetch failure.
+  const loginError = request.nextUrl.searchParams.get('error')
+  if (user && pathname === '/login' && loginError !== 'profile_fetch_failed') {
     const url = request.nextUrl.clone()
     url.pathname = '/home'
     return NextResponse.redirect(url)
   }
 
-  // Only query profile for admin routes or status-gated pages
-  // Skip for regular app pages to reduce latency
-  const needsProfileCheck = user && !isPublicPath && pathname !== '/' && (
-    pathname.startsWith('/admin') ||
-    pathname === '/home' ||
-    pathname === '/pending' ||
-    pathname === '/blocked'
-  )
+  // Check account status for authenticated users across protected pages
+  // and the status landing pages themselves.
+  const profileCheckRequired = needsProfileCheck({
+    hasUser: Boolean(user),
+    pathname,
+    isPublic: requestIsPublicPath,
+  })
 
-  if (needsProfileCheck) {
-    const { data: profile } = await supabase
+  if (profileCheckRequired) {
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('status, role')
       .eq('id', user!.id)
       .single()
 
-    if (profile) {
-      if (profile.status === 'PENDING' && pathname !== '/pending') {
-        const url = request.nextUrl.clone()
-        url.pathname = '/pending'
-        return NextResponse.redirect(url)
-      }
+    if (profileError) {
+      console.error('Failed to fetch profile in middleware:', profileError)
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      url.searchParams.set('error', 'profile_fetch_failed')
+      return NextResponse.redirect(url)
+    }
 
-      if ((profile.status === 'REJECTED' || profile.status === 'DISABLED') && pathname !== '/blocked') {
-        const url = request.nextUrl.clone()
-        url.pathname = '/blocked'
-        return NextResponse.redirect(url)
-      }
+    if (!profile) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/pending'
+      return NextResponse.redirect(url)
+    }
 
-      if (pathname.startsWith('/admin') && profile.role !== 'ADMIN') {
-        const url = request.nextUrl.clone()
-        url.pathname = '/home'
-        return NextResponse.redirect(url)
-      }
+    const statusRedirect = resolveStatusRedirect(profile.status)
+    if (statusRedirect && pathname !== statusRedirect) {
+      const url = request.nextUrl.clone()
+      url.pathname = statusRedirect
+      return NextResponse.redirect(url)
+    }
+
+    if (pathname.startsWith('/admin') && profile.role !== 'ADMIN') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/home'
+      return NextResponse.redirect(url)
     }
   }
 

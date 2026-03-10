@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { withTimeout } from '@/lib/utils/with-timeout'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -10,7 +10,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
-  const router = useRouter()
   const supabase = createClient()
 
   const handleGoogleSignIn = async () => {
@@ -33,12 +32,24 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
-      setError(error.message)
+    try {
+      const { error } = await withTimeout(
+        supabase.auth.signInWithPassword({ email, password }),
+        15000,
+        'Sign in request timed out. Please try again.'
+      )
+      if (error) {
+        setError(error.message)
+        return
+      }
+
+      // Use a hard navigation to avoid stale client state during auth cookie hydration.
+      window.location.assign('/home')
+      return
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to sign in')
+    } finally {
       setLoading(false)
-    } else {
-      router.push('/home')
     }
   }
 

@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { formatDate } from '@/lib/utils/format-date'
+import type { SlotRef } from '@/lib/types/supabase-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,7 +32,7 @@ export default async function ReportListPage() {
 
   // Get user's observations to check report status per slot
   const slotIds = (memberships || []).map(m => {
-    const slot = m.walk_slots as unknown as { id: string }
+    const slot = m.walk_slots as unknown as SlotRef
     return slot?.id
   }).filter(Boolean)
 
@@ -60,11 +62,7 @@ export default async function ReportListPage() {
       ) : (
         <div className="space-y-2">
           {memberships.map((membership) => {
-            const slot = membership.walk_slots as unknown as {
-              id: string; location_name: string; walk_date: string;
-              start_time: string; end_time: string;
-              survey_rounds: { name: string } | null
-            }
+            const slot = membership.walk_slots as unknown as SlotRef
             if (!slot) return null
 
             const obs = observationMap.get(slot.id)
@@ -89,9 +87,7 @@ export default async function ReportListPage() {
                   <div>
                     <p className="font-semibold text-gray-900">{slot.location_name}</p>
                     <p className="text-sm text-gray-600 mt-1">
-                      {new Date(slot.walk_date).toLocaleDateString('en-SG', {
-                        weekday: 'short', day: 'numeric', month: 'short'
-                      })} &middot; {slot.start_time.slice(0, 5)}
+                      {formatDate(slot.walk_date, 'short')} &middot; {slot.start_time.slice(0, 5)}
                     </p>
                     {slot.survey_rounds && (
                       <p className="text-xs text-gray-400 mt-1">{slot.survey_rounds.name}</p>

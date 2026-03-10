@@ -57,7 +57,7 @@ describe('extractExifData', () => {
   })
 
   it('extracts date when GPS is unavailable', async () => {
-    mockGps.mockResolvedValue(null)
+    mockGps.mockResolvedValue(null as never)
     mockParse.mockResolvedValue({ DateTimeOriginal: new Date('2025-06-15T10:30:00Z') })
 
     const result = await extractExifData(makeImageFile())
@@ -68,7 +68,7 @@ describe('extractExifData', () => {
   })
 
   it('returns all nulls when neither GPS nor date is available', async () => {
-    mockGps.mockResolvedValue(null)
+    mockGps.mockResolvedValue(null as never)
     mockParse.mockResolvedValue(null)
 
     const result = await extractExifData(makeImageFile())
@@ -119,7 +119,7 @@ describe('extractExifData', () => {
   })
 
   it('returns null datetime when exifr.parse returns null', async () => {
-    mockGps.mockResolvedValue(null)
+    mockGps.mockResolvedValue(null as never)
     mockParse.mockResolvedValue(null)
 
     const result = await extractExifData(makeImageFile())
@@ -128,7 +128,7 @@ describe('extractExifData', () => {
   })
 
   it('returns null datetime when exifr.gps returns null', async () => {
-    mockGps.mockResolvedValue(null)
+    mockGps.mockResolvedValue(null as never)
     mockParse.mockResolvedValue({ DateTimeOriginal: new Date('2025-03-10T12:00:00Z') })
 
     const result = await extractExifData(makeImageFile())
@@ -139,7 +139,7 @@ describe('extractExifData', () => {
   })
 
   it('ignores DateTimeOriginal when it is a string instead of a Date instance', async () => {
-    mockGps.mockResolvedValue(null)
+    mockGps.mockResolvedValue(null as never)
     mockParse.mockResolvedValue({ DateTimeOriginal: '2025-06-15 10:30:00' })
 
     const result = await extractExifData(makeImageFile())

@@ -12,15 +12,17 @@ const { mockSupabase, methods } = vi.hoisted(() => {
     in: vi.fn(),
     limit: vi.fn(),
     single: vi.fn().mockResolvedValue({ data: null, error: null }),
+    rpc: vi.fn(),
   }
   for (const key of Object.keys(methods) as (keyof typeof methods)[]) {
-    if (key !== 'single') methods[key].mockReturnThis()
+    if (key !== 'single' && key !== 'rpc') methods[key].mockReturnThis()
   }
   const mockSupabase = {
     auth: {
       getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
     },
     from: vi.fn().mockReturnValue(methods),
+    rpc: vi.fn(),
   }
   return { mockSupabase, methods }
 })
@@ -47,6 +49,7 @@ function resetChain() {
   methods.in.mockReturnThis()
   methods.limit.mockReturnThis()
   methods.single.mockResolvedValue({ data: null, error: null })
+  mockSupabase.rpc.mockResolvedValue({ data: null, error: null })
 }
 
 function setupUser(userId = 'user-1') {
@@ -70,32 +73,32 @@ describe('walk-actions', () => {
       expect(result).toEqual({ error: 'Not authenticated' })
     })
 
-    it('inserts membership and creates draft observation on success', async () => {
+    it('calls RPC and returns success', async () => {
       setupUser()
+      mockSupabase.rpc.mockResolvedValue({
+        data: { success: true, membership_id: 'mem-1', observation_id: 'obs-1' },
+        error: null,
+      })
 
       const result = await joinSlot('slot-1')
 
       expect(result).toEqual({ success: true })
-      expect(mockSupabase.from).toHaveBeenCalledWith('slot_memberships')
-      expect(methods.insert).toHaveBeenCalledWith({
-        slot_id: 'slot-1',
-        user_id: 'user-1',
-        status: 'ACTIVE',
-      })
-      expect(mockSupabase.from).toHaveBeenCalledWith('observations')
-      expect(methods.insert).toHaveBeenCalledWith({
-        slot_id: 'slot-1',
-        user_id: 'user-1',
-        status: 'DRAFT',
+      expect(mockSupabase.rpc).toHaveBeenCalledWith('join_slot_with_observation', {
+        p_slot_id: 'slot-1',
+        p_user_id: 'user-1',
       })
       expect(revalidatePath).toHaveBeenCalledWith('/walk')
       expect(revalidatePath).toHaveBeenCalledWith('/walk/slot-1')
+      expect(revalidatePath).toHaveBeenCalledWith('/home')
+      expect(revalidatePath).toHaveBeenCalledWith('/report')
+      expect(revalidatePath).toHaveBeenCalledWith('/report/slot-1')
     })
 
-    it('returns "Slot is full" error', async () => {
+    it('returns "Slot is full" error from RPC', async () => {
       setupUser()
-      methods.insert.mockReturnValueOnce({
-        error: { message: 'Slot is full', code: '' },
+      mockSupabase.rpc.mockResolvedValue({
+        data: { error: 'This walk slot is full.' },
+        error: null,
       })
 
       const result = await joinSlot('slot-1')
@@ -103,10 +106,11 @@ describe('walk-actions', () => {
       expect(result).toEqual({ error: 'This walk slot is full.' })
     })
 
-    it('returns "already joined" error on duplicate (23505)', async () => {
+    it('returns "already joined" error from RPC', async () => {
       setupUser()
-      methods.insert.mockReturnValueOnce({
-        error: { message: 'unique violation', code: '23505' },
+      mockSupabase.rpc.mockResolvedValue({
+        data: { error: 'You have already joined this walk.' },
+        error: null,
       })
 
       const result = await joinSlot('slot-1')
@@ -114,15 +118,32 @@ describe('walk-actions', () => {
       expect(result).toEqual({ error: 'You have already joined this walk.' })
     })
 
-    it('returns generic DB error', async () => {
+    it('returns generic DB error from RPC', async () => {
       setupUser()
-      methods.insert.mockReturnValueOnce({
-        error: { message: 'Unexpected error', code: '' },
+      mockSupabase.rpc.mockResolvedValue({
+        data: null,
+        error: { message: 'Unexpected error' },
       })
 
       const result = await joinSlot('slot-1')
 
       expect(result).toEqual({ error: 'Unexpected error' })
+    })
+
+    it('handles re-join after cancel (RPC reactivates membership)', async () => {
+      setupUser()
+      mockSupabase.rpc.mockResolvedValue({
+        data: { success: true, membership_id: 'mem-1', observation_id: 'obs-1' },
+        error: null,
+      })
+
+      const result = await joinSlot('slot-1')
+
+      expect(result).toEqual({ success: true })
+      expect(mockSupabase.rpc).toHaveBeenCalledWith('join_slot_with_observation', {
+        p_slot_id: 'slot-1',
+        p_user_id: 'user-1',
+      })
     })
   })
 
@@ -165,6 +186,8 @@ describe('walk-actions', () => {
         'Test User'
       )
       expect(revalidatePath).toHaveBeenCalledWith('/walk')
+      expect(revalidatePath).toHaveBeenCalledWith('/report')
+      expect(revalidatePath).toHaveBeenCalledWith('/report/slot-1')
     })
 
     it('returns error when DB update fails', async () => {
@@ -230,7 +253,7 @@ describe('walk-actions', () => {
       expect(sendSlotCancellationEmail).not.toHaveBeenCalled()
     })
 
-    it('still succeeds when email notification throws', async () => {
+    it('returns success with warning when email notification throws', async () => {
       setupUser()
       methods.single
         .mockResolvedValueOnce({
@@ -250,7 +273,10 @@ describe('walk-actions', () => {
 
       const result = await cancelSlot('slot-1')
 
-      expect(result).toEqual({ success: true })
+      expect(result).toEqual({
+        success: true,
+        warning: 'Cancelled successfully, but failed to notify other members.',
+      })
     })
 
     it('uses full_name for cancellingName', async () => {

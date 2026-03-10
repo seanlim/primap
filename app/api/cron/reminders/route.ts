@@ -10,15 +10,19 @@ export async function GET(req: NextRequest) {
   if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return new NextResponse('Unauthorized', { status: 401 });
   }
-  
+
   const supabase = createAdminClient();
 
-  // Get tomorrow's date in YYYY-MM-DD format based on server time (UTC usually)
-  // Ideally this should respect the timezone of the deployment (Singapore/Asia)
-  // For now, using UTC date + 1 day as approximation or assuming server runs in UTC.
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const dateStr = tomorrow.toISOString().split('T')[0];
+  // Use Asia/Singapore timezone to compute "tomorrow"
+  const sgFormatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Singapore',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const nowInSG = new Date();
+  nowInSG.setDate(nowInSG.getDate() + 1);
+  const dateStr = sgFormatter.format(nowInSG); // YYYY-MM-DD
 
   console.log(`[Cron] Checking for walks on: ${dateStr}`);
 
@@ -38,22 +42,31 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message: 'No walks scheduled.', date: dateStr });
   }
 
+  // Batch fetch all active members for all slots at once (fixes N+1)
+  const slotIds = slots.map(s => s.id);
+  const { data: allMembers, error: membersError } = await supabase
+    .from('slot_memberships')
+    .select('slot_id, user_id, profiles:user_id(full_name, email)')
+    .in('slot_id', slotIds)
+    .eq('status', 'ACTIVE');
+
+  if (membersError) {
+    console.error('[Cron] Error fetching members:', membersError);
+    return NextResponse.json({ error: membersError.message }, { status: 500 });
+  }
+
+  // Group members by slot_id
+  const membersBySlot = new Map<string, typeof allMembers>();
+  for (const member of allMembers || []) {
+    const list = membersBySlot.get(member.slot_id) || [];
+    list.push(member);
+    membersBySlot.set(member.slot_id, list);
+  }
+
   let emailCount = 0;
 
   for (const slot of slots) {
-    // Fetch active members for this slot
-    const { data: members, error: membersError } = await supabase
-      .from('slot_memberships')
-      .select('user_id, profiles:user_id(full_name, email)')
-      .eq('slot_id', slot.id)
-      .eq('status', 'ACTIVE');
-    
-    if (membersError) {
-      console.error(`[Cron] Error fetching members for slot ${slot.id}:`, membersError);
-      continue;
-    }
-
-    if (!members) continue;
+    const members = membersBySlot.get(slot.id) || [];
 
     for (const member of members) {
       const profile = member.profiles as unknown as { full_name: string | null; email: string };

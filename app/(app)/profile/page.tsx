@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { ProfileClient } from './profile-client'
+import type { SlotRef, HistoryObservation } from '@/lib/types/supabase-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,7 +58,7 @@ export default async function ProfilePage() {
 
   // Get observations for walk history items
   const walkSlotIds = (walkHistory || [])
-    .map(w => (w.walk_slots as unknown as { id: string })?.id)
+    .map(w => (w.walk_slots as unknown as SlotRef)?.id)
     .filter(Boolean)
 
   const { data: historyObservations } = walkSlotIds.length > 0
@@ -69,7 +70,7 @@ export default async function ProfilePage() {
     : { data: [] }
 
   const obsMap = new Map(
-    (historyObservations || []).map(o => [o.slot_id, o])
+    (historyObservations || []).map(o => [o.slot_id, o as unknown as HistoryObservation])
   )
 
   // Get app settings for progress
@@ -97,11 +98,7 @@ export default async function ProfilePage() {
         requiredWalks: settings?.required_walks_per_round || 4,
       }}
       walkHistory={(walkHistory || []).map(w => {
-        const slot = w.walk_slots as unknown as {
-          id: string; location_name: string; walk_date: string;
-          start_time: string; end_time: string;
-          survey_rounds: { name: string } | null
-        }
+        const slot = w.walk_slots as unknown as SlotRef
         const obs = obsMap.get(slot?.id)
         return {
           membershipId: w.id,
@@ -111,7 +108,7 @@ export default async function ProfilePage() {
           startTime: slot?.start_time || '',
           roundName: slot?.survey_rounds?.name || '',
           reportStatus: !obs ? 'none' : obs.status as string,
-          sightingCount: obs?.outcome === 'SIGHTED' ? ((obs.sightings as unknown as { count: number }[])?.length || 0) : 0,
+          sightingCount: obs?.outcome === 'SIGHTED' ? ((obs.sightings as unknown as { count: number }[])?.[0]?.count || 0) : 0,
         }
       })}
     />

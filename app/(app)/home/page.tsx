@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { formatDate } from '@/lib/utils/format-date'
+import type { SlotRef } from '@/lib/types/supabase-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,19 +11,21 @@ export default async function HomePage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const today = new Date().toISOString().split('T')[0]
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
     .single()
 
-  // Get upcoming walks the user has joined
+  // Get upcoming walks: start from walk_slots with !inner join to only get future walks
   const { data: upcomingWalks } = await supabase
     .from('slot_memberships')
     .select(`
       id,
       status,
-      walk_slots (
+      walk_slots!inner (
         id,
         location_name,
         walk_date,
@@ -32,6 +36,7 @@ export default async function HomePage() {
     `)
     .eq('user_id', user.id)
     .eq('status', 'ACTIVE')
+    .gte('walk_slots.walk_date', today)
     .order('joined_at', { ascending: false })
     .limit(5)
 
@@ -49,10 +54,7 @@ export default async function HomePage() {
     .eq('user_id', user.id)
     .eq('status', 'SUBMITTED')
 
-  const futureWalks = (upcomingWalks || []).filter((m) => {
-    const slot = m.walk_slots as unknown as { walk_date: string }
-    return slot && new Date(slot.walk_date) >= new Date(new Date().toDateString())
-  })
+  const futureWalks = upcomingWalks || []
 
   return (
     <div className="space-y-6">
@@ -84,18 +86,12 @@ export default async function HomePage() {
         <div className="bg-green-50 border border-green-200 rounded-xl p-5">
           <h2 className="text-sm font-semibold text-green-800 mb-3">Next Walk</h2>
           {(() => {
-            const slot = futureWalks[0].walk_slots as unknown as {
-              id: string; location_name: string; walk_date: string;
-              start_time: string; end_time: string;
-              survey_rounds: { name: string } | null
-            }
+            const slot = futureWalks[0].walk_slots as unknown as SlotRef
             return (
               <Link href={`/walk/${slot.id}`} className="block">
                 <p className="font-semibold text-gray-900">{slot.location_name}</p>
                 <p className="text-sm text-gray-600 mt-1">
-                  {new Date(slot.walk_date).toLocaleDateString('en-SG', {
-                    weekday: 'short', day: 'numeric', month: 'short'
-                  })} &middot; {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
+                  {formatDate(slot.walk_date, 'short')} &middot; {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
                 </p>
                 {slot.survey_rounds && (
                   <p className="text-xs text-green-600 mt-1">{slot.survey_rounds.name}</p>
@@ -133,10 +129,7 @@ export default async function HomePage() {
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Upcoming Walks</h2>
           <div className="space-y-2">
             {futureWalks.slice(1).map((membership) => {
-              const slot = membership.walk_slots as unknown as {
-                id: string; location_name: string; walk_date: string;
-                start_time: string; end_time: string;
-              }
+              const slot = membership.walk_slots as unknown as SlotRef
               return (
                 <Link
                   key={membership.id}
@@ -145,9 +138,7 @@ export default async function HomePage() {
                 >
                   <p className="font-medium text-gray-900">{slot.location_name}</p>
                   <p className="text-sm text-gray-500">
-                    {new Date(slot.walk_date).toLocaleDateString('en-SG', {
-                      weekday: 'short', day: 'numeric', month: 'short'
-                    })} &middot; {slot.start_time.slice(0, 5)}
+                    {formatDate(slot.walk_date, 'short')} &middot; {slot.start_time.slice(0, 5)}
                   </p>
                 </Link>
               )

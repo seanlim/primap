@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import { SlotDetailClient } from './slot-detail-client'
+import type { MembershipWithProfile } from '@/lib/types/supabase-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,10 +33,8 @@ export default async function SlotDetailPage({
 
   if (!slot) notFound()
 
-  const memberships = (slot.slot_memberships as unknown as {
-    id: string; user_id: string; status: string; joined_at: string;
-    profiles: { full_name: string | null; email: string; avatar_url: string | null }
-  }[]).filter(m => m.status === 'ACTIVE')
+  const memberships = (slot.slot_memberships as unknown as MembershipWithProfile[])
+    .filter(m => m.status === 'ACTIVE')
 
   const userMembership = memberships.find(m => m.user_id === user.id)
   const round = slot.survey_rounds as unknown as { name: string; status: string }

@@ -432,7 +432,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      join_slot_with_observation: {
+        Args: { p_slot_id: string; p_user_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       incident_type:

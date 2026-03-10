@@ -1,10 +1,25 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { formatDate } from '@/lib/utils/format-date'
+import { WalkFilters } from './walk-filters-client'
+import type { MembershipWithProfile } from '@/lib/types/supabase-helpers'
 
 export const dynamic = 'force-dynamic'
 
-export default async function WalkPage() {
+const PAGE_SIZE = 10
+
+export default async function WalkPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; date?: string; location?: string; availability?: string }>
+}) {
+  const params = await searchParams
+  const page = Math.max(1, parseInt(params.page || '1', 10))
+  const dateFilter = params.date || ''
+  const locationFilter = params.location || ''
+  const availabilityFilter = params.availability || ''
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -16,15 +31,31 @@ export default async function WalkPage() {
     .eq('status', 'OPEN')
     .order('start_date', { ascending: false })
 
-  // Get all slots for open rounds
+  // Get all slots for open rounds with filters
   const roundIds = (rounds || []).map(r => r.id)
-  const { data: slots } = roundIds.length > 0
-    ? await supabase
+
+  let slotsQuery = roundIds.length > 0
+    ? supabase
         .from('walk_slots')
-        .select('*, slot_memberships(id, user_id, status)')
+        .select('*, slot_memberships(id, user_id, status)', { count: 'exact' })
         .in('round_id', roundIds)
         .order('walk_date', { ascending: true })
-    : { data: [] }
+    : null
+
+  if (slotsQuery) {
+    if (dateFilter) {
+      slotsQuery = slotsQuery.eq('walk_date', dateFilter)
+    }
+    if (locationFilter) {
+      slotsQuery = slotsQuery.ilike('location_name', `%${locationFilter}%`)
+    }
+  }
+
+  const slotsResult = slotsQuery
+    ? await slotsQuery
+    : { data: [], count: 0 }
+
+  const allSlots = slotsResult.data || []
 
   // Get user's active memberships
   const { data: myMemberships } = await supabase
@@ -35,12 +66,38 @@ export default async function WalkPage() {
 
   const mySlotIds = new Set((myMemberships || []).map(m => m.slot_id))
 
-  const mySlots = (slots || []).filter(s => mySlotIds.has(s.id))
-  const availableSlots = (slots || []).filter(s => !mySlotIds.has(s.id))
+  const mySlots = allSlots.filter(s => mySlotIds.has(s.id))
+
+  // Apply availability filter to available slots
+  let availableSlots = allSlots.filter(s => !mySlotIds.has(s.id))
+  if (availabilityFilter === 'open') {
+    availableSlots = availableSlots.filter(s => {
+      const activeCount = (s.slot_memberships as unknown as { status: string }[])
+        .filter(m => m.status === 'ACTIVE').length
+      return activeCount < s.max_volunteers
+    })
+  } else if (availabilityFilter === 'full') {
+    availableSlots = availableSlots.filter(s => {
+      const activeCount = (s.slot_memberships as unknown as { status: string }[])
+        .filter(m => m.status === 'ACTIVE').length
+      return activeCount >= s.max_volunteers
+    })
+  }
+
+  // Paginate available slots
+  const totalAvailable = availableSlots.length
+  const totalPages = Math.max(1, Math.ceil(totalAvailable / PAGE_SIZE))
+  const from = (page - 1) * PAGE_SIZE
+  const paginatedSlots = availableSlots.slice(from, from + PAGE_SIZE)
+
+  const hasFilters = dateFilter || locationFilter || availabilityFilter
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">Walks</h1>
+
+      {/* Filters */}
+      <WalkFilters />
 
       {/* My Walks */}
       {mySlots.length > 0 && (
@@ -48,7 +105,7 @@ export default async function WalkPage() {
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">My Walks</h2>
           <div className="space-y-2">
             {mySlots.map((slot) => {
-              const activeCount = (slot.slot_memberships as { status: string }[])
+              const activeCount = (slot.slot_memberships as unknown as { status: string }[])
                 .filter(m => m.status === 'ACTIVE').length
               return (
                 <Link
@@ -60,9 +117,7 @@ export default async function WalkPage() {
                     <div>
                       <p className="font-semibold text-gray-900">{slot.location_name}</p>
                       <p className="text-sm text-gray-600 mt-1">
-                        {new Date(slot.walk_date).toLocaleDateString('en-SG', {
-                          weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
-                        })}
+                        {formatDate(slot.walk_date, 'default')}
                       </p>
                       <p className="text-sm text-gray-500">
                         {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
@@ -87,21 +142,23 @@ export default async function WalkPage() {
       {/* Available Walks */}
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-          Available Walks
+          Available Walks {totalAvailable > 0 && `(${totalAvailable})`}
         </h2>
-        {availableSlots.length === 0 && mySlots.length === 0 ? (
+        {paginatedSlots.length === 0 && mySlots.length === 0 && !hasFilters ? (
           <div className="bg-white rounded-xl p-8 text-center shadow-sm">
             <p className="text-gray-500">No walks available at the moment.</p>
             <p className="text-sm text-gray-400 mt-1">Check back when a new survey round opens.</p>
           </div>
-        ) : availableSlots.length === 0 ? (
+        ) : paginatedSlots.length === 0 ? (
           <div className="bg-white rounded-xl p-6 text-center shadow-sm">
-            <p className="text-gray-500 text-sm">No more available walks in this round.</p>
+            <p className="text-gray-500 text-sm">
+              {hasFilters ? 'No walks match your filters.' : 'No more available walks in this round.'}
+            </p>
           </div>
         ) : (
           <div className="space-y-2">
-            {availableSlots.map((slot) => {
-              const activeCount = (slot.slot_memberships as { status: string }[])
+            {paginatedSlots.map((slot) => {
+              const activeCount = (slot.slot_memberships as unknown as { status: string }[])
                 .filter(m => m.status === 'ACTIVE').length
               const isFull = activeCount >= slot.max_volunteers
               return (
@@ -116,9 +173,7 @@ export default async function WalkPage() {
                     <div>
                       <p className="font-semibold text-gray-900">{slot.location_name}</p>
                       <p className="text-sm text-gray-600 mt-1">
-                        {new Date(slot.walk_date).toLocaleDateString('en-SG', {
-                          weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
-                        })}
+                        {formatDate(slot.walk_date, 'default')}
                       </p>
                       <p className="text-sm text-gray-500">
                         {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
@@ -146,6 +201,31 @@ export default async function WalkPage() {
                 </Link>
               )
             })}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 pt-2">
+            {page > 1 && (
+              <Link
+                href={`/walk?page=${page - 1}${dateFilter ? `&date=${dateFilter}` : ''}${locationFilter ? `&location=${locationFilter}` : ''}${availabilityFilter ? `&availability=${availabilityFilter}` : ''}`}
+                className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Previous
+              </Link>
+            )}
+            <span className="text-sm text-gray-500">
+              Page {page} of {totalPages}
+            </span>
+            {page < totalPages && (
+              <Link
+                href={`/walk?page=${page + 1}${dateFilter ? `&date=${dateFilter}` : ''}${locationFilter ? `&location=${locationFilter}` : ''}${availabilityFilter ? `&availability=${availabilityFilter}` : ''}`}
+                className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Next
+              </Link>
+            )}
           </div>
         )}
       </section>

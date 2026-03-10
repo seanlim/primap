@@ -3,7 +3,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react'
 import { renderHook } from '@testing-library/react'
 import { ToastProvider, useToast } from '@/components/ui/toast'
 
-function TestComponent({ type = 'success' as const }) {
+function TestComponent({ type = 'success' }: { type?: 'success' | 'error' | 'info' }) {
   const { showToast } = useToast()
   return (
     <button onClick={() => showToast('Test message', type)}>Show</button>

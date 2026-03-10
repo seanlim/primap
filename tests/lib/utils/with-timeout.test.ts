@@ -47,9 +47,14 @@ describe('withTimeout', () => {
 
   it('works with PromiseLike (thenable) objects', async () => {
     const thenable: PromiseLike<string> = {
-      then(resolve) {
-        resolve!('from thenable')
-        return Promise.resolve('from thenable')
+      then<TResult1 = string, TResult2 = never>(
+        onfulfilled?: ((value: string) => TResult1 | PromiseLike<TResult1>) | null | undefined,
+        _onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null | undefined,
+      ): PromiseLike<TResult1 | TResult2> {
+        if (onfulfilled) {
+          return Promise.resolve(onfulfilled('from thenable'))
+        }
+        return Promise.resolve('from thenable') as unknown as PromiseLike<TResult1 | TResult2>
       },
     }
     const result = await withTimeout(thenable, 1000, 'timeout')

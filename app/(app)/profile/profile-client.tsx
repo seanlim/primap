@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { LogOut, Check, Pencil } from 'lucide-react'
+import { formatDate } from '@/lib/utils/format-date'
 import { updateProfile } from '@/lib/actions/profile-actions'
 import { signOut } from '@/lib/actions/auth-actions'
 import { createClient } from '@/lib/supabase/client'
@@ -115,7 +116,7 @@ export function ProfileClient({ profile, stats, walkHistory }: Props) {
           <div className="text-center">
             <p className="text-xs text-gray-400">Since</p>
             <p className="text-sm font-medium text-gray-700">
-              {new Date(profile.createdAt).toLocaleDateString('en-SG', { month: 'short', year: 'numeric' })}
+              {formatDate(profile.createdAt, 'monthYear')}
             </p>
           </div>
         </div>
@@ -179,9 +180,7 @@ export function ProfileClient({ profile, stats, walkHistory }: Props) {
                     <div>
                       <p className="font-medium text-gray-900">{walk.locationName}</p>
                       <p className="text-sm text-gray-500 mt-0.5">
-                        {new Date(walk.walkDate).toLocaleDateString('en-SG', {
-                          day: 'numeric', month: 'short', year: 'numeric'
-                        })}
+                        {formatDate(walk.walkDate, 'compact')}
                       </p>
                       {walk.roundName && (
                         <p className="text-xs text-gray-400 mt-0.5">{walk.roundName}</p>

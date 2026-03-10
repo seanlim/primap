@@ -134,7 +134,7 @@ describe('admin-round-actions', () => {
   describe('updateRoundStatus', () => {
     it.each(['DRAFT', 'OPEN', 'CLOSED'] as const)(
       'updates round status to %s',
-      async (status) => {
+      async (status: 'DRAFT' | 'OPEN' | 'CLOSED') => {
         setupAdmin()
 
         const result = await updateRoundStatus('round-1', status)

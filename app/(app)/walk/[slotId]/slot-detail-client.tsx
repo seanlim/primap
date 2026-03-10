@@ -1,10 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useOptimistic, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { joinSlot, cancelSlot } from '@/lib/actions/walk-actions'
 import { ArrowLeft, MapPin, Calendar, Clock, Users } from 'lucide-react'
 import Link from 'next/link'
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
+import { useToast } from '@/components/ui/toast'
+import { formatDate } from '@/lib/utils/format-date'
 
 interface SlotDetailProps {
   slot: {
@@ -29,33 +32,56 @@ interface SlotDetailProps {
 }
 
 export function SlotDetailClient({ slot, members, isJoined, isFull, currentUserId }: SlotDetailProps) {
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showCancelDialog, setShowCancelDialog] = useState(false)
+  const [isPending, startTransition] = useTransition()
   const router = useRouter()
+  const { showToast } = useToast()
 
-  const handleJoin = async () => {
-    setLoading(true)
-    setError('')
-    const result = await joinSlot(slot.id)
-    if (result.error) {
-      setError(result.error)
-    } else {
-      router.refresh()
+  const [optimistic, setOptimistic] = useOptimistic(
+    { isJoined, isFull, memberCount: members.length },
+    (_state, action: 'join' | 'cancel') => {
+      if (action === 'join') {
+        const newCount = _state.memberCount + 1
+        return { isJoined: true, isFull: newCount >= slot.maxVolunteers, memberCount: newCount }
+      }
+      const newCount = _state.memberCount - 1
+      return { isJoined: false, isFull: false, memberCount: newCount }
     }
-    setLoading(false)
+  )
+
+  const handleJoin = () => {
+    setError('')
+    startTransition(async () => {
+      setOptimistic('join')
+      const result = await joinSlot(slot.id)
+      if (result.error) {
+        setError(result.error)
+      } else {
+        router.refresh()
+      }
+    })
   }
 
-  const handleCancel = async () => {
-    if (!confirm('Are you sure you want to cancel your participation?')) return
-    setLoading(true)
+  const handleCancel = () => {
+    setShowCancelDialog(true)
+  }
+
+  const confirmCancel = () => {
+    setShowCancelDialog(false)
     setError('')
-    const result = await cancelSlot(slot.id)
-    if (result.error) {
-      setError(result.error)
-    } else {
-      router.refresh()
-    }
-    setLoading(false)
+    startTransition(async () => {
+      setOptimistic('cancel')
+      const result = await cancelSlot(slot.id)
+      if (result.error) {
+        setError(result.error)
+      } else {
+        if (result.warning) {
+          showToast(result.warning, 'info')
+        }
+        router.refresh()
+      }
+    })
   }
 
   return (
@@ -74,9 +100,7 @@ export function SlotDetailClient({ slot, members, isJoined, isFull, currentUserI
         <div className="space-y-3">
           <div className="flex items-center gap-3 text-sm text-gray-600">
             <Calendar className="w-4 h-4 text-gray-400" />
-            {new Date(slot.walkDate).toLocaleDateString('en-SG', {
-              weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-            })}
+            {formatDate(slot.walkDate, 'full')}
           </div>
           <div className="flex items-center gap-3 text-sm text-gray-600">
             <Clock className="w-4 h-4 text-gray-400" />
@@ -84,7 +108,7 @@ export function SlotDetailClient({ slot, members, isJoined, isFull, currentUserI
           </div>
           <div className="flex items-center gap-3 text-sm text-gray-600">
             <Users className="w-4 h-4 text-gray-400" />
-            {members.length}/{slot.maxVolunteers} volunteers
+            {optimistic.memberCount}/{slot.maxVolunteers} volunteers
           </div>
           {slot.notes && (
             <div className="flex items-start gap-3 text-sm text-gray-600">
@@ -98,26 +122,26 @@ export function SlotDetailClient({ slot, members, isJoined, isFull, currentUserI
           <p className="text-sm text-red-500 bg-red-50 p-3 rounded-lg">{error}</p>
         )}
 
-        {isJoined ? (
+        {optimistic.isJoined ? (
           <div className="space-y-2">
             <div className="bg-green-50 border border-green-200 p-3 rounded-lg text-center">
               <p className="text-sm font-medium text-green-700">You&apos;re signed up for this walk</p>
             </div>
             <button
               onClick={handleCancel}
-              disabled={loading}
+              disabled={isPending}
               className="w-full py-3 px-4 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 font-medium transition-colors disabled:opacity-50 text-sm"
             >
-              {loading ? 'Cancelling...' : 'Cancel Participation'}
+              {isPending ? 'Cancelling...' : 'Cancel Participation'}
             </button>
           </div>
         ) : (
           <button
             onClick={handleJoin}
-            disabled={loading || isFull}
+            disabled={isPending || optimistic.isFull}
             className="w-full bg-green-600 text-white py-3 px-4 rounded-xl hover:bg-green-700 disabled:opacity-50 font-medium transition-colors"
           >
-            {loading ? 'Joining...' : isFull ? 'Slot Full' : 'Join Walk'}
+            {isPending ? 'Joining...' : optimistic.isFull ? 'Slot Full' : 'Join Walk'}
           </button>
         )}
       </div>
@@ -148,7 +172,7 @@ export function SlotDetailClient({ slot, members, isJoined, isFull, currentUserI
                     )}
                   </p>
                   <p className="text-xs text-gray-400">
-                    Joined {new Date(member.joinedAt).toLocaleDateString('en-SG')}
+                    Joined {formatDate(member.joinedAt)}
                   </p>
                 </div>
               </div>
@@ -156,6 +180,17 @@ export function SlotDetailClient({ slot, members, isJoined, isFull, currentUserI
           </div>
         )}
       </div>
+
+      <ConfirmationDialog
+        open={showCancelDialog}
+        title="Cancel Participation"
+        message="Are you sure you want to cancel your participation? Other group members will be notified."
+        confirmLabel="Yes, Cancel"
+        cancelLabel="Keep"
+        destructive
+        onConfirm={confirmCancel}
+        onCancel={() => setShowCancelDialog(false)}
+      />
     </div>
   )
 }

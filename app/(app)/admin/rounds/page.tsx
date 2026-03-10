@@ -23,7 +23,7 @@ export default async function AdminRoundsPage() {
         startDate: r.start_date,
         endDate: r.end_date,
         status: r.status,
-        slotCount: r.walk_slots?.length || 0,
+        slotCount: r.walk_slots[0]?.count,
       }))}
     />
   )

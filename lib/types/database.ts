@@ -387,7 +387,6 @@ export type Database = {
           id: string
           location_name: string
           max_volunteers: number
-          notes: string | null
           round_id: string
           start_time: string
           updated_at: string
@@ -399,7 +398,6 @@ export type Database = {
           id?: string
           location_name: string
           max_volunteers?: number
-          notes?: string | null
           round_id: string
           start_time: string
           updated_at?: string
@@ -411,7 +409,6 @@ export type Database = {
           id?: string
           location_name?: string
           max_volunteers?: number
-          notes?: string | null
           round_id?: string
           start_time?: string
           updated_at?: string

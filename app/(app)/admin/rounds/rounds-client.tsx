@@ -26,7 +26,7 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleCreate = async (e: React.SubmitEvent) => {
     e.preventDefault()
     setLoading(true)
     const result = await createRound({ name, description, startDate, endDate })
@@ -89,12 +89,12 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
           />
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Start Date</label>
+              <label className="text-xs font-medium text-gray-500 mb-1">Start Date</label>
               <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">End Date</label>
+              <label className="text-xs font-medium text-gray-500 mb-1">End Date</label>
               <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required />
             </div>
@@ -120,8 +120,7 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
                 <p className="font-semibold text-gray-900">{round.name}</p>
                 {round.description && <p className="text-sm text-gray-500 mt-0.5">{round.description}</p>}
                 <p className="text-xs text-gray-400 mt-1">
-                  {formatDate(round.startDate)} - {formatDate(round.endDate)}
-                  &middot; {round.slotCount} slot(s)
+                  {formatDate(round.startDate)} - {formatDate(round.endDate)} &middot; {round.slotCount} slot(s)
                 </p>
               </div>
               <span className={`text-xs px-2 py-1 rounded-full font-medium ${

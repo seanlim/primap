@@ -16,15 +16,20 @@ export async function reportIncident(input: ReportIncidentInput) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
   
-  const { data: membership } = await supabase
+  const membershipResult = await supabase
     .from('slot_memberships')
     .select('id')
     .eq('slot_id', input.slotId)
     .eq('user_id', user.id)
     .eq('status', 'ACTIVE')
-    .maybeSingle()
 
-  if (!membership) return { error: 'Only walk participants can report incidents for this walk' }
+  const memberships = Array.isArray(membershipResult.data)
+    ? membershipResult.data
+    : membershipResult.data
+      ? [membershipResult.data]
+      : []
+
+  if (memberships.length === 0) return { error: 'Only walk participants can report incidents for this walk' }
 
   const { error } = await supabase
     .from('incidents')

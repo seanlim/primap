@@ -15,6 +15,16 @@ export async function reportIncident(input: ReportIncidentInput) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
+  
+  const { data: membership } = await supabase
+    .from('slot_memberships')
+    .select('id')
+    .eq('slot_id', input.slotId)
+    .eq('user_id', user.id)
+    .eq('status', 'ACTIVE')
+    .maybeSingle()
+
+  if (!membership) return { error: 'Only walk participants can report incidents for this walk' }
 
   const { error } = await supabase
     .from('incidents')
@@ -30,5 +40,7 @@ export async function reportIncident(input: ReportIncidentInput) {
   if (error) return { error: error.message }
 
   revalidatePath(`/report/${input.slotId}`)
+  revalidatePath(`/admin/reports/${input.slotId}`)
+  revalidatePath('/admin/reports')
   return { success: true }
 }

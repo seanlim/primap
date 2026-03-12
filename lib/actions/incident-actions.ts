@@ -16,12 +16,18 @@ export async function reportIncident(input: ReportIncidentInput) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
   
-  const membershipResult = await supabase
+ const membershipQuery = supabase
     .from('slot_memberships')
     .select('id')
     .eq('slot_id', input.slotId)
     .eq('user_id', user.id)
     .eq('status', 'ACTIVE')
+
+  const membershipResult = typeof (membershipQuery as { maybeSingle?: unknown }).maybeSingle === 'function'
+    ? await (membershipQuery as { maybeSingle: () => Promise<{ data: unknown; error?: { message: string } }> }).maybeSingle()
+    : await membershipQuery
+
+  if (membershipResult.error) return { error: membershipResult.error.message }
 
   const memberships = Array.isArray(membershipResult.data)
     ? membershipResult.data

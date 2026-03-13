@@ -7,6 +7,8 @@ import {
   sendAccountRejectedEmail,
   sendAccountDisabledEmail,
   sendAccountEnabledEmail,
+  sendRolePromotedEmail,
+  sendRoleDemotedEmail,
 } from '@/lib/email'
 
 interface AdminActionResult {
@@ -107,6 +109,15 @@ export async function setUserRole(userId: string, role: 'ADMIN' | 'VOLUNTEER'): 
   const { supabase, adminId } = await requireAdmin()
   if (userId === adminId && role === 'VOLUNTEER') return { error: 'Cannot demote your own account' }
 
+  const { data: target, error: fetchError } = await supabase
+    .from('profiles')
+    .select('status, email, full_name')
+    .eq('id', userId)
+    .single()
+
+  if (fetchError) return { error: fetchError.message }
+  if (target.status !== 'ACTIVE') return { error: 'Can only change role for active users' }
+
   const { error } = await supabase
     .from('profiles')
     .update({ role, updated_at: new Date().toISOString() })
@@ -115,6 +126,12 @@ export async function setUserRole(userId: string, role: 'ADMIN' | 'VOLUNTEER'): 
     .single()
 
   if (error) return { error: error.message }
+
+  if (role === 'ADMIN') {
+    await sendRolePromotedEmail(target.email, target.full_name)
+  } else {
+    await sendRoleDemotedEmail(target.email, target.full_name)
+  }
 
   revalidatePath('/admin/users')
   return { success: true }

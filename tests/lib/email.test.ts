@@ -13,6 +13,8 @@ import {
   sendAccountRejectedEmail,
   sendAccountDisabledEmail,
   sendAccountEnabledEmail,
+  sendRolePromotedEmail,
+  sendRoleDemotedEmail,
   sendSlotCancellationEmail,
   sendWalkReminderEmail,
 } from '@/lib/email'
@@ -169,6 +171,56 @@ describe('email utilities', () => {
 
       const call = mockSend.mock.calls[0][0]
       expect(call.html).toContain('https://primap.org/login')
+    })
+  })
+
+  describe('sendRolePromotedEmail', () => {
+    it('sends promotion email with full name', async () => {
+      await sendRolePromotedEmail('user@example.com', 'Jane Doe')
+
+      const call = mockSend.mock.calls[0][0]
+      expect(call.subject).toBe('Primap: You Have Been Promoted to Admin')
+      expect(call.html).toContain('Hi Jane Doe')
+      expect(call.html).toContain('administrator')
+    })
+
+    it('uses "User" when fullName is null', async () => {
+      await sendRolePromotedEmail('user@example.com', null)
+
+      const call = mockSend.mock.calls[0][0]
+      expect(call.html).toContain('Hi User')
+    })
+
+    it('includes admin dashboard link', async () => {
+      await sendRolePromotedEmail('user@example.com', 'Jane')
+
+      const call = mockSend.mock.calls[0][0]
+      expect(call.html).toContain('https://primap.org/admin')
+    })
+  })
+
+  describe('sendRoleDemotedEmail', () => {
+    it('sends demotion email with full name', async () => {
+      await sendRoleDemotedEmail('user@example.com', 'John Doe')
+
+      const call = mockSend.mock.calls[0][0]
+      expect(call.subject).toBe('Primap: Your Role Has Been Updated')
+      expect(call.html).toContain('Hi John Doe')
+      expect(call.html).toContain('volunteer')
+    })
+
+    it('uses "User" when fullName is null', async () => {
+      await sendRoleDemotedEmail('user@example.com', null)
+
+      const call = mockSend.mock.calls[0][0]
+      expect(call.html).toContain('Hi User')
+    })
+
+    it('includes home link', async () => {
+      await sendRoleDemotedEmail('user@example.com', 'John')
+
+      const call = mockSend.mock.calls[0][0]
+      expect(call.html).toContain('https://primap.org/home')
     })
   })
 

@@ -88,6 +88,26 @@ export async function sendAccountEnabledEmail(email: string, fullName: string | 
   `));
 }
 
+export async function sendRolePromotedEmail(email: string, fullName: string | null) {
+  const name = fullName || 'User';
+  await sendEmail(email, 'Primap: You Have Been Promoted to Admin', wrapHtml(`
+    <p>Hi ${name},</p>
+    <p>You have been promoted to an <strong>administrator</strong> on Primap.</p>
+    <p>You now have access to admin features including user management, survey round management, and data exports.</p>
+    <a href="${APP_URL()}/admin" class="button">Go to Admin Dashboard</a>
+  `));
+}
+
+export async function sendRoleDemotedEmail(email: string, fullName: string | null) {
+  const name = fullName || 'User';
+  await sendEmail(email, 'Primap: Your Role Has Been Updated', wrapHtml(`
+    <p>Hi ${name},</p>
+    <p>Your role on Primap has been changed from administrator to <strong>volunteer</strong>.</p>
+    <p>You can continue to participate in survey walks and submit observations as a volunteer.</p>
+    <a href="${APP_URL()}/home" class="button">Go to Home</a>
+  `));
+}
+
 export async function sendSlotCancellationEmail(
   recipients: string[],
   slotInfo: { date: string; time: string; location: string },

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Camera, X, Loader2 } from 'lucide-react'
-import { uploadMedia, deleteMedia } from '@/lib/actions/observation-actions'
+import { deleteMedia } from '@/lib/actions/observation-actions'
 import { extractExifData } from '@/lib/utils/exif'
 import { getSignedMediaUrl } from '@/lib/utils/storage'
 
@@ -86,12 +86,14 @@ export function MediaUploader({
 
         const formData = new FormData()
         formData.append('file', file)
+        formData.append('parentType', parentType)
+        formData.append('parentId', parentId)
+        if (exifData.lat != null) formData.append('exifLat', String(exifData.lat))
+        if (exifData.lng != null) formData.append('exifLng', String(exifData.lng))
+        if (exifData.datetime) formData.append('exifDatetime', exifData.datetime)
 
-        const result = await uploadMedia(formData, parentType, parentId, {
-          lat: exifData.lat,
-          lng: exifData.lng,
-          datetime: exifData.datetime,
-        })
+        const res = await fetch('/api/media', { method: 'POST', body: formData })
+        const result = await res.json()
 
         if (result.success && result.media) {
           setMedia(prev => [...prev, result.media as MediaItem])

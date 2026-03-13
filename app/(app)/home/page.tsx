@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils/format-date'
-import type { SlotRef } from '@/lib/types/supabase-helpers'
+import type { WalkRef } from '@/lib/types/supabase-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,7 +86,7 @@ export default async function HomePage() {
         <div className="bg-green-50 border border-green-200 rounded-xl p-5">
           <h2 className="text-sm font-semibold text-green-800 mb-3">Next Walk</h2>
           {(() => {
-            const slot = futureWalks[0].walk_slots as unknown as SlotRef
+            const slot = futureWalks[0].walk_slots as unknown as WalkRef
             return (
               <Link href={`/walk/${slot.id}`} className="block">
                 <p className="font-semibold text-gray-900">{slot.location_name}</p>
@@ -129,7 +129,7 @@ export default async function HomePage() {
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Upcoming Walks</h2>
           <div className="space-y-2">
             {futureWalks.slice(1).map((membership) => {
-              const slot = membership.walk_slots as unknown as SlotRef
+              const slot = membership.walk_slots as unknown as WalkRef
               return (
                 <Link
                   key={membership.id}

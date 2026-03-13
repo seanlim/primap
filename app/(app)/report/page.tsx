@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils/format-date'
-import type { SlotRef } from '@/lib/types/supabase-helpers'
+import type { WalkRef } from '@/lib/types/supabase-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,7 +32,7 @@ export default async function ReportListPage() {
 
   // Get user's observations to check report status per slot
   const slotIds = (memberships || []).map(m => {
-    const slot = m.walk_slots as unknown as SlotRef
+    const slot = m.walk_slots as unknown as WalkRef
     return slot?.id
   }).filter(Boolean)
 
@@ -62,7 +62,7 @@ export default async function ReportListPage() {
       ) : (
         <div className="space-y-2">
           {memberships.map((membership) => {
-            const slot = membership.walk_slots as unknown as SlotRef
+            const slot = membership.walk_slots as unknown as WalkRef
             if (!slot) return null
 
             const obs = observationMap.get(slot.id)

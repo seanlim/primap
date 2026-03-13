@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 interface ReportIncidentInput {
-  slotId: string
+  walkId: string
   incidentType: 'INJURED_ANIMAL' | 'DEAD_ANIMAL' | 'HUMAN_WILDLIFE_CONFLICT' | 'HABITAT_DAMAGE' | 'OTHER'
   description: string
   lat?: number
@@ -19,7 +19,7 @@ export async function reportIncident(input: ReportIncidentInput) {
   const { error } = await supabase
     .from('incidents')
     .insert({
-      slot_id: input.slotId,
+      slot_id: input.walkId,
       reported_by: user.id,
       incident_type: input.incidentType,
       description: input.description,
@@ -29,6 +29,6 @@ export async function reportIncident(input: ReportIncidentInput) {
 
   if (error) return { error: error.message }
 
-  revalidatePath(`/report/${input.slotId}`)
+  revalidatePath(`/report/${input.walkId}`)
   return { success: true }
 }

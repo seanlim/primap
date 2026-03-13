@@ -5,22 +5,22 @@ import type { ProfileNameRef } from '@/lib/types/supabase-helpers'
 
 export const dynamic = 'force-dynamic'
 
-export default async function SlotReportPage({
+export default async function WalkReportPage({
   params,
 }: {
-  params: Promise<{ slotId: string }>
+  params: Promise<{ walkId: string }>
 }) {
-  const { slotId } = await params
+  const { walkId } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   // Run all queries in parallel
-  const [slotResult, observationsResult, membersResult, incidentsResult] = await Promise.all([
+  const [walkResult, observationsResult, membersResult, incidentsResult] = await Promise.all([
     supabase
       .from('walk_slots')
       .select('*, survey_rounds(name)')
-      .eq('id', slotId)
+      .eq('id', walkId)
       .single(),
     supabase
       .from('observations')
@@ -30,36 +30,36 @@ export default async function SlotReportPage({
         sightings (*, media:media!media_sighting_id_fkey(*)),
         media:media!media_observation_id_fkey(*)
       `)
-      .eq('slot_id', slotId)
+      .eq('slot_id', walkId)
       .order('created_at', { ascending: true }),
     supabase
       .from('slot_memberships')
       .select('user_id, profiles:user_id(full_name, email)')
-      .eq('slot_id', slotId)
+      .eq('slot_id', walkId)
       .eq('status', 'ACTIVE'),
     supabase
       .from('incidents')
       .select('*, profiles:reported_by(full_name, email)')
-      .eq('slot_id', slotId)
+      .eq('slot_id', walkId)
       .order('created_at', { ascending: false }),
   ])
 
-  const slot = slotResult.data
-  if (!slot) notFound()
+  const walk = walkResult.data
+  if (!walk) notFound()
 
   const observations = observationsResult.data
   const members = membersResult.data
   const incidents = incidentsResult.data
-  const round = slot.survey_rounds as unknown as { name: string }
+  const round = walk.survey_rounds as unknown as { name: string }
 
   return (
     <GroupViewClient
       slot={{
-        id: slot.id,
-        locationName: slot.location_name,
-        walkDate: slot.walk_date,
-        startTime: slot.start_time,
-        endTime: slot.end_time,
+        id: walk.id,
+        locationName: walk.location_name,
+        walkDate: walk.walk_date,
+        startTime: walk.start_time,
+        endTime: walk.end_time,
         roundName: round?.name || '',
       }}
       observations={(observations || []).map(obs => {

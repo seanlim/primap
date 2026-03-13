@@ -69,7 +69,7 @@ export async function deleteRound(roundId: string) {
   return { success: true }
 }
 
-export async function createSlot(data: {
+export async function createWalk(data: {
   roundId: string
   locationName: string
   walkDate: string
@@ -93,21 +93,21 @@ export async function createSlot(data: {
     })
 
   if (error) return { error: error.message }
-  revalidatePath('/admin/slots')
+  revalidatePath('/admin/walks')
   revalidatePath('/walk')
   return { success: true }
 }
 
-export async function deleteSlot(slotId: string) {
+export async function deleteWalk(walkId: string) {
   const { supabase } = await requireAdmin()
 
   const { error } = await supabase
     .from('walk_slots')
     .delete()
-    .eq('id', slotId)
+    .eq('id', walkId)
 
   if (error) return { error: error.message }
-  revalidatePath('/admin/slots')
+  revalidatePath('/admin/walks')
   revalidatePath('/walk')
   return { success: true }
 }

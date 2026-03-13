@@ -16,11 +16,14 @@ const { mockSupabase, methods } = vi.hoisted(() => {
   for (const key of Object.keys(methods) as (keyof typeof methods)[]) {
     if (key !== 'single') methods[key].mockReturnThis()
   }
-  const mockSupabase = {
+  const mockSupabase: Record<string, unknown> = {
     auth: {
       getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
     },
     from: vi.fn().mockReturnValue(methods),
+    functions: {
+      invoke: vi.fn().mockResolvedValue({ data: null, error: null }),
+    },
   }
   return { mockSupabase, methods }
 })
@@ -31,10 +34,13 @@ vi.mock('@/lib/supabase/server', () => ({
 
 import {
   createRound,
+  updateRound,
   updateRoundStatus,
   deleteRound,
   createSlot,
+  updateSlot,
   deleteSlot,
+  bulkCreateSlots,
   updateSettings,
   resolveIncident,
 } from '@/lib/actions/admin-round-actions'
@@ -297,6 +303,205 @@ describe('admin-round-actions', () => {
       })
 
       expect(result).toEqual({ error: 'Update failed' })
+    })
+  })
+
+  describe('updateRound', () => {
+    it('updates a round and revalidates', async () => {
+      setupAdmin()
+
+      const result = await updateRound('round-1', roundData)
+
+      expect(result).toEqual({ success: true })
+      expect(mockSupabase.from).toHaveBeenCalledWith('survey_rounds')
+      expect(methods.update).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Round 1', start_date: '2026-04-01' })
+      )
+      expect(revalidatePath).toHaveBeenCalledWith('/admin/rounds')
+      expect(revalidatePath).toHaveBeenCalledWith('/walk')
+    })
+
+    it('returns validation error for empty name', async () => {
+      const result = await updateRound('round-1', { ...roundData, name: '' })
+      expect(result).toEqual({ error: expect.stringContaining('Round name is required') })
+    })
+
+    it('returns validation error when start date after end date', async () => {
+      const result = await updateRound('round-1', {
+        ...roundData,
+        startDate: '2026-05-01',
+        endDate: '2026-04-01',
+      })
+      expect(result).toEqual({ error: expect.stringContaining('Start date must be before end date') })
+    })
+
+    it('returns error on DB failure', async () => {
+      setupAdmin()
+      methods.eq
+        .mockReturnValueOnce(methods)
+        .mockReturnValueOnce({ error: { message: 'Update failed' } })
+
+      const result = await updateRound('round-1', roundData)
+
+      expect(result).toEqual({ error: 'Update failed' })
+    })
+  })
+
+  describe('updateSlot', () => {
+    it('updates a slot and revalidates', async () => {
+      setupAdmin()
+
+      const result = await updateSlot('slot-1', slotData)
+
+      expect(result).toEqual({ success: true })
+      expect(mockSupabase.from).toHaveBeenCalledWith('walk_slots')
+      expect(methods.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          location_name: 'Central Park',
+          walk_date: '2026-04-15',
+          max_volunteers: 3,
+        })
+      )
+      expect(revalidatePath).toHaveBeenCalledWith('/admin/slots')
+      expect(revalidatePath).toHaveBeenCalledWith('/walk')
+    })
+
+    it('returns validation error for missing slot ID', async () => {
+      const result = await updateSlot('', slotData)
+      expect(result).toEqual({ error: 'Slot ID is required' })
+    })
+
+    it('returns validation error when start time >= end time', async () => {
+      const result = await updateSlot('slot-1', {
+        ...slotData,
+        startTime: '10:00',
+        endTime: '08:00',
+      })
+      expect(result).toEqual({ error: expect.stringContaining('Start time must be before end time') })
+    })
+
+    it('returns validation error for invalid maxVolunteers', async () => {
+      const result = await updateSlot('slot-1', {
+        ...slotData,
+        maxVolunteers: 15,
+      })
+      expect(result).toEqual({ error: expect.stringContaining('Max volunteers must be between 1 and 10') })
+    })
+
+    it('returns error on DB failure', async () => {
+      setupAdmin()
+      methods.eq
+        .mockReturnValueOnce(methods)
+        .mockReturnValueOnce({ error: { message: 'Update failed' } })
+
+      const result = await updateSlot('slot-1', slotData)
+
+      expect(result).toEqual({ error: 'Update failed' })
+    })
+  })
+
+  describe('bulkCreateSlots', () => {
+    it('invokes edge function and revalidates', async () => {
+      setupAdmin()
+      mockSupabase.functions = {
+        invoke: vi.fn().mockResolvedValue({
+          data: { success: true, created: 2 },
+          error: null,
+        }),
+      }
+
+      const result = await bulkCreateSlots({
+        roundId: 'round-1',
+        slots: [
+          { locationName: 'Park A', walkDate: '2026-04-15', startTime: '08:00', endTime: '10:00' },
+          { locationName: 'Park B', walkDate: '2026-04-16', startTime: '09:00', endTime: '11:00' },
+        ],
+      })
+
+      expect(result).toEqual({ success: true, created: 2 })
+      expect(mockSupabase.functions.invoke).toHaveBeenCalledWith('bulk-create-walks', {
+        body: expect.objectContaining({ roundId: 'round-1' }),
+      })
+      expect(revalidatePath).toHaveBeenCalledWith('/admin/slots')
+      expect(revalidatePath).toHaveBeenCalledWith('/walk')
+    })
+
+    it('returns error for missing roundId', async () => {
+      const result = await bulkCreateSlots({ roundId: '', slots: [] })
+      expect(result).toEqual({ error: 'Round is required' })
+    })
+
+    it('returns error for empty slots array', async () => {
+      const result = await bulkCreateSlots({ roundId: 'round-1', slots: [] })
+      expect(result).toEqual({ error: 'At least one walk is required' })
+    })
+
+    it('validates individual slot data', async () => {
+      const result = await bulkCreateSlots({
+        roundId: 'round-1',
+        slots: [
+          { locationName: '', walkDate: '2026-04-15', startTime: '08:00', endTime: '10:00' },
+        ],
+      })
+      expect(result).toEqual({ error: expect.stringContaining('Walk 1:') })
+      expect(result).toEqual({ error: expect.stringContaining('Location name is required') })
+    })
+
+    it('returns error on edge function failure', async () => {
+      setupAdmin()
+      mockSupabase.functions = {
+        invoke: vi.fn().mockResolvedValue({
+          data: null,
+          error: { message: 'Edge function failed' },
+        }),
+      }
+
+      const result = await bulkCreateSlots({
+        roundId: 'round-1',
+        slots: [
+          { locationName: 'Park A', walkDate: '2026-04-15', startTime: '08:00', endTime: '10:00' },
+        ],
+      })
+
+      expect(result).toEqual({ error: 'Edge function failed' })
+    })
+  })
+
+  describe('createRound validation', () => {
+    it('returns error for empty name', async () => {
+      const result = await createRound({ ...roundData, name: '' })
+      expect(result).toEqual({ error: expect.stringContaining('Round name is required') })
+    })
+
+    it('returns error for missing dates', async () => {
+      const result = await createRound({ ...roundData, startDate: '', endDate: '' })
+      expect(result).toEqual({ error: expect.stringContaining('Start date is required') })
+    })
+
+    it('returns error for invalid date order', async () => {
+      const result = await createRound({
+        ...roundData,
+        startDate: '2026-05-01',
+        endDate: '2026-04-01',
+      })
+      expect(result).toEqual({ error: expect.stringContaining('Start date must be before end date') })
+    })
+  })
+
+  describe('createSlot validation', () => {
+    it('returns error for missing location name', async () => {
+      const result = await createSlot({ ...slotData, locationName: '' })
+      expect(result).toEqual({ error: expect.stringContaining('Location name is required') })
+    })
+
+    it('returns error for invalid time order', async () => {
+      const result = await createSlot({ ...slotData, startTime: '12:00', endTime: '08:00' })
+      expect(result).toEqual({ error: expect.stringContaining('Start time must be before end time') })
+    })
+
+    it('returns error for maxVolunteers out of range', async () => {
+      const result = await createSlot({ ...slotData, maxVolunteers: 0 })
+      expect(result).toEqual({ error: expect.stringContaining('Max volunteers must be between 1 and 10') })
     })
   })
 

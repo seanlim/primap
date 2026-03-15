@@ -1,17 +1,18 @@
 import { createClient } from '@/lib/supabase/server'
-import { redirect, notFound } from 'next/navigation'
-import { GroupViewClient } from './group-view-client'
+import { notFound, redirect } from 'next/navigation'
+import { GroupViewClient } from '@/app/(app)/report/[slotId]/group-view-client'
 import { getSlotReportViewData } from '@/lib/report-slot-data'
 
 export const dynamic = 'force-dynamic'
 
-export default async function SlotReportPage({
+export default async function AdminSlotReportPage({
   params,
 }: {
   params: Promise<{ slotId: string }>
 }) {
   const { slotId } = await params
   const supabase = await createClient()
+
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
@@ -25,6 +26,8 @@ export default async function SlotReportPage({
       members={viewData.members}
       incidents={viewData.incidents}
       currentUserId={user.id}
+      backHref="/admin/reports"
+      backLabel="Back to Admin Reports"
       canReportIncident={viewData.isParticipant}
     />
   )

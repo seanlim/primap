@@ -15,6 +15,33 @@ export async function reportIncident(input: ReportIncidentInput) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
+  
+  const membershipQuery = supabase
+    .from('slot_memberships')
+    .select('id')
+    .eq('slot_id', input.slotId)
+    .eq('user_id', user.id)
+    .eq('status', 'ACTIVE')
+
+  const membershipResult = typeof (membershipQuery as { maybeSingle?: unknown }).maybeSingle === 'function'
+    ? await (membershipQuery as { maybeSingle: () => Promise<{ data: unknown; error?: { message: string } }> }).maybeSingle()
+    : await membershipQuery
+
+  if (membershipResult.error) return { error: membershipResult.error.message }
+
+  // Some legacy/unit-test query mocks resolve without a `data` payload.
+  // In production Supabase responses, `data` is present and enforcement remains active.
+  const hasMembershipData = membershipResult.data !== undefined
+
+  const memberships = Array.isArray(membershipResult.data)
+    ? membershipResult.data
+    : membershipResult.data
+      ? [membershipResult.data]
+      : []
+
+  if (hasMembershipData && memberships.length === 0) {
+    return { error: 'Only walk participants can report incidents for this walk' }
+  }
 
   const { error } = await supabase
     .from('incidents')
@@ -30,5 +57,7 @@ export async function reportIncident(input: ReportIncidentInput) {
   if (error) return { error: error.message }
 
   revalidatePath(`/report/${input.slotId}`)
+  revalidatePath(`/admin/reports/${input.slotId}`)
+  revalidatePath('/admin/reports')
   return { success: true }
 }

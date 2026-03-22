@@ -31,8 +31,8 @@ interface Props {
   }
   existingObservation: {
     id: string
-    walkCompletion: 'COMPLETED' | 'PARTIAL' | 'ABORTED' | null
-    outcome: 'SIGHTED' | 'NOT_SIGHTED' | null
+    walkCompletion: 'COMPLETED' | 'PARTIAL' | 'ABORTED'
+    outcome: 'SIGHTED' | 'NOT_SIGHTED'
     notes: string | null
     lat: number | null
     lng: number | null
@@ -54,7 +54,7 @@ const WALK_COMPLETION_OPTIONS = [
   { value: 'COMPLETED', label: 'Completed' },
   { value: 'PARTIAL', label: 'Partial' },
   { value: 'ABORTED', label: 'Aborted' },
-]
+] as const;
 
 const SPECIES_OPTIONS = [
   { value: 'RBL', label: "Raffles' Banded Langur" },
@@ -63,8 +63,8 @@ const SPECIES_OPTIONS = [
 ]
 
 export function ObservationFormClient({ slot, existingObservation }: Props) {
-  const [walkCompletion, setWalkCompletion] = useState<string>(existingObservation?.walkCompletion || '')
-  const [notes, setNotes] = useState(existingObservation?.notes || '')
+  const [walkCompletion, setWalkCompletion] = useState(existingObservation?.walkCompletion ?? 'PARTIAL')
+  const [notes, setNotes] = useState(existingObservation?.notes ?? '')
   const [lat, setLat] = useState<number | null>(existingObservation?.lat ?? null)
   const [lng, setLng] = useState<number | null>(existingObservation?.lng ?? null)
   const [observationId, setObservationId] = useState<string | undefined>(existingObservation?.id)
@@ -78,7 +78,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
       lng: s.lng,
       notes: s.notes || '',
       media: s.media || [],
-    })) || []
+    })) ?? []
   )
   const [saving, setSaving] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -126,15 +126,6 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
     })
   }
 
-  // Run auto-save when triggered
-  const autoSaveRef = useRef(0)
-  useEffect(() => {
-    if (autoSaveCounter > 0 && autoSaveCounter !== autoSaveRef.current) {
-      autoSaveRef.current = autoSaveCounter
-      handleSaveDraft(true).then(() => setAutoSavingIndexes(new Set()))
-    }
-  }, [autoSaveCounter]) // eslint-disable-line react-hooks/exhaustive-deps
-
   const buildSightingsPayload = (fromSightings?: SightingForm[]) => {
     return (fromSightings ?? sightings).filter(s => s.species).map(s => ({
       id: s.id,
@@ -160,9 +151,9 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
     const result = await saveDraft({
       walkId: slot.id,
       observationId,
-      walkCompletion: walkCompletion as 'COMPLETED' | 'PARTIAL' | 'ABORTED' | undefined,
-      outcome: hasSightings ? 'SIGHTED' : undefined,
-      notes: notes || undefined,
+      walkCompletion: walkCompletion,
+      outcome: hasSightings ? 'SIGHTED' : 'NOT_SIGHTED',
+      notes: notes,
       lat: lat ?? undefined,
       lng: lng ?? undefined,
       sightings: validSightings,
@@ -194,15 +185,24 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
     setSaving(false)
   }
 
+  // Run auto-save when triggered
+  const autoSaveRef = useRef(0)
+  useEffect(() => {
+    if (autoSaveCounter > 0 && autoSaveCounter !== autoSaveRef.current) {
+      autoSaveRef.current = autoSaveCounter
+      handleSaveDraft(true).then(() => setAutoSavingIndexes(new Set()))
+    }
+  }, [autoSaveCounter]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleSubmit = async () => {
     const validSightings = buildSightingsPayload()
     const hasSightings = validSightings.length > 0
 
     if (!hasSightings) {
-      if (!confirm("You haven't added any sightings. Submit as Not Sighted?")) return
+      if (!confirm("You haven't added any sightings. Submit?\nYou won't be able to edit it after submission.")) return
+    } else {
+      if (!confirm("Submit this report? You won't be able to edit it after submission.")) return
     }
-
-    if (!confirm('Submit this report? You won\'t be able to edit it after submission.')) return
 
     setSaving(true)
     setSubmitting(true)
@@ -213,9 +213,9 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
     const saveResult = await saveDraft({
       walkId: slot.id,
       observationId,
-      walkCompletion: walkCompletion as 'COMPLETED' | 'PARTIAL' | 'ABORTED' | undefined,
+      walkCompletion: walkCompletion,
       outcome,
-      notes: notes || undefined,
+      notes: notes,
       lat: lat ?? undefined,
       lng: lng ?? undefined,
       sightings: validSightings,
@@ -299,7 +299,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
 
         {sightings.length === 0 && (
           <p className="text-sm text-gray-400 text-center py-4">
-            No sightings yet. Add sightings or submit as &quot;Not Sighted&quot;.
+            No sightings yet
           </p>
         )}
 

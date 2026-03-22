@@ -48,6 +48,9 @@ interface Props {
   members: { userId: string; fullName: string | null; email: string }[]
   incidents: { id: string; type: string; description: string; reportedBy: string; createdAt: string; resolved: boolean }[]
   currentUserId: string
+  backHref?: string
+  backLabel?: string
+  canReportIncident?: boolean
 }
 
 const SPECIES_LABELS: Record<string, string> = {
@@ -64,7 +67,16 @@ const INCIDENT_TYPES = [
   { value: 'OTHER', label: 'Other' },
 ] as const
 
-export function GroupViewClient({ slot, observations, members, incidents, currentUserId }: Props) {
+export function GroupViewClient({
+  slot,
+  observations,
+  members,
+  incidents,
+  currentUserId,
+  backHref = '/report',
+  backLabel = 'Back to Reports',
+  canReportIncident = true,
+}: Props) {
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set())
   const [showIncidentModal, setShowIncidentModal] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -97,9 +109,9 @@ export function GroupViewClient({ slot, observations, members, incidents, curren
 
   return (
     <div className="space-y-6">
-      <Link href="/report" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700">
+      <Link href={backHref} className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700">
         <ArrowLeft className="w-4 h-4" />
-        Back to Reports
+        {backLabel}
       </Link>
 
       {/* Walk Header */}
@@ -111,7 +123,7 @@ export function GroupViewClient({ slot, observations, members, incidents, curren
         </p>
       </div>
 
-      {/* Your Report — always shown since auto-draft exists */}
+      {/* Your Report */}
       {myObservation && (
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="p-4 border-b border-gray-100">
@@ -241,16 +253,18 @@ export function GroupViewClient({ slot, observations, members, incidents, curren
       )}
 
       {/* Report Incident Button */}
-      <button
-        onClick={() => setShowIncidentModal(true)}
-        className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 font-medium transition-colors text-sm"
-      >
-        <AlertTriangle className="w-4 h-4" />
-        Report Incident
-      </button>
+      {canReportIncident && (
+        <button
+          onClick={() => setShowIncidentModal(true)}
+          className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 font-medium transition-colors text-sm"
+        >
+          <AlertTriangle className="w-4 h-4" />
+          Report Incident
+        </button>
+      )}
 
       {/* Incident Modal */}
-      {showIncidentModal && (
+      {showIncidentModal && canReportIncident && (
         <IncidentModal
           walkId={slot.id}
           onClose={() => setShowIncidentModal(false)}

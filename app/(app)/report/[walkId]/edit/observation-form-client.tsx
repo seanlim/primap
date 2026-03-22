@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Loader2 } from 'lucide-react'
 import { formatDate } from '@/lib/utils/format-date'
 import { saveDraft, submitObservation } from '@/lib/actions/observation-actions'
 import { LocationPicker } from '@/components/map/location-picker'
@@ -112,12 +112,14 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
   }
 
   const [autoSaveCounter, setAutoSaveCounter] = useState(0)
+  const [autoSavingIndexes, setAutoSavingIndexes] = useState<Set<number>>(new Set())
 
   const updateSighting = (index: number, field: keyof SightingForm, value: string | number | null) => {
     setSightings(prev => {
       const updated = prev.map((s, i) => i === index ? { ...s, [field]: value } : s)
       // Auto-save when species is selected on a new sighting (no id yet) so it gets a DB id for media uploads
       if (field === 'species' && value && !prev[index].id) {
+        setAutoSavingIndexes(prev => new Set(prev).add(index))
         setAutoSaveCounter(c => c + 1)
       }
       return updated
@@ -129,7 +131,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
   useEffect(() => {
     if (autoSaveCounter > 0 && autoSaveCounter !== autoSaveRef.current) {
       autoSaveRef.current = autoSaveCounter
-      handleSaveDraft(true)
+      handleSaveDraft(true).then(() => setAutoSavingIndexes(new Set()))
     }
   }, [autoSaveCounter]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -328,76 +330,86 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
               </select>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Count *</label>
-                <input
-                  type="text"
-                  value={sighting.count}
-                  onChange={(e) => updateSighting(index, 'count', e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                  placeholder="e.g. 3, 5-8, Unknown"
-                />
+            {sighting.species && autoSavingIndexes.has(index) && (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Time</label>
-                <input
-                  type="datetime-local"
-                  value={sighting.observedAt}
-                  onChange={(e) => updateSighting(index, 'observedAt', e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-            </div>
+            )}
 
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">GPS Location *</label>
-              <LocationPicker
-                lat={sighting.lat}
-                lng={sighting.lng}
-                onLocationChange={(newLat, newLng) => {
-                  updateSighting(index, 'lat', newLat)
-                  updateSighting(index, 'lng', newLng)
-                }}
-              />
-              {sighting.lat && sighting.lng && (
-                <p className="text-xs text-gray-400 mt-1">
-                  {sighting.lat.toFixed(5)}, {sighting.lng.toFixed(5)}
-                </p>
-              )}
-            </div>
+            {sighting.species && !autoSavingIndexes.has(index) && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Count *</label>
+                    <input
+                      type="text"
+                      value={sighting.count}
+                      onChange={(e) => updateSighting(index, 'count', e.target.value)}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      placeholder="e.g. 3, 5-8, Unknown"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Time</label>
+                    <input
+                      type="datetime-local"
+                      value={sighting.observedAt}
+                      onChange={(e) => updateSighting(index, 'observedAt', e.target.value)}
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                </div>
 
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
-              <textarea
-                value={sighting.notes}
-                onChange={(e) => updateSighting(index, 'notes', e.target.value)}
-                rows={2}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="Additional notes for this sighting..."
-              />
-            </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">GPS Location *</label>
+                  <LocationPicker
+                    lat={sighting.lat}
+                    lng={sighting.lng}
+                    onLocationChange={(newLat, newLng) => {
+                      updateSighting(index, 'lat', newLat)
+                      updateSighting(index, 'lng', newLng)
+                    }}
+                  />
+                  {sighting.lat && sighting.lng && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      {sighting.lat.toFixed(5)}, {sighting.lng.toFixed(5)}
+                    </p>
+                  )}
+                </div>
 
-            {/* Media for this sighting */}
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Photos/Videos</label>
-              <MediaUploader
-                parentType="sighting"
-                parentId={sighting.id ?? null}
-                existingMedia={sighting.media}
-                onExifGps={(exifLat, exifLng) => {
-                  if (!sighting.lat && !sighting.lng) {
-                    updateSighting(index, 'lat', exifLat)
-                    updateSighting(index, 'lng', exifLng)
-                  }
-                }}
-                onExifDatetime={(datetime) => {
-                  if (!sighting.observedAt) {
-                    updateSighting(index, 'observedAt', datetime)
-                  }
-                }}
-              />
-            </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
+                  <textarea
+                    value={sighting.notes}
+                    onChange={(e) => updateSighting(index, 'notes', e.target.value)}
+                    rows={2}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="Additional notes for this sighting..."
+                  />
+                </div>
+
+                {/* Media for this sighting */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Photos/Videos</label>
+                  <MediaUploader
+                    parentType="sighting"
+                    parentId={sighting.id ?? null}
+                    existingMedia={sighting.media}
+                    onExifGps={(exifLat, exifLng) => {
+                      if (!sighting.lat && !sighting.lng) {
+                        updateSighting(index, 'lat', exifLat)
+                        updateSighting(index, 'lng', exifLng)
+                      }
+                    }}
+                    onExifDatetime={(datetime) => {
+                      if (!sighting.observedAt) {
+                        updateSighting(index, 'observedAt', datetime)
+                      }
+                    }}
+                  />
+                </div>
+              </>
+            )}
           </div>
         ))}
       </div>

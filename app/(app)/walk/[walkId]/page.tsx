@@ -48,7 +48,7 @@ export default async function WalkDetailPage({
         startTime: walk.start_time,
         endTime: walk.end_time,
         maxVolunteers: walk.max_volunteers,
-        notes: walk.notes,
+        notes: null,
         roundName: round?.name || '',
       }}
       members={memberships.map(m => ({

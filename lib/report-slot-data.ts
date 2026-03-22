@@ -98,7 +98,7 @@ export async function getSlotReportViewData(
   const observations = observationsResult.data
   const members = membersResult.data
   const incidents = incidentsResult.data
-  const round = slot.survey_rounds as unknown as { name: string }
+  const round = slot.survey_rounds
 
   return {
     slot: {
@@ -107,12 +107,12 @@ export async function getSlotReportViewData(
       walkDate: slot.walk_date,
       startTime: slot.start_time,
       endTime: slot.end_time,
-      roundName: round?.name || '',
+      roundName: round.name,
     },
     observations: (observations || []).map(obs => ({
       id: obs.id,
       userId: obs.user_id,
-      userName: (obs.profiles as unknown as { full_name: string | null; email: string })?.full_name || (obs.profiles as unknown as { email: string })?.email || 'Unknown',
+      userName: obs.profiles.full_name || obs.profiles.email,
       walkCompletion: obs.walk_completion,
       outcome: obs.outcome,
       notes: obs.notes,
@@ -120,11 +120,7 @@ export async function getSlotReportViewData(
       lng: obs.lng,
       status: obs.status,
       submittedAt: obs.submitted_at,
-      sightings: ((obs.sightings as unknown as Array<{
-        id: string; species: string; count: string;
-        observed_at: string | null; lat: number; lng: number; notes: string | null;
-        media: Array<{ id: string; file_path: string; file_name: string; media_type: string }>
-      }>) || []).map(s => ({
+      sightings: obs.sightings.map(s => ({
         id: s.id,
         species: s.species,
         count: s.count,
@@ -132,20 +128,20 @@ export async function getSlotReportViewData(
         lat: s.lat,
         lng: s.lng,
         notes: s.notes,
-        media: s.media || [],
+        media: s.media,
       })),
-      media: (obs.media as unknown as Array<{ id: string; file_path: string; file_name: string; media_type: string }>) || [],
+      media: obs.media,
     })),
     members: (members || []).map(m => ({
       userId: m.user_id,
-      fullName: (m.profiles as unknown as { full_name: string | null })?.full_name || null,
-      email: (m.profiles as unknown as { email: string })?.email || '',
+      fullName: m.profiles.full_name,
+      email: m.profiles.email,
     })),
     incidents: (incidents || []).map(inc => ({
       id: inc.id,
       type: inc.incident_type,
       description: inc.description,
-      reportedBy: (inc.profiles as unknown as { full_name: string | null; email: string })?.full_name || (inc.profiles as unknown as { email: string })?.email || 'Unknown',
+      reportedBy: inc.profiles.full_name || inc.profiles.email,
       createdAt: inc.created_at,
       resolved: inc.resolved,
     })),

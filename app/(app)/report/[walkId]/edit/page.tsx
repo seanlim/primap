@@ -39,6 +39,9 @@ export default async function EditReportPage({
   const walk = walkResult.data
   if (!walk) notFound()
 
+  const membership = membershipResult.data
+  if (!membership) redirect('/report')
+
   const existingObs = obsResult.data
 
   // Can't edit submitted observations

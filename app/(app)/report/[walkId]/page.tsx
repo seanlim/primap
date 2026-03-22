@@ -15,6 +15,16 @@ export default async function WalkReportPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const membershipResult = await supabase
+      .from('slot_memberships')
+      .select('id')
+      .eq('slot_id', walkId)
+      .eq('user_id', user.id)
+      .eq('status', 'ACTIVE')
+      .single()
+  
+  if (!membershipResult.data) redirect('/report')
+
   const viewData = await getSlotReportViewData(supabase, walkId, user.id)
   if (!viewData) notFound()
 

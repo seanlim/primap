@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils/format-date'
-import type { WalkRef } from '@/lib/types/supabase-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,22 +29,13 @@ export default async function ReportListPage() {
     .eq('status', 'ACTIVE')
     .order('joined_at', { ascending: false })
 
-  // Get user's observations to check report status per slot
-  const slotIds = (memberships || []).map(m => {
-    const slot = m.walk_slots as unknown as WalkRef
-    return slot?.id
-  }).filter(Boolean)
-
-  const { data: observations } = slotIds.length > 0
-    ? await supabase
+  const { data: observations } =  await supabase
         .from('observations')
         .select('id, slot_id, status')
         .eq('user_id', user.id)
-        .in('slot_id', slotIds)
-    : { data: [] }
 
   const observationMap = new Map(
-    (observations || []).map(o => [o.slot_id, { id: o.id, status: o.status }])
+    (observations || []).map(o => [o.slot_id,  o.status ])
   )
 
   return (
@@ -62,18 +52,17 @@ export default async function ReportListPage() {
       ) : (
         <div className="space-y-2">
           {memberships.map((membership) => {
-            const slot = membership.walk_slots as unknown as WalkRef
-            if (!slot) return null
+            const slot = membership.walk_slots;
+            const status = observationMap.get(slot.id)
 
-            const obs = observationMap.get(slot.id)
-            const statusLabel = !obs
+            const statusLabel = !status
               ? 'No Report'
-              : obs.status === 'DRAFT'
+              : status === 'DRAFT'
               ? 'Draft'
               : 'Submitted'
-            const statusColor = !obs
+            const statusColor = !status
               ? 'bg-gray-100 text-gray-500'
-              : obs.status === 'DRAFT'
+              : status === 'DRAFT'
               ? 'bg-yellow-100 text-yellow-700'
               : 'bg-green-100 text-green-700'
 
@@ -89,9 +78,7 @@ export default async function ReportListPage() {
                     <p className="text-sm text-gray-600 mt-1">
                       {formatDate(slot.walk_date, 'short')} &middot; {slot.start_time.slice(0, 5)}
                     </p>
-                    {slot.survey_rounds && (
-                      <p className="text-xs text-gray-400 mt-1">{slot.survey_rounds.name}</p>
-                    )}
+                    <p className="text-xs text-gray-400 mt-1">{slot.survey_rounds.name}</p>
                   </div>
                   <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusColor}`}>
                     {statusLabel}

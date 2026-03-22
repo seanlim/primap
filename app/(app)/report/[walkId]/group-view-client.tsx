@@ -114,7 +114,7 @@ export function GroupViewClient({
         {backLabel}
       </Link>
 
-      {/* Slot Header */}
+      {/* Walk Header */}
       <div className="bg-white rounded-xl p-5 shadow-sm">
         <p className="text-xs text-green-600 font-medium">{slot.roundName}</p>
         <h1 className="text-xl font-bold text-gray-900 mt-1">{slot.locationName}</h1>
@@ -266,7 +266,7 @@ export function GroupViewClient({
       {/* Incident Modal */}
       {showIncidentModal && canReportIncident && (
         <IncidentModal
-          slotId={slot.id}
+          walkId={slot.id}
           onClose={() => setShowIncidentModal(false)}
           onSubmitted={() => {
             setShowIncidentModal(false)
@@ -399,11 +399,11 @@ function ObservationDetails({ observation }: { observation: ObservationData }) {
 }
 
 function IncidentModal({
-  slotId,
+  walkId,
   onClose,
   onSubmitted,
 }: {
-  slotId: string
+  walkId: string
   onClose: () => void
   onSubmitted: () => void
 }) {
@@ -419,7 +419,7 @@ function IncidentModal({
     setError('')
 
     const result = await reportIncident({
-      slotId,
+      walkId,
       incidentType: type as 'INJURED_ANIMAL' | 'DEAD_ANIMAL' | 'HUMAN_WILDLIFE_CONFLICT' | 'HABITAT_DAMAGE' | 'OTHER',
       description,
     })

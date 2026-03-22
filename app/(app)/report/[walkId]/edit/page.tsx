@@ -7,37 +7,37 @@ export const dynamic = 'force-dynamic'
 export default async function EditReportPage({
   params,
 }: {
-  params: Promise<{ slotId: string }>
+  params: Promise<{ walkId: string }>
 }) {
-  const { slotId } = await params
+  const { walkId } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   // Run all queries in parallel
-  const [slotResult, membershipResult, obsResult] = await Promise.all([
+  const [walkResult, membershipResult, obsResult] = await Promise.all([
     supabase
       .from('walk_slots')
       .select('*, survey_rounds(name)')
-      .eq('id', slotId)
+      .eq('id', walkId)
       .single(),
     supabase
       .from('slot_memberships')
       .select('id')
-      .eq('slot_id', slotId)
+      .eq('slot_id', walkId)
       .eq('user_id', user.id)
       .eq('status', 'ACTIVE')
       .single(),
     supabase
       .from('observations')
       .select('*, sightings(*, media:media!media_sighting_id_fkey(*)), media:media!media_observation_id_fkey(*)')
-      .eq('slot_id', slotId)
+      .eq('slot_id', walkId)
       .eq('user_id', user.id)
       .single(),
   ])
 
-  const slot = slotResult.data
-  if (!slot) notFound()
+  const walk = walkResult.data
+  if (!walk) notFound()
 
   const membership = membershipResult.data
   if (!membership) redirect('/report')
@@ -46,19 +46,19 @@ export default async function EditReportPage({
 
   // Can't edit submitted observations
   if (existingObs?.status === 'SUBMITTED') {
-    redirect(`/report/${slotId}`)
+    redirect(`/report/${walkId}`)
   }
 
-  const round = slot.survey_rounds as unknown as { name: string }
+  const round = walk.survey_rounds as unknown as { name: string }
 
   return (
     <ObservationFormClient
       slot={{
-        id: slot.id,
-        locationName: slot.location_name,
-        walkDate: slot.walk_date,
-        startTime: slot.start_time,
-        endTime: slot.end_time,
+        id: walk.id,
+        locationName: walk.location_name,
+        walkDate: walk.walk_date,
+        startTime: walk.start_time,
+        endTime: walk.end_time,
         roundName: round?.name || '',
       }}
       existingObservation={existingObs ? {

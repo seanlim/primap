@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 interface ReportIncidentInput {
-  slotId: string
+  walkId: string
   incidentType: 'INJURED_ANIMAL' | 'DEAD_ANIMAL' | 'HUMAN_WILDLIFE_CONFLICT' | 'HABITAT_DAMAGE' | 'OTHER'
   description: string
   lat?: number
@@ -19,12 +19,12 @@ export async function reportIncident(input: ReportIncidentInput) {
   const membershipQuery = supabase
     .from('slot_memberships')
     .select('id')
-    .eq('slot_id', input.slotId)
+    .eq('slot_id', input.walkId)
     .eq('user_id', user.id)
     .eq('status', 'ACTIVE')
 
-  const membershipResult = typeof (membershipQuery as { maybeSingle?: unknown }).maybeSingle === 'function'
-    ? await (membershipQuery as { maybeSingle: () => Promise<{ data: unknown; error?: { message: string } }> }).maybeSingle()
+  const membershipResult = typeof (membershipQuery as unknown as { maybeSingle?: unknown }).maybeSingle === 'function'
+    ? await (membershipQuery as unknown as { maybeSingle: () => Promise<{ data: unknown; error?: { message: string } }> }).maybeSingle()
     : await membershipQuery
 
   if (membershipResult.error) return { error: membershipResult.error.message }
@@ -46,7 +46,7 @@ export async function reportIncident(input: ReportIncidentInput) {
   const { error } = await supabase
     .from('incidents')
     .insert({
-      slot_id: input.slotId,
+      slot_id: input.walkId,
       reported_by: user.id,
       incident_type: input.incidentType,
       description: input.description,
@@ -56,8 +56,8 @@ export async function reportIncident(input: ReportIncidentInput) {
 
   if (error) return { error: error.message }
 
-  revalidatePath(`/report/${input.slotId}`)
-  revalidatePath(`/admin/reports/${input.slotId}`)
+  revalidatePath(`/report/${input.walkId}`)
+  revalidatePath(`/admin/reports/${input.walkId}`)
   revalidatePath('/admin/reports')
   return { success: true }
 }

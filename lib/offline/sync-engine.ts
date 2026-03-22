@@ -19,8 +19,8 @@ export async function processOutbox(): Promise<number> {
     try {
       switch (item.action) {
         case 'UPSERT_DRAFT': {
-          const { slotId, observationId, ...data } = item.payload as {
-            slotId: string
+          const { walkId, observationId, ...data } = item.payload as {
+            walkId: string
             observationId?: string
             [key: string]: unknown
           }
@@ -36,7 +36,7 @@ export async function processOutbox(): Promise<number> {
             await supabase
               .from('observations')
               .upsert({
-                slot_id: slotId,
+                slot_id: walkId,
                 user_id: user.id,
                 client_draft_id: item.clientDraftId,
                 ...data,

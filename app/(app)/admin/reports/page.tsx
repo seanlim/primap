@@ -5,7 +5,7 @@ import { ArrowLeft, Users } from 'lucide-react'
 export const dynamic = 'force-dynamic'
 
 interface GroupedReport {
-  slotId: string
+  walkId: string
   locationName: string
   walkDate: string
   startTime: string
@@ -54,7 +54,7 @@ export default async function AdminReportsPage() {
     const existing = grouped.get(obs.slot_id)
     if (!existing) {
       grouped.set(obs.slot_id, {
-        slotId: obs.slot_id,
+        walkId: obs.slot_id,
         locationName: slot.location_name,
         walkDate: slot.walk_date,
         startTime: slot.start_time,
@@ -96,8 +96,8 @@ export default async function AdminReportsPage() {
         <div className="space-y-2">
         {groupedReports.map((report) => (
             <Link
-              key={report.slotId}
-              href={`/admin/reports/${report.slotId}`}
+              key={report.walkId}
+              href={`/admin/reports/${report.walkId}`}
               className="block bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
             >
               <div className="flex justify-between items-start gap-4">

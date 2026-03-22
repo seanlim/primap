@@ -4,10 +4,10 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
-import { createSlot, deleteSlot } from '@/lib/actions/admin-round-actions'
+import { createWalk, deleteWalk } from '@/lib/actions/admin-round-actions'
 import { formatDate } from '@/lib/utils/format-date'
 
-interface SlotData {
+interface WalkData {
   id: string
   roundId: string
   roundName: string
@@ -19,8 +19,8 @@ interface SlotData {
   memberCount: number
 }
 
-export function SlotsClient({ slots, rounds }: {
-  slots: SlotData[]
+export function WalksClient({ walks, rounds }: {
+  walks: WalkData[]
   rounds: { id: string; name: string }[]
 }) {
   const [showForm, setShowForm] = useState(false)
@@ -36,7 +36,7 @@ export function SlotsClient({ slots, rounds }: {
   const handleCreate = async (e: React.SubmitEvent) => {
     e.preventDefault()
     setLoading(true)
-    const result = await createSlot({
+    const result = await createWalk({
       roundId,
       locationName,
       walkDate,
@@ -53,9 +53,9 @@ export function SlotsClient({ slots, rounds }: {
     setLoading(false)
   }
 
-  const handleDelete = async (slotId: string) => {
-    if (!confirm('Delete this slot?')) return
-    const result = await deleteSlot(slotId)
+  const handleDelete = async (walkId: string) => {
+    if (!confirm('Delete this walk?')) return
+    const result = await deleteWalk(walkId)
     if (result.error) alert(result.error)
     else router.refresh()
   }
@@ -67,14 +67,14 @@ export function SlotsClient({ slots, rounds }: {
           <Link href="/admin" className="text-gray-400 hover:text-gray-600">
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Walk Slots</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Walks</h1>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
           className="flex items-center gap-1 bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-green-700"
         >
           <Plus className="w-4 h-4" />
-          New Slot
+          New Walk
         </button>
       </div>
 
@@ -119,33 +119,33 @@ export function SlotsClient({ slots, rounds }: {
             </button>
             <button type="submit" disabled={loading}
               className="flex-1 bg-green-600 text-white py-3 rounded-xl text-sm font-medium hover:bg-green-700 disabled:opacity-50">
-              {loading ? 'Creating...' : 'Create Slot'}
+              {loading ? 'Creating...' : 'Create Walk'}
             </button>
           </div>
         </form>
       )}
 
       <div className="space-y-2">
-        {slots.map(slot => (
-          <div key={slot.id} className="bg-white rounded-xl p-4 shadow-sm flex items-center justify-between">
+        {walks.map(walk => (
+          <div key={walk.id} className="bg-white rounded-xl p-4 shadow-sm flex items-center justify-between">
             <div>
-              <p className="font-medium text-gray-900">{slot.locationName}</p>
+              <p className="font-medium text-gray-900">{walk.locationName}</p>
               <p className="text-sm text-gray-500">
-                {formatDate(slot.walkDate, 'compact')}
-                {" "} &middot; {slot.startTime.slice(0, 5)} - {slot.endTime.slice(0, 5)}
+                {formatDate(walk.walkDate, 'compact')}
+                {" "} &middot; {walk.startTime.slice(0, 5)} - {walk.endTime.slice(0, 5)}
               </p>
               <p className="text-xs text-gray-400 mt-0.5">
-                {slot.roundName} &middot; {slot.memberCount}/{slot.maxVolunteers} volunteers
+                {walk.roundName} &middot; {walk.memberCount}/{walk.maxVolunteers} volunteers
               </p>
             </div>
-            <button onClick={() => handleDelete(slot.id)} className="text-red-400 hover:text-red-600 p-2">
+            <button onClick={() => handleDelete(walk.id)} className="text-red-400 hover:text-red-600 p-2">
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
         ))}
-        {slots.length === 0 && (
+        {walks.length === 0 && (
           <div className="bg-white rounded-xl p-8 text-center shadow-sm">
-            <p className="text-gray-500">No walk slots yet.</p>
+            <p className="text-gray-500">No walks yet.</p>
           </div>
         )}
       </div>

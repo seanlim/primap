@@ -68,7 +68,7 @@ function setupUser(userId = 'user-1') {
 }
 
 const baseDraftInput = {
-  slotId: 'slot-1',
+  walkId: 'slot-1',
   walkCompletion: 'COMPLETED' as const,
   outcome: 'NOT_SIGHTED' as const,
   notes: 'All clear',
@@ -245,7 +245,7 @@ describe('observation-actions', () => {
       })
 
       const result = await saveDraft({
-        slotId: 'slot-1',
+        walkId: 'slot-1',
         sightings: [],
       })
 

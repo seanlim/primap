@@ -11,7 +11,7 @@ export default async function AdminDashboard() {
     { count: totalUsers },
     { count: pendingUsers },
     { count: activeRounds },
-    { count: totalSlots },
+    { count: totalWalks },
     { count: totalObservations },
     { count: openIncidents },
   ] = await Promise.all([
@@ -26,7 +26,7 @@ export default async function AdminDashboard() {
   const cards = [
     { label: 'Users', value: totalUsers || 0, sub: `${pendingUsers || 0} pending`, href: '/admin/users', icon: Users, color: 'bg-blue-50 text-blue-600' },
     { label: 'Rounds', value: activeRounds || 0, sub: 'active', href: '/admin/rounds', icon: Calendar, color: 'bg-green-50 text-green-600' },
-    { label: 'Slots', value: totalSlots || 0, sub: 'total', href: '/admin/slots', icon: MapPin, color: 'bg-purple-50 text-purple-600' },
+    { label: 'Walks', value: totalWalks || 0, sub: 'total', href: '/admin/walks', icon: MapPin, color: 'bg-purple-50 text-purple-600' },
     { label: 'Reports', value: totalObservations || 0, sub: 'submitted', href: '/admin/reports', icon: ClipboardList, color: 'bg-indigo-50 text-indigo-600' },
     { label: 'Incidents', value: openIncidents || 0, sub: 'open', href: '/admin/incidents', icon: AlertTriangle, color: 'bg-red-50 text-red-600' },
     { label: 'Settings', value: '', sub: 'Configure', href: '/admin/settings', icon: Settings, color: 'bg-gray-50 text-gray-600' },

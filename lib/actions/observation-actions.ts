@@ -14,7 +14,7 @@ interface SightingInput {
 }
 
 interface SaveDraftInput {
-  slotId: string
+  walkId: string
   observationId?: string
   walkCompletion?: 'COMPLETED' | 'PARTIAL' | 'ABORTED'
   outcome?: 'SIGHTED' | 'NOT_SIGHTED'
@@ -75,7 +75,7 @@ export async function saveDraft(input: SaveDraftInput) {
     const { data, error } = await supabase
       .from('observations')
       .insert({
-        slot_id: input.slotId,
+        slot_id: input.walkId,
         user_id: user.id,
         walk_completion: input.walkCompletion,
         outcome: derivedOutcome,
@@ -176,11 +176,11 @@ export async function saveDraft(input: SaveDraftInput) {
   }
 
   revalidatePath('/report')
-  revalidatePath(`/report/${input.slotId}`)
+  revalidatePath(`/report/${input.walkId}`)
   return { success: true, observationId, sightingIds }
 }
 
-export async function submitObservation(observationId: string, slotId: string) {
+export async function submitObservation(observationId: string, walkId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
@@ -228,7 +228,7 @@ export async function submitObservation(observationId: string, slotId: string) {
   if (error) return { error: error.message }
 
   revalidatePath('/report')
-  revalidatePath(`/report/${slotId}`)
+  revalidatePath(`/report/${walkId}`)
   revalidatePath('/home')
   revalidatePath('/profile')
   return { success: true }

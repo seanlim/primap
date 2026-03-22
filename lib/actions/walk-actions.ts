@@ -2,15 +2,15 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { sendSlotCancellationEmail } from '@/lib/email'
+import { sendWalkCancellationEmail } from '@/lib/email'
 
-export async function joinSlot(slotId: string) {
+export async function joinWalk(walkId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
   const { data, error } = await supabase.rpc('join_slot_with_observation', {
-    p_slot_id: slotId,
+    p_slot_id: walkId,
     p_user_id: user.id,
   })
 
@@ -20,15 +20,15 @@ export async function joinSlot(slotId: string) {
   if (result.error) return { error: result.error }
 
   revalidatePath('/walk')
-  revalidatePath(`/walk/${slotId}`)
+  revalidatePath(`/walk/${walkId}`)
   revalidatePath('/home')
   revalidatePath('/report')
-  revalidatePath(`/report/${slotId}`)
+  revalidatePath(`/report/${walkId}`)
   return { success: true }
 }
 
 
-export async function cancelSlot(slotId: string) {
+export async function cancelWalk(walkId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
@@ -39,7 +39,7 @@ export async function cancelSlot(slotId: string) {
       status: 'CANCELLED',
       cancelled_at: new Date().toISOString(),
     })
-    .eq('slot_id', slotId)
+    .eq('slot_id', walkId)
     .eq('user_id', user.id)
     .eq('status', 'ACTIVE')
 
@@ -47,11 +47,11 @@ export async function cancelSlot(slotId: string) {
 
   // Notify other members
   try {
-    // 1. Get slot info
+    // 1. Get walk info
     const { data: slot } = await supabase
       .from('walk_slots')
       .select('walk_date, start_time, location_name')
-      .eq('id', slotId)
+      .eq('id', walkId)
       .single()
 
     // 2. Get cancelling user info
@@ -67,7 +67,7 @@ export async function cancelSlot(slotId: string) {
     const { data: otherMembers } = await supabase
       .from('slot_memberships')
       .select('user_id, profiles:user_id(email)')
-      .eq('slot_id', slotId)
+      .eq('slot_id', walkId)
       .eq('status', 'ACTIVE')
       .neq('user_id', user.id)
 
@@ -77,7 +77,7 @@ export async function cancelSlot(slotId: string) {
         .filter(Boolean)
 
       if (recipients.length > 0) {
-        await sendSlotCancellationEmail(
+        await sendWalkCancellationEmail(
           recipients,
           {
             date: slot.walk_date,
@@ -92,17 +92,17 @@ export async function cancelSlot(slotId: string) {
     console.error('Error sending cancellation emails:', err)
     // Return success with warning so UI can show a toast
     revalidatePath('/walk')
-    revalidatePath(`/walk/${slotId}`)
+    revalidatePath(`/walk/${walkId}`)
     revalidatePath('/home')
     revalidatePath('/report')
-    revalidatePath(`/report/${slotId}`)
+    revalidatePath(`/report/${walkId}`)
     return { success: true, warning: 'Cancelled successfully, but failed to notify other members.' }
   }
 
   revalidatePath('/walk')
-  revalidatePath(`/walk/${slotId}`)
+  revalidatePath(`/walk/${walkId}`)
   revalidatePath('/home')
   revalidatePath('/report')
-  revalidatePath(`/report/${slotId}`)
+  revalidatePath(`/report/${walkId}`)
   return { success: true }
 }

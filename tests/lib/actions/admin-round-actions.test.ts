@@ -33,8 +33,8 @@ import {
   createRound,
   updateRoundStatus,
   deleteRound,
-  createSlot,
-  deleteSlot,
+  createWalk,
+  deleteWalk,
   updateSettings,
   resolveIncident,
 } from '@/lib/actions/admin-round-actions'
@@ -66,7 +66,7 @@ const roundData = {
   endDate: '2026-04-30',
 }
 
-const slotData = {
+const walkData = {
   roundId: 'round-1',
   locationName: 'Central Park',
   walkDate: '2026-04-15',
@@ -184,25 +184,25 @@ describe('admin-round-actions', () => {
     })
   })
 
-  describe('createSlot', () => {
+  describe('createWalk', () => {
     it('creates a slot with default maxVolunteers of 3', async () => {
       setupAdmin()
 
-      const result = await createSlot(slotData)
+      const result = await createWalk(walkData)
 
       expect(result).toEqual({ success: true })
       expect(mockSupabase.from).toHaveBeenCalledWith('walk_slots')
       expect(methods.insert).toHaveBeenCalledWith(
         expect.objectContaining({ max_volunteers: 3 })
       )
-      expect(revalidatePath).toHaveBeenCalledWith('/admin/slots')
+      expect(revalidatePath).toHaveBeenCalledWith('/admin/walks')
       expect(revalidatePath).toHaveBeenCalledWith('/walk')
     })
 
     it('creates a slot with custom maxVolunteers', async () => {
       setupAdmin()
 
-      const result = await createSlot({ ...slotData, maxVolunteers: 5 })
+      const result = await createWalk({ ...walkData, maxVolunteers: 5 })
 
       expect(result).toEqual({ success: true })
       expect(methods.insert).toHaveBeenCalledWith(
@@ -216,21 +216,21 @@ describe('admin-round-actions', () => {
         error: { message: 'Slot insert failed' },
       })
 
-      const result = await createSlot(slotData)
+      const result = await createWalk(walkData)
 
       expect(result).toEqual({ error: 'Slot insert failed' })
     })
   })
 
-  describe('deleteSlot', () => {
+  describe('deleteWalk', () => {
     it('deletes a slot and revalidates', async () => {
       setupAdmin()
 
-      const result = await deleteSlot('slot-1')
+      const result = await deleteWalk('slot-1')
 
       expect(result).toEqual({ success: true })
       expect(mockSupabase.from).toHaveBeenCalledWith('walk_slots')
-      expect(revalidatePath).toHaveBeenCalledWith('/admin/slots')
+      expect(revalidatePath).toHaveBeenCalledWith('/admin/walks')
       expect(revalidatePath).toHaveBeenCalledWith('/walk')
     })
 
@@ -240,7 +240,7 @@ describe('admin-round-actions', () => {
         .mockReturnValueOnce(methods) // requireAdmin's eq
         .mockReturnValueOnce({ error: { message: 'Delete failed' } }) // action's eq
 
-      const result = await deleteSlot('slot-1')
+      const result = await deleteWalk('slot-1')
 
       expect(result).toEqual({ error: 'Delete failed' })
     })

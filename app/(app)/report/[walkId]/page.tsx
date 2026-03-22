@@ -5,17 +5,17 @@ import { getSlotReportViewData } from '@/lib/report-slot-data'
 
 export const dynamic = 'force-dynamic'
 
-export default async function SlotReportPage({
+export default async function WalkReportPage({
   params,
 }: {
-  params: Promise<{ slotId: string }>
+  params: Promise<{ walkId: string }>
 }) {
-  const { slotId } = await params
+  const { walkId } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const viewData = await getSlotReportViewData(supabase, slotId, user.id)
+  const viewData = await getSlotReportViewData(supabase, walkId, user.id)
   if (!viewData) notFound()
 
   return (

@@ -88,7 +88,7 @@ export async function sendAccountEnabledEmail(email: string, fullName: string | 
   `));
 }
 
-export async function sendSlotCancellationEmail(
+export async function sendWalkCancellationEmail(
   recipients: string[],
   slotInfo: { date: string; time: string; location: string },
   cancelledBy: string
@@ -96,19 +96,19 @@ export async function sendSlotCancellationEmail(
   if (recipients.length === 0) return;
 
   const html = wrapHtml(`
-    <p>A volunteer has cancelled their participation in an upcoming walk slot you are also joined in.</p>
+    <p>A volunteer has cancelled their participation in an upcoming walk you are also joined in.</p>
     <div style="background-color: #f9fafb; padding: 15px; border-radius: 5px; margin: 15px 0;">
       <p><strong>Date:</strong> ${slotInfo.date}</p>
       <p><strong>Time:</strong> ${slotInfo.time}</p>
       <p><strong>Location:</strong> ${slotInfo.location}</p>
     </div>
     <p><strong>Cancelled by:</strong> ${cancelledBy}</p>
-    <p>You are still signed up for this slot. If you also need to cancel, please do so as soon as possible.</p>
+    <p>You are still signed up for this walk. If you also need to cancel, please do so as soon as possible.</p>
   `);
 
   // Send individually to preserve recipient privacy
   await Promise.all(recipients.map(email =>
-    sendEmail(email, 'Walk Slot Cancellation Update', html)
+    sendEmail(email, 'Walk Cancellation Update', html)
   ));
 }
 
@@ -127,7 +127,7 @@ export async function sendWalkReminderEmail(
       <p><strong>Location:</strong> ${slotInfo.location}</p>
     </div>
     <p>Please remember to bring your equipment and arrive on time.</p>
-    <p>If you cannot make it, please cancel your slot as soon as possible to allow others to join.</p>
+    <p>If you cannot make it, please cancel your walk as soon as possible to allow others to join.</p>
     <a href="${APP_URL()}/walk" class="button">View My Walks</a>
   `));
 }

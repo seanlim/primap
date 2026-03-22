@@ -1,21 +1,21 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
-import { SlotDetailClient } from './slot-detail-client'
+import { WalkDetailClient } from './walk-detail-client'
 import type { MembershipWithProfile } from '@/lib/types/supabase-helpers'
 
 export const dynamic = 'force-dynamic'
 
-export default async function SlotDetailPage({
+export default async function WalkDetailPage({
   params,
 }: {
-  params: Promise<{ slotId: string }>
+  params: Promise<{ walkId: string }>
 }) {
-  const { slotId } = await params
+  const { walkId } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: slot } = await supabase
+  const { data: walk } = await supabase
     .from('walk_slots')
     .select(`
       *,
@@ -28,27 +28,27 @@ export default async function SlotDetailPage({
         profiles:user_id (full_name, email, avatar_url)
       )
     `)
-    .eq('id', slotId)
+    .eq('id', walkId)
     .single()
 
-  if (!slot) notFound()
+  if (!walk) notFound()
 
-  const memberships = (slot.slot_memberships as unknown as MembershipWithProfile[])
+  const memberships = (walk.slot_memberships as unknown as MembershipWithProfile[])
     .filter(m => m.status === 'ACTIVE')
 
   const userMembership = memberships.find(m => m.user_id === user.id)
-  const round = slot.survey_rounds as unknown as { name: string; status: string }
+  const round = walk.survey_rounds as unknown as { name: string; status: string }
 
   return (
-    <SlotDetailClient
-      slot={{
-        id: slot.id,
-        locationName: slot.location_name,
-        walkDate: slot.walk_date,
-        startTime: slot.start_time,
-        endTime: slot.end_time,
-        maxVolunteers: slot.max_volunteers,
-        notes: slot.notes,
+    <WalkDetailClient
+      walk={{
+        id: walk.id,
+        locationName: walk.location_name,
+        walkDate: walk.walk_date,
+        startTime: walk.start_time,
+        endTime: walk.end_time,
+        maxVolunteers: walk.max_volunteers,
+        notes: null,
         roundName: round?.name || '',
       }}
       members={memberships.map(m => ({
@@ -58,7 +58,7 @@ export default async function SlotDetailPage({
         joinedAt: m.joined_at,
       }))}
       isJoined={!!userMembership}
-      isFull={memberships.length >= slot.max_volunteers}
+      isFull={memberships.length >= walk.max_volunteers}
       currentUserId={user.id}
     />
   )

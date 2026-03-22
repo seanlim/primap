@@ -9,43 +9,43 @@ beforeEach(() => {
 })
 
 describe('Drafts', () => {
-  it('saveDraftLocally + getDraftBySlot round trip', async () => {
-    const { saveDraftLocally, getDraftBySlot } = await import('@/lib/offline/db')
+  it('saveDraftLocally + getDraftByWalk round trip', async () => {
+    const { saveDraftLocally, getDraftByWalk } = await import('@/lib/offline/db')
 
     await saveDraftLocally('draft-1', 'slot-A', { species: 'macaque' })
-    const result = await getDraftBySlot('slot-A')
+    const result = await getDraftByWalk('slot-A')
 
     expect(result).toBeDefined()
     expect(result!.id).toBe('draft-1')
-    expect(result!.slotId).toBe('slot-A')
+    expect(result!.walkId).toBe('slot-A')
     expect(result!.data).toEqual({ species: 'macaque' })
     expect(result!.updatedAt).toBeTypeOf('number')
   })
 
   it('saveDraftLocally overwrites existing with same id', async () => {
-    const { saveDraftLocally, getDraftBySlot } = await import('@/lib/offline/db')
+    const { saveDraftLocally, getDraftByWalk } = await import('@/lib/offline/db')
 
     await saveDraftLocally('draft-1', 'slot-A', { species: 'macaque' })
     await saveDraftLocally('draft-1', 'slot-A', { species: 'gibbon' })
 
-    const result = await getDraftBySlot('slot-A')
+    const result = await getDraftByWalk('slot-A')
     expect(result!.data).toEqual({ species: 'gibbon' })
   })
 
-  it('getDraftBySlot returns undefined for missing slot', async () => {
-    const { getDraftBySlot } = await import('@/lib/offline/db')
+  it('getDraftByWalk returns undefined for missing slot', async () => {
+    const { getDraftByWalk } = await import('@/lib/offline/db')
 
-    const result = await getDraftBySlot('nonexistent-slot')
+    const result = await getDraftByWalk('nonexistent-slot')
     expect(result).toBeUndefined()
   })
 
   it('deleteDraft removes draft', async () => {
-    const { saveDraftLocally, getDraftBySlot, deleteDraft } = await import('@/lib/offline/db')
+    const { saveDraftLocally, getDraftByWalk, deleteDraft } = await import('@/lib/offline/db')
 
     await saveDraftLocally('draft-1', 'slot-A', { species: 'macaque' })
     await deleteDraft('draft-1')
 
-    const result = await getDraftBySlot('slot-A')
+    const result = await getDraftByWalk('slot-A')
     expect(result).toBeUndefined()
   })
 
@@ -73,12 +73,12 @@ describe('Outbox', () => {
   it('addToOutbox + getOutboxItems round trip', async () => {
     const { addToOutbox, getOutboxItems } = await import('@/lib/offline/db')
 
-    await addToOutbox('UPSERT_DRAFT', { slotId: 'slot-A' }, 'client-1')
+    await addToOutbox('UPSERT_DRAFT', { walkId: 'slot-A' }, 'client-1')
     const items = await getOutboxItems()
 
     expect(items).toHaveLength(1)
     expect(items[0].action).toBe('UPSERT_DRAFT')
-    expect(items[0].payload).toEqual({ slotId: 'slot-A' })
+    expect(items[0].payload).toEqual({ walkId: 'slot-A' })
     expect(items[0].clientDraftId).toBe('client-1')
   })
 
@@ -98,7 +98,7 @@ describe('Outbox', () => {
   it('removeFromOutbox removes item', async () => {
     const { addToOutbox, getOutboxItems, removeFromOutbox } = await import('@/lib/offline/db')
 
-    await addToOutbox('UPSERT_DRAFT', { slotId: 'slot-A' }, 'client-1')
+    await addToOutbox('UPSERT_DRAFT', { walkId: 'slot-A' }, 'client-1')
     const items = await getOutboxItems()
     expect(items).toHaveLength(1)
 

@@ -14,7 +14,7 @@ interface RoundData {
   startDate: string
   endDate: string
   status: string
-  slotCount: number
+  walkCount: number
 }
 
 export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
@@ -46,7 +46,7 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
   }
 
   const handleDelete = async (roundId: string) => {
-    if (!confirm('Delete this round and all its slots?')) return
+    if (!confirm('Delete this round and all its walks?')) return
     const result = await deleteRound(roundId)
     if (result.error) alert(result.error)
     else router.refresh()
@@ -120,7 +120,7 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
                 <p className="font-semibold text-gray-900">{round.name}</p>
                 {round.description && <p className="text-sm text-gray-500 mt-0.5">{round.description}</p>}
                 <p className="text-xs text-gray-400 mt-1">
-                  {formatDate(round.startDate)} - {formatDate(round.endDate)} &middot; {round.slotCount} slot(s)
+                  {formatDate(round.startDate)} - {formatDate(round.endDate)} &middot; {round.walkCount} walk(s)
                 </p>
               </div>
               <span className={`text-xs px-2 py-1 rounded-full font-medium ${

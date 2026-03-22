@@ -2,15 +2,15 @@
 
 import { useState, useOptimistic, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { joinSlot, cancelSlot } from '@/lib/actions/walk-actions'
+import { joinWalk, cancelWalk } from '@/lib/actions/walk-actions'
 import { ArrowLeft, MapPin, Calendar, Clock, Users } from 'lucide-react'
 import Link from 'next/link'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { useToast } from '@/components/ui/toast'
 import { formatDate } from '@/lib/utils/format-date'
 
-interface SlotDetailProps {
-  slot: {
+interface WalkDetailProps {
+  walk: {
     id: string
     locationName: string
     walkDate: string
@@ -31,7 +31,7 @@ interface SlotDetailProps {
   currentUserId: string
 }
 
-export function SlotDetailClient({ slot, members, isJoined, isFull, currentUserId }: SlotDetailProps) {
+export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserId }: WalkDetailProps) {
   const [error, setError] = useState('')
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -43,7 +43,7 @@ export function SlotDetailClient({ slot, members, isJoined, isFull, currentUserI
     (_state, action: 'join' | 'cancel') => {
       if (action === 'join') {
         const newCount = _state.memberCount + 1
-        return { isJoined: true, isFull: newCount >= slot.maxVolunteers, memberCount: newCount }
+        return { isJoined: true, isFull: newCount >= walk.maxVolunteers, memberCount: newCount }
       }
       const newCount = _state.memberCount - 1
       return { isJoined: false, isFull: false, memberCount: newCount }
@@ -54,7 +54,7 @@ export function SlotDetailClient({ slot, members, isJoined, isFull, currentUserI
     setError('')
     startTransition(async () => {
       setOptimistic('join')
-      const result = await joinSlot(slot.id)
+      const result = await joinWalk(walk.id)
       if (result.error) {
         setError(result.error)
       } else {
@@ -72,7 +72,7 @@ export function SlotDetailClient({ slot, members, isJoined, isFull, currentUserI
     setError('')
     startTransition(async () => {
       setOptimistic('cancel')
-      const result = await cancelSlot(slot.id)
+      const result = await cancelWalk(walk.id)
       if (result.error) {
         setError(result.error)
       } else {
@@ -93,27 +93,27 @@ export function SlotDetailClient({ slot, members, isJoined, isFull, currentUserI
 
       <div className="bg-white rounded-xl p-6 shadow-sm space-y-4">
         <div>
-          <p className="text-xs text-green-600 font-medium">{slot.roundName}</p>
-          <h1 className="text-xl font-bold text-gray-900 mt-1">{slot.locationName}</h1>
+          <p className="text-xs text-green-600 font-medium">{walk.roundName}</p>
+          <h1 className="text-xl font-bold text-gray-900 mt-1">{walk.locationName}</h1>
         </div>
 
         <div className="space-y-3">
           <div className="flex items-center gap-3 text-sm text-gray-600">
             <Calendar className="w-4 h-4 text-gray-400" />
-            {formatDate(slot.walkDate, 'full')}
+            {formatDate(walk.walkDate, 'full')}
           </div>
           <div className="flex items-center gap-3 text-sm text-gray-600">
             <Clock className="w-4 h-4 text-gray-400" />
-            {slot.startTime.slice(0, 5)} - {slot.endTime.slice(0, 5)}
+            {walk.startTime.slice(0, 5)} - {walk.endTime.slice(0, 5)}
           </div>
           <div className="flex items-center gap-3 text-sm text-gray-600">
             <Users className="w-4 h-4 text-gray-400" />
-            {optimistic.memberCount}/{slot.maxVolunteers} volunteers
+            {optimistic.memberCount}/{walk.maxVolunteers} volunteers
           </div>
-          {slot.notes && (
+          {walk.notes && (
             <div className="flex items-start gap-3 text-sm text-gray-600">
               <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
-              {slot.notes}
+              {walk.notes}
             </div>
           )}
         </div>
@@ -141,7 +141,7 @@ export function SlotDetailClient({ slot, members, isJoined, isFull, currentUserI
             disabled={isPending || optimistic.isFull}
             className="w-full bg-green-600 text-white py-3 px-4 rounded-xl hover:bg-green-700 disabled:opacity-50 font-medium transition-colors"
           >
-            {isPending ? 'Joining...' : optimistic.isFull ? 'Slot Full' : 'Join Walk'}
+            {isPending ? 'Joining...' : optimistic.isFull ? 'Walk Full' : 'Join Walk'}
           </button>
         )}
       </div>

@@ -17,6 +17,9 @@ export default async function WalkReportPage({
 
   const viewData = await getSlotReportViewData(supabase, walkId, user.id)
   if (!viewData) notFound()
+  if (!viewData.isParticipant && !viewData.hasSubmittedOwnObservation) {
+    redirect('/report')
+  }
 
   return (
     <GroupViewClient

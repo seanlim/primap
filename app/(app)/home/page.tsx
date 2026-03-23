@@ -11,7 +11,8 @@ export default async function HomePage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const today = new Date().toISOString().split('T')[0]
+  const now = new Date()
+  const today = now.toISOString().split('T')[0]
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -37,15 +38,20 @@ export default async function HomePage() {
     .eq('user_id', user.id)
     .eq('status', 'ACTIVE')
     .gte('walk_slots.walk_date', today)
-    .order('joined_at', { ascending: false })
-    .limit(5)
 
-  // Count draft reports
-  const { count: draftCount } = await supabase
-    .from('observations')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', user.id)
-    .eq('status', 'DRAFT')
+  const upcomingMemberships = upcomingWalks || []
+  const activeSlotIds = upcomingMemberships
+    .map((membership) => (membership.walk_slots as unknown as WalkRef)?.id)
+    .filter(Boolean)
+
+  const { count: draftCount } = activeSlotIds.length > 0
+    ? await supabase
+        .from('observations')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('status', 'DRAFT')
+        .in('slot_id', activeSlotIds)
+    : { count: 0 }
 
   // Count submitted reports
   const { count: submittedCount } = await supabase
@@ -54,7 +60,18 @@ export default async function HomePage() {
     .eq('user_id', user.id)
     .eq('status', 'SUBMITTED')
 
-  const futureWalks = upcomingWalks || []
+  const futureWalks = upcomingMemberships
+    .map((membership) => {
+      const slot = membership.walk_slots as unknown as WalkRef
+      return slot ? { membershipId: membership.id, slot } : null
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      const aTime = new Date(`${a!.slot.walk_date}T${a!.slot.start_time}`).getTime()
+      const bTime = new Date(`${b!.slot.walk_date}T${b!.slot.start_time}`).getTime()
+      return aTime - bTime
+    })
+    .slice(0, 5) as Array<{ membershipId: string; slot: WalkRef }>
 
   return (
     <div className="space-y-6">
@@ -86,7 +103,7 @@ export default async function HomePage() {
         <div className="bg-green-50 border border-green-200 rounded-xl p-5">
           <h2 className="text-sm font-semibold text-green-800 mb-3">Next Walk</h2>
           {(() => {
-            const slot = futureWalks[0].walk_slots as unknown as WalkRef
+            const slot = futureWalks[0].slot
             return (
               <Link href={`/walk/${slot.id}`} className="block">
                 <p className="font-semibold text-gray-900">{slot.location_name}</p>
@@ -128,11 +145,10 @@ export default async function HomePage() {
         <div className="space-y-3">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Upcoming Walks</h2>
           <div className="space-y-2">
-            {futureWalks.slice(1).map((membership) => {
-              const slot = membership.walk_slots as unknown as WalkRef
+            {futureWalks.slice(1).map(({ membershipId, slot }) => {
               return (
                 <Link
-                  key={membership.id}
+                  key={membershipId}
                   href={`/walk/${slot.id}`}
                   className="block bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
                 >

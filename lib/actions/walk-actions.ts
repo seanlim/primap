@@ -3,10 +3,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { sendWalkCancellationEmail } from '@/lib/email'
+import { deleteDraftObservationsForSlot } from '@/lib/actions/observation-actions'
+import { getJoinBlockInfo, hasWalkStarted } from '@/lib/utils/walk-participation'
 
-function getSlotStartDateTime(walkDate: string, startTime: string) {
-  return new Date(`${walkDate}T${startTime}`)
-}
 
 export async function joinWalk(walkId: string) {
   const supabase = await createClient()
@@ -32,14 +31,20 @@ export async function joinWalk(walkId: string) {
   const memberships = (slot.slot_memberships as unknown as Array<{ user_id: string; status: string }>) || []
   const activeMemberships = memberships.filter((membership) => membership.status === 'ACTIVE')
   const alreadyJoined = activeMemberships.some((membership) => membership.user_id === user.id)
+  const joinBlock = getJoinBlockInfo({
+    roundStatus: round?.status,
+    hasStarted: hasWalkStarted(slot.walk_date, slot.start_time),
+    isFull: activeMemberships.length >= slot.max_volunteers,
+  })
 
-  if (round?.status !== 'OPEN') return { error: 'This walk is no longer open for signup.' }
-  if (getSlotStartDateTime(slot.walk_date, slot.start_time) <= new Date()) {
-    return { error: 'This walk has already started or passed.' }
-  }
+  if (joinBlock?.label === 'Round Closed') return { error: joinBlock.description }
+  if (joinBlock?.label === 'Walk Started') return { error: joinBlock.description }
   if (alreadyJoined) return { error: 'You have already joined this walk.' }
-  if (activeMemberships.length >= slot.max_volunteers) return { error: 'This walk slot is full.' }
+  if (joinBlock?.label === 'Walk Full') return { error: joinBlock.description }
 
+  // The RPC remains the atomic source of truth for membership + draft-observation
+  // creation/reactivation. These prechecks only keep the volunteer UX and server
+  // action aligned before we hand off to the database boundary.
   const { data, error } = await supabase.rpc('join_slot_with_observation', {
     p_slot_id: walkId,
     p_user_id: user.id,
@@ -104,6 +109,18 @@ export async function cancelWalk(walkId: string) {
   if (error) return { error: error.message }
   if (!cancelledMemberships || cancelledMemberships.length === 0) {
     return { error: 'You are not actively joined to this walk.' }
+  }
+
+  const draftCleanupResult = await deleteDraftObservationsForSlot(supabase, user.id, walkId)
+  if (draftCleanupResult.error) {
+    console.error('Error deleting draft observations after cancellation:', draftCleanupResult.error)
+    revalidatePath('/walk')
+    revalidatePath(`/walk/${walkId}`)
+    revalidatePath('/home')
+    revalidatePath('/report')
+    revalidatePath(`/report/${walkId}`)
+    revalidatePath('/profile')
+    return { success: true, warning: 'Cancelled successfully, but failed to remove your draft report.' }
   }
 
   // Notify other members

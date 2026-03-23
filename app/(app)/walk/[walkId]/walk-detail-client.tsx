@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { useToast } from '@/components/ui/toast'
 import { formatDate } from '@/lib/utils/format-date'
+import type { JoinBlockInfo } from '@/lib/utils/walk-participation'
 
 interface WalkDetailProps {
   walk: {
@@ -19,7 +20,7 @@ interface WalkDetailProps {
     maxVolunteers: number
     notes: string | null
     roundName: string
-    joinBlockedReason: string | null
+    joinBlockedInfo: JoinBlockInfo | null
   }
   members: {
     userId: string
@@ -57,7 +58,7 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
   const isJoining = isPending && pendingAction === 'join'
   const isCancelling = isPending && pendingAction === 'cancel'
   const displayIsJoined = isCancelling ? true : isJoining ? false : optimistic.isJoined
-  const joinDisabled = isPending || optimistic.isFull || !!walk.joinBlockedReason
+  const joinDisabled = isPending || optimistic.isFull || !!walk.joinBlockedInfo
 
   const handleJoin = () => {
     setError('')
@@ -161,10 +162,10 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
               disabled={joinDisabled}
               className="w-full bg-green-600 text-white py-3 px-4 rounded-xl hover:bg-green-700 disabled:opacity-50 font-medium transition-colors"
             >
-              {isJoining ? 'Joining...' : optimistic.isFull ? 'Walk Full' : walk.joinBlockedReason || 'Join Walk'}
+              {isJoining ? 'Joining...' : walk.joinBlockedInfo?.label || 'Join Walk'}
             </button>
-            {walk.joinBlockedReason && (
-              <p className="text-xs text-gray-500 text-center">{walk.joinBlockedReason}</p>
+            {walk.joinBlockedInfo && (
+              <p className="text-xs text-gray-500 text-center">{walk.joinBlockedInfo.description}</p>
             )}
           </div>
         )}

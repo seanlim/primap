@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { ProfileClient } from './profile-client'
 import type { WalkRef, HistoryObservation } from '@/lib/types/supabase-helpers'
+import { hasWalkEnded } from '@/lib/utils/walk-participation'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,15 +87,17 @@ export default async function ProfilePage() {
     ...activeWalkHistory.map((membership) => ({
       membershipId: membership.id,
       slot: membership.walk_slots as unknown as WalkRef,
+      historyType: 'active' as const,
     })),
     ...(submittedObservationHistory || [])
       .filter((observation) => !activeSlotIds.includes(observation.slot_id))
       .map((observation) => ({
         membershipId: observation.id,
         slot: observation.walk_slots as unknown as WalkRef,
+        historyType: 'submitted' as const,
       })),
   ]
-    .filter((item) => item.slot)
+    .filter((item) => item.slot && (item.historyType === 'active' || hasWalkEnded(item.slot.walk_date, item.slot.end_time)))
     .sort((a, b) => {
       const aTime = new Date(`${a.slot.walk_date}T${a.slot.start_time}`).getTime()
       const bTime = new Date(`${b.slot.walk_date}T${b.slot.start_time}`).getTime()

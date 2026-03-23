@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils/format-date'
 import type { WalkRef } from '@/lib/types/supabase-helpers'
+import { hasWalkEnded } from '@/lib/utils/walk-participation'
 
 export const dynamic = 'force-dynamic'
 
@@ -131,6 +132,7 @@ export default async function ReportListPage() {
 
     const slot = observation.walk_slots as unknown as WalkRef
     if (!slot) continue
+    if (!hasWalkEnded(slot.walk_date, slot.end_time)) continue
 
     reportItems.set(slot.id, {
       key: observation.id,

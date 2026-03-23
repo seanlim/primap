@@ -21,6 +21,11 @@ const { mockSend, mockSingle, mockChain, mockSupabase } = vi.hoisted(() => {
   }
   const mockSupabase = {
     from: vi.fn().mockReturnValue(mockChain),
+    storage: {
+      from: vi.fn().mockReturnValue({
+        remove: vi.fn().mockResolvedValue({ error: null }),
+      }),
+    },
     auth: {
       getUser: vi.fn(),
     },
@@ -36,6 +41,14 @@ vi.mock('resend', () => ({
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn().mockResolvedValue(mockSupabase),
+}))
+
+const { mockDeleteDraftObservationsForSlot } = vi.hoisted(() => ({
+  mockDeleteDraftObservationsForSlot: vi.fn().mockResolvedValue({ deletedCount: 0 }),
+}))
+
+vi.mock('@/lib/actions/observation-actions', () => ({
+  deleteDraftObservationsForSlot: (...args: unknown[]) => mockDeleteDraftObservationsForSlot(...args),
 }))
 
 import { cancelWalk } from '@/lib/actions/walk-actions'
@@ -55,12 +68,15 @@ function resetChain() {
   mockChain.neq.mockReturnThis()
   mockSingle.mockReset()
   mockSupabase.from.mockReturnValue(mockChain)
+  mockDeleteDraftObservationsForSlot.mockResolvedValue({ deletedCount: 0 })
 }
 
 describe('cancel-walk-email-flow (integration)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetChain()
+    mockSend.mockReset()
+    mockSend.mockResolvedValue({})
     process.env.RESEND_API_KEY = 'test-key'
   })
 

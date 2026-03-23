@@ -22,6 +22,9 @@ const { mockSupabase, methods } = vi.hoisted(() => {
     auth: {
       getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
     },
+    storage: {
+      from: vi.fn(),
+    },
     from: vi.fn().mockReturnValue(methods),
     rpc: vi.fn(),
   }
@@ -34,6 +37,14 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('@/lib/email', () => ({
   sendWalkCancellationEmail: vi.fn(),
+}))
+
+const { mockDeleteDraftObservationsForSlot } = vi.hoisted(() => ({
+  mockDeleteDraftObservationsForSlot: vi.fn().mockResolvedValue({ deletedCount: 0 }),
+}))
+
+vi.mock('@/lib/actions/observation-actions', () => ({
+  deleteDraftObservationsForSlot: (...args: unknown[]) => mockDeleteDraftObservationsForSlot(...args),
 }))
 
 import { joinWalk, cancelWalk } from '@/lib/actions/walk-actions'
@@ -53,6 +64,7 @@ function resetChain() {
   methods.single.mockResolvedValue({ data: null, error: null })
   mockSupabase.rpc.mockResolvedValue({ data: null, error: null })
   mockSupabase.from.mockReturnValue(methods)
+  mockDeleteDraftObservationsForSlot.mockResolvedValue({ deletedCount: 0 })
 }
 
 function setupUser(userId = 'user-1') {
@@ -228,7 +240,7 @@ describe('walk-actions', () => {
 
       const result = await joinWalk('slot-1')
 
-      expect(result).toEqual({ error: 'This walk slot is full.' })
+      expect(result).toEqual({ error: 'This walk has reached its volunteer limit.' })
       expect(mockSupabase.rpc).not.toHaveBeenCalled()
     })
 
@@ -294,6 +306,7 @@ describe('walk-actions', () => {
 
       expect(result).toEqual({ success: true })
       expect(mockSupabase.from).toHaveBeenCalledWith('slot_memberships')
+      expect(mockDeleteDraftObservationsForSlot).toHaveBeenCalledWith(mockSupabase, 'user-1', 'slot-1')
       expect(sendWalkCancellationEmail).toHaveBeenCalledWith(
         ['other@test.com'],
         { date: '2026-04-15', time: '08:00', location: 'Central Park' },
@@ -388,6 +401,20 @@ describe('walk-actions', () => {
         success: true,
         warning: 'Cancelled successfully, but failed to notify other members.',
       })
+    })
+
+    it('returns success with warning when draft cleanup fails', async () => {
+      setupUser()
+      setupCancelMocks()
+      mockDeleteDraftObservationsForSlot.mockResolvedValueOnce({ error: 'Delete failed' })
+
+      const result = await cancelWalk('slot-1')
+
+      expect(result).toEqual({
+        success: true,
+        warning: 'Cancelled successfully, but failed to remove your draft report.',
+      })
+      expect(sendWalkCancellationEmail).not.toHaveBeenCalled()
     })
 
     it('uses full_name for cancellingName', async () => {

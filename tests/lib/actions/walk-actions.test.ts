@@ -11,11 +11,12 @@ const { mockSupabase, methods } = vi.hoisted(() => {
     neq: vi.fn(),
     in: vi.fn(),
     limit: vi.fn(),
+    maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
     single: vi.fn().mockResolvedValue({ data: null, error: null }),
     rpc: vi.fn(),
   }
   for (const key of Object.keys(methods) as (keyof typeof methods)[]) {
-    if (key !== 'single' && key !== 'rpc') methods[key].mockReturnThis()
+    if (key !== 'single' && key !== 'maybeSingle' && key !== 'rpc') methods[key].mockReturnThis()
   }
   const mockSupabase = {
     auth: {
@@ -48,13 +49,135 @@ function resetChain() {
   methods.neq.mockReturnThis()
   methods.in.mockReturnThis()
   methods.limit.mockReturnThis()
+  methods.maybeSingle.mockResolvedValue({ data: null, error: null })
   methods.single.mockResolvedValue({ data: null, error: null })
   mockSupabase.rpc.mockResolvedValue({ data: null, error: null })
+  mockSupabase.from.mockReturnValue(methods)
 }
 
 function setupUser(userId = 'user-1') {
   mockSupabase.auth.getUser.mockResolvedValue({
     data: { user: { id: userId } },
+  })
+}
+
+function mockJoinableSlot(overrides?: Partial<{
+  walk_date: string
+  start_time: string
+  max_volunteers: number
+  survey_rounds: { status: string }
+  slot_memberships: Array<{ user_id: string; status: string }>
+}>) {
+  methods.single.mockResolvedValueOnce({
+    data: {
+      walk_date: '2099-04-15',
+      start_time: '08:00',
+      max_volunteers: 3,
+      survey_rounds: { status: 'OPEN' },
+      slot_memberships: [],
+      ...overrides,
+    },
+    error: null,
+  })
+}
+
+function setupCancelMocks(overrides?: {
+  submittedObservation?: { id: string } | null
+  submittedObservationError?: { code?: string; message: string } | null
+  cancelledMemberships?: Array<{ id: string }>
+  updateError?: { message: string } | null
+  slot?: { walk_date: string; start_time: string; location_name: string } | null
+  profile?: { full_name: string | null; email: string | null } | null
+  otherMembers?: Array<{ user_id: string; profiles: { email: string | null } }>
+}) {
+  const submittedObservation = overrides && 'submittedObservation' in overrides ? overrides.submittedObservation : null
+  const submittedObservationError = overrides && 'submittedObservationError' in overrides
+    ? overrides.submittedObservationError
+    : { code: 'PGRST116', message: 'No rows found' }
+  const cancelledMemberships = overrides?.cancelledMemberships ?? [{ id: 'membership-1' }]
+  const updateError = overrides?.updateError ?? null
+  const slot = overrides && 'slot' in overrides
+    ? overrides.slot
+    : { walk_date: '2026-04-15', start_time: '08:00', location_name: 'Central Park' }
+  const profile = overrides && 'profile' in overrides
+    ? overrides.profile
+    : { full_name: 'Test User', email: 'user@test.com' }
+  const otherMembers = overrides && 'otherMembers' in overrides
+    ? overrides.otherMembers
+    : [{ user_id: 'other-1', profiles: { email: 'other@test.com' } }]
+
+  mockSupabase.from.mockImplementation((table: string) => {
+    if (table === 'observations') {
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: submittedObservation,
+                  error: submittedObservationError,
+                }),
+              }),
+            }),
+          }),
+        }),
+      }
+    }
+
+    if (table === 'slot_memberships') {
+      return {
+        update: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                select: vi.fn().mockResolvedValue({
+                  data: cancelledMemberships,
+                  error: updateError,
+                }),
+              }),
+            }),
+          }),
+        }),
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              neq: vi.fn().mockResolvedValue({
+                data: otherMembers,
+                error: null,
+              }),
+            }),
+          }),
+        }),
+      }
+    }
+
+    if (table === 'walk_slots') {
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({
+              data: slot,
+              error: null,
+            }),
+          }),
+        }),
+      }
+    }
+
+    if (table === 'profiles') {
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({
+              data: profile,
+              error: null,
+            }),
+          }),
+        }),
+      }
+    }
+
+    return methods
   })
 }
 
@@ -75,6 +198,7 @@ describe('walk-actions', () => {
 
     it('calls RPC and returns success', async () => {
       setupUser()
+      mockJoinableSlot()
       mockSupabase.rpc.mockResolvedValue({
         data: { success: true, membership_id: 'mem-1', observation_id: 'obs-1' },
         error: null,
@@ -92,34 +216,37 @@ describe('walk-actions', () => {
       expect(revalidatePath).toHaveBeenCalledWith('/home')
       expect(revalidatePath).toHaveBeenCalledWith('/report')
       expect(revalidatePath).toHaveBeenCalledWith('/report/slot-1')
+      expect(revalidatePath).toHaveBeenCalledWith('/profile')
     })
 
-    it('returns "Slot is full" error from RPC', async () => {
+    it('returns "Slot is full" before calling RPC', async () => {
       setupUser()
-      mockSupabase.rpc.mockResolvedValue({
-        data: { error: 'This walk slot is full.' },
-        error: null,
+      mockJoinableSlot({
+        max_volunteers: 1,
+        slot_memberships: [{ user_id: 'other-user', status: 'ACTIVE' }],
       })
 
       const result = await joinWalk('slot-1')
 
       expect(result).toEqual({ error: 'This walk slot is full.' })
+      expect(mockSupabase.rpc).not.toHaveBeenCalled()
     })
 
-    it('returns "already joined" error from RPC', async () => {
+    it('returns "already joined" before calling RPC', async () => {
       setupUser()
-      mockSupabase.rpc.mockResolvedValue({
-        data: { error: 'You have already joined this walk.' },
-        error: null,
+      mockJoinableSlot({
+        slot_memberships: [{ user_id: 'user-1', status: 'ACTIVE' }],
       })
 
       const result = await joinWalk('slot-1')
 
       expect(result).toEqual({ error: 'You have already joined this walk.' })
+      expect(mockSupabase.rpc).not.toHaveBeenCalled()
     })
 
     it('returns generic DB error from RPC', async () => {
       setupUser()
+      mockJoinableSlot()
       mockSupabase.rpc.mockResolvedValue({
         data: null,
         error: { message: 'Unexpected error' },
@@ -132,6 +259,9 @@ describe('walk-actions', () => {
 
     it('handles re-join after cancel (RPC reactivates membership)', async () => {
       setupUser()
+      mockJoinableSlot({
+        slot_memberships: [{ user_id: 'user-1', status: 'CANCELLED' }],
+      })
       mockSupabase.rpc.mockResolvedValue({
         data: { success: true, membership_id: 'mem-1', observation_id: 'obs-1' },
         error: null,
@@ -158,28 +288,12 @@ describe('walk-actions', () => {
 
     it('cancels slot and sends email notification', async () => {
       setupUser()
-      // single() calls for slot info and profile info
-      methods.single
-        .mockResolvedValueOnce({
-          data: { walk_date: '2026-04-15', start_time: '08:00', location_name: 'Central Park' },
-          error: null,
-        })
-        .mockResolvedValueOnce({
-          data: { full_name: 'Test User', email: 'user@test.com' },
-          error: null,
-        })
-      // neq() for other members query
-      methods.neq.mockReturnValueOnce({
-        data: [{ user_id: 'other-1', profiles: { email: 'other@test.com' } }],
-      })
+      setupCancelMocks()
 
       const result = await cancelWalk('slot-1')
 
       expect(result).toEqual({ success: true })
       expect(mockSupabase.from).toHaveBeenCalledWith('slot_memberships')
-      expect(methods.update).toHaveBeenCalledWith(
-        expect.objectContaining({ status: 'CANCELLED' })
-      )
       expect(sendWalkCancellationEmail).toHaveBeenCalledWith(
         ['other@test.com'],
         { date: '2026-04-15', time: '08:00', location: 'Central Park' },
@@ -188,24 +302,48 @@ describe('walk-actions', () => {
       expect(revalidatePath).toHaveBeenCalledWith('/walk')
       expect(revalidatePath).toHaveBeenCalledWith('/report')
       expect(revalidatePath).toHaveBeenCalledWith('/report/slot-1')
+      expect(revalidatePath).toHaveBeenCalledWith('/profile')
     })
 
     it('returns error when DB update fails', async () => {
       setupUser()
-      // update().eq().eq().eq() — third eq must return error
-      methods.eq
-        .mockReturnValueOnce(methods) // eq('slot_id', slotId)
-        .mockReturnValueOnce(methods) // eq('user_id', user.id)
-        .mockReturnValueOnce({ error: { message: 'Update failed' } }) // eq('status', 'ACTIVE')
+      setupCancelMocks({
+        updateError: { message: 'Update failed' },
+      })
 
       const result = await cancelWalk('slot-1')
 
       expect(result).toEqual({ error: 'Update failed' })
     })
 
+    it('returns error when no active membership is cancelled', async () => {
+      setupUser()
+      setupCancelMocks({
+        cancelledMemberships: [],
+      })
+
+      const result = await cancelWalk('slot-1')
+
+      expect(result).toEqual({ error: 'You are not actively joined to this walk.' })
+    })
+
+    it('returns error when a submitted report already exists', async () => {
+      setupUser()
+      setupCancelMocks({
+        submittedObservation: { id: 'obs-1' },
+        submittedObservationError: null,
+      })
+
+      const result = await cancelWalk('slot-1')
+
+      expect(result).toEqual({ error: "You can't cancel this walk after submitting your report." })
+    })
+
     it('still succeeds when slot is not found for email', async () => {
       setupUser()
-      methods.single.mockResolvedValueOnce({ data: null, error: null })
+      setupCancelMocks({
+        slot: null,
+      })
 
       const result = await cancelWalk('slot-1')
 
@@ -215,16 +353,9 @@ describe('walk-actions', () => {
 
     it('still succeeds when no other members', async () => {
       setupUser()
-      methods.single
-        .mockResolvedValueOnce({
-          data: { walk_date: '2026-04-15', start_time: '08:00', location_name: 'Central Park' },
-          error: null,
-        })
-        .mockResolvedValueOnce({
-          data: { full_name: 'Test User', email: 'user@test.com' },
-          error: null,
-        })
-      methods.neq.mockReturnValueOnce({ data: [] })
+      setupCancelMocks({
+        otherMembers: [],
+      })
 
       const result = await cancelWalk('slot-1')
 
@@ -234,17 +365,8 @@ describe('walk-actions', () => {
 
     it('still succeeds when recipients are empty after filter', async () => {
       setupUser()
-      methods.single
-        .mockResolvedValueOnce({
-          data: { walk_date: '2026-04-15', start_time: '08:00', location_name: 'Central Park' },
-          error: null,
-        })
-        .mockResolvedValueOnce({
-          data: { full_name: 'Test User', email: 'user@test.com' },
-          error: null,
-        })
-      methods.neq.mockReturnValueOnce({
-        data: [{ user_id: 'other-1', profiles: { email: null } }],
+      setupCancelMocks({
+        otherMembers: [{ user_id: 'other-1', profiles: { email: null } }],
       })
 
       const result = await cancelWalk('slot-1')
@@ -255,18 +377,7 @@ describe('walk-actions', () => {
 
     it('returns success with warning when email notification throws', async () => {
       setupUser()
-      methods.single
-        .mockResolvedValueOnce({
-          data: { walk_date: '2026-04-15', start_time: '08:00', location_name: 'Central Park' },
-          error: null,
-        })
-        .mockResolvedValueOnce({
-          data: { full_name: 'Test User', email: 'user@test.com' },
-          error: null,
-        })
-      methods.neq.mockReturnValueOnce({
-        data: [{ user_id: 'other-1', profiles: { email: 'other@test.com' } }],
-      })
+      setupCancelMocks()
       vi.mocked(sendWalkCancellationEmail).mockRejectedValueOnce(
         new Error('Email service down')
       )
@@ -281,17 +392,8 @@ describe('walk-actions', () => {
 
     it('uses full_name for cancellingName', async () => {
       setupUser()
-      methods.single
-        .mockResolvedValueOnce({
-          data: { walk_date: '2026-04-15', start_time: '08:00', location_name: 'Park' },
-          error: null,
-        })
-        .mockResolvedValueOnce({
-          data: { full_name: 'Jane Doe', email: 'jane@test.com' },
-          error: null,
-        })
-      methods.neq.mockReturnValueOnce({
-        data: [{ user_id: 'other-1', profiles: { email: 'other@test.com' } }],
+      setupCancelMocks({
+        profile: { full_name: 'Jane Doe', email: 'jane@test.com' },
       })
 
       await cancelWalk('slot-1')
@@ -305,17 +407,8 @@ describe('walk-actions', () => {
 
     it('falls back to email for cancellingName', async () => {
       setupUser()
-      methods.single
-        .mockResolvedValueOnce({
-          data: { walk_date: '2026-04-15', start_time: '08:00', location_name: 'Park' },
-          error: null,
-        })
-        .mockResolvedValueOnce({
-          data: { full_name: null, email: 'jane@test.com' },
-          error: null,
-        })
-      methods.neq.mockReturnValueOnce({
-        data: [{ user_id: 'other-1', profiles: { email: 'other@test.com' } }],
+      setupCancelMocks({
+        profile: { full_name: null, email: 'jane@test.com' },
       })
 
       await cancelWalk('slot-1')
@@ -329,17 +422,8 @@ describe('walk-actions', () => {
 
     it('falls back to "A volunteer" for cancellingName', async () => {
       setupUser()
-      methods.single
-        .mockResolvedValueOnce({
-          data: { walk_date: '2026-04-15', start_time: '08:00', location_name: 'Park' },
-          error: null,
-        })
-        .mockResolvedValueOnce({
-          data: { full_name: null, email: null },
-          error: null,
-        })
-      methods.neq.mockReturnValueOnce({
-        data: [{ user_id: 'other-1', profiles: { email: 'other@test.com' } }],
+      setupCancelMocks({
+        profile: { full_name: null, email: null },
       })
 
       await cancelWalk('slot-1')

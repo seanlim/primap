@@ -170,8 +170,8 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
           prev.forEach((s, i) => { if (s.species) validIndexes.push(i) })
           return prev.map((s, i) => {
             const validIdx = validIndexes.indexOf(i)
-            if (validIdx >= 0 && validIdx < result.sightingIds!.length) {
-              return { ...s, id: result.sightingIds![validIdx] }
+            if (validIdx >= 0 && validIdx < result.sightingIds.length) {
+              return { ...s, id: result.sightingIds[validIdx] }
             }
             return s
           })

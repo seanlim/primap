@@ -15,7 +15,6 @@ export default async function AdminWalksPage() {
   const { data: rounds } = await supabase
     .from('survey_rounds')
     .select('id, name')
-    .in('status', ['DRAFT', 'OPEN'])
     .order('start_date', { ascending: false })
 
   const typed = (walks || []) as unknown as WalkWithCount[]

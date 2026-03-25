@@ -138,6 +138,7 @@ export async function createWalk(data: {
   startTime: string
   endTime: string
   maxVolunteers?: number
+  notes?: string
 }) {
   const errors = validateWalkData(data)
   if (errors.length > 0) return { error: errors.join('; ') }
@@ -153,6 +154,7 @@ export async function createWalk(data: {
       start_time: data.startTime,
       end_time: data.endTime,
       max_volunteers: data.maxVolunteers || 3,
+      notes: data.notes,
     })
 
   if (error) return { error: error.message }
@@ -168,6 +170,7 @@ export async function updateWalk(walkId: string, data: {
   startTime: string
   endTime: string
   maxVolunteers?: number
+  notes?: string
 }) {
   if (!walkId) return { error: 'Walk ID is required' }
   const errors = validateWalkData(data)
@@ -184,6 +187,7 @@ export async function updateWalk(walkId: string, data: {
       start_time: data.startTime,
       end_time: data.endTime,
       max_volunteers: data.maxVolunteers || 3,
+      notes: data.notes,
     })
     .eq('id', walkId)
 

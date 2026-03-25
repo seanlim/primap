@@ -4,10 +4,10 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Plus, Trash2, Pencil, X, Layers } from 'lucide-react'
-import { createSlot, updateSlot, deleteSlot, bulkCreateSlots } from '@/lib/actions/admin-round-actions'
+import { createWalk, updateWalk, deleteWalk, bulkCreateWalks } from '@/lib/actions/admin-round-actions'
 import { formatDate } from '@/lib/utils/format-date'
 
-interface SlotData {
+interface WalkData {
   id: string
   roundId: string
   roundName: string
@@ -29,7 +29,7 @@ interface BulkRule {
   maxVolunteers: number
 }
 
-interface GeneratedSlot {
+interface GeneratedWalk {
   locationName: string
   walkDate: string
   startTime: string
@@ -39,8 +39,8 @@ interface GeneratedSlot {
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-function generateSlotsFromRules(rule: BulkRule): GeneratedSlot[] {
-  const slots: GeneratedSlot[] = []
+function generateWalksFromRules(rule: BulkRule): GeneratedWalk[] {
+  const walks: GeneratedWalk[] = []
   const start = new Date(rule.dateFrom + 'T00:00:00')
   const end = new Date(rule.dateTo + 'T00:00:00')
 
@@ -48,7 +48,7 @@ function generateSlotsFromRules(rule: BulkRule): GeneratedSlot[] {
     if (!rule.daysOfWeek.includes(d.getDay())) continue
     const dateStr = d.toISOString().slice(0, 10)
     for (const loc of rule.locations) {
-      slots.push({
+      walks.push({
         locationName: loc,
         walkDate: dateStr,
         startTime: rule.startTime,
@@ -58,16 +58,16 @@ function generateSlotsFromRules(rule: BulkRule): GeneratedSlot[] {
     }
   }
 
-  return slots.sort((a, b) => a.walkDate.localeCompare(b.walkDate) || a.locationName.localeCompare(b.locationName))
+  return walks.sort((a, b) => a.walkDate.localeCompare(b.walkDate) || a.locationName.localeCompare(b.locationName))
 }
 
-export function SlotsClient({ slots, rounds }: {
-  slots: SlotData[]
+export function WalksClient({ walks, rounds }: {
+  walks: WalkData[]
   rounds: { id: string; name: string }[]
 }) {
   const [showForm, setShowForm] = useState(false)
   const [showBulkForm, setShowBulkForm] = useState(false)
-  const [editingSlotId, setEditingSlotId] = useState<string | null>(null)
+  const [editingWalkId, setEditingWalkId] = useState<string | null>(null)
   const [roundId, setRoundId] = useState(rounds[0]?.id || '')
   const [locationName, setLocationName] = useState('')
   const [walkDate, setWalkDate] = useState('')
@@ -82,7 +82,7 @@ export function SlotsClient({ slots, rounds }: {
     dateFrom: '', dateTo: '', daysOfWeek: [1, 3, 5], // Mon, Wed, Fri default
     locations: [''], startTime: '07:00', endTime: '10:00', maxVolunteers: 3,
   })
-  const [generatedSlots, setGeneratedSlots] = useState<GeneratedSlot[]>([])
+  const [generatedWalks, setGeneratedWalks] = useState<GeneratedWalk[]>([])
   const [bulkStep, setBulkStep] = useState<'rules' | 'preview'>('rules')
   const [bulkLoading, setBulkLoading] = useState(false)
 
@@ -91,7 +91,7 @@ export function SlotsClient({ slots, rounds }: {
   const handleCreate = async (e: React.SubmitEvent) => {
     e.preventDefault()
     setLoading(true)
-    const result = await createSlot({
+    const result = await createWalk({
       roundId,
       locationName,
       walkDate,
@@ -108,18 +108,18 @@ export function SlotsClient({ slots, rounds }: {
     setLoading(false)
   }
 
-  const startEdit = (slot: SlotData) => {
-    setEditingSlotId(slot.id)
-    setRoundId(slot.roundId)
-    setLocationName(slot.locationName)
-    setWalkDate(slot.walkDate)
-    setStartTime(slot.startTime.slice(0, 5))
-    setEndTime(slot.endTime.slice(0, 5))
-    setMaxVol(slot.maxVolunteers)
+  const startEdit = (walk: WalkData) => {
+    setEditingWalkId(walk.id)
+    setRoundId(walk.roundId)
+    setLocationName(walk.locationName)
+    setWalkDate(walk.walkDate)
+    setStartTime(walk.startTime.slice(0, 5))
+    setEndTime(walk.endTime.slice(0, 5))
+    setMaxVol(walk.maxVolunteers)
   }
 
   const cancelEdit = () => {
-    setEditingSlotId(null)
+    setEditingWalkId(null)
     setRoundId(rounds[0]?.id || '')
     setLocationName('')
     setWalkDate('')
@@ -130,9 +130,9 @@ export function SlotsClient({ slots, rounds }: {
 
   const handleUpdate = async (e: React.SubmitEvent) => {
     e.preventDefault()
-    if (!editingSlotId) return
+    if (!editingWalkId) return
     setLoading(true)
-    const result = await updateSlot(editingSlotId, {
+    const result = await updateWalk(editingWalkId, {
       roundId,
       locationName,
       walkDate,
@@ -148,9 +148,9 @@ export function SlotsClient({ slots, rounds }: {
     setLoading(false)
   }
 
-  const handleDelete = async (slotId: string) => {
+  const handleDelete = async (walkId: string) => {
     if (!confirm('Delete this walk?')) return
-    const result = await deleteSlot(slotId)
+    const result = await deleteWalk(walkId)
     if (result.error) alert(result.error)
     else router.refresh()
   }
@@ -174,27 +174,27 @@ export function SlotsClient({ slots, rounds }: {
     const validLocations = bulkRule.locations.filter(l => l.trim())
     if (validLocations.length === 0) { alert('Please enter at least one location'); return }
     const ruleWithCleanLocations = { ...bulkRule, locations: validLocations }
-    const slots = generateSlotsFromRules(ruleWithCleanLocations)
-    if (slots.length === 0) { alert('No walks generated. Check your date range and selected days.'); return }
-    setGeneratedSlots(slots)
+    const generated = generateWalksFromRules(ruleWithCleanLocations)
+    if (generated.length === 0) { alert('No walks generated. Check your date range and selected days.'); return }
+    setGeneratedWalks(generated)
     setBulkStep('preview')
   }
 
   const handleBulkConfirm = async () => {
     setBulkLoading(true)
-    const result = await bulkCreateSlots({ roundId: bulkRoundId, slots: generatedSlots })
+    const result = await bulkCreateWalks({ roundId: bulkRoundId, slots: generatedWalks })
     if (result.error) alert(result.error)
     else {
       setShowBulkForm(false)
       setBulkStep('rules')
       setBulkRule({ dateFrom: '', dateTo: '', daysOfWeek: [1, 3, 5], locations: [''], startTime: '07:00', endTime: '10:00', maxVolunteers: 3 })
-      setGeneratedSlots([])
+      setGeneratedWalks([])
       router.refresh()
     }
     setBulkLoading(false)
   }
 
-  const slotForm = (onSubmit: (e: React.SubmitEvent) => void, submitLabel: string, onCancel: () => void) => (
+  const walkForm = (onSubmit: (e: React.SubmitEvent) => void, submitLabel: string, onCancel: () => void) => (
     <form onSubmit={onSubmit} className="bg-white rounded-xl p-5 shadow-sm space-y-4">
       <div>
         <label className="text-xs font-medium text-gray-500 mb-1">Round</label>
@@ -248,7 +248,7 @@ export function SlotsClient({ slots, rounds }: {
           <Link href="/admin" className="text-gray-400 hover:text-gray-600">
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Walk Slots</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Walks</h1>
         </div>
         <div className="flex gap-2">
           <button
@@ -263,17 +263,17 @@ export function SlotsClient({ slots, rounds }: {
             className="flex items-center gap-1 bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-green-700"
           >
             <Plus className="w-4 h-4" />
-            New Slot
+            New Walk
           </button>
         </div>
       </div>
 
-      {showForm && slotForm(handleCreate, 'Create Slot', () => setShowForm(false))}
+      {showForm && walkForm(handleCreate, 'Create Walk', () => setShowForm(false))}
 
       {showBulkForm && (
         <div className="bg-white rounded-xl p-5 shadow-sm space-y-4">
           <h2 className="font-semibold text-gray-900">Bulk Create Walks</h2>
-          <p className="text-sm text-gray-500">Define scheduling rules and the system will generate walk slots automatically.</p>
+          <p className="text-sm text-gray-500">Define scheduling rules and the system will generate walks automatically.</p>
 
           {bulkStep === 'rules' && (
             <>
@@ -374,7 +374,7 @@ export function SlotsClient({ slots, rounds }: {
           {bulkStep === 'preview' && (
             <>
               <p className="text-sm text-gray-600">
-                <strong>{generatedSlots.length}</strong> walk{generatedSlots.length !== 1 ? 's' : ''} will be created in <strong>{rounds.find(r => r.id === bulkRoundId)?.name}</strong>:
+                <strong>{generatedWalks.length}</strong> walk{generatedWalks.length !== 1 ? 's' : ''} will be created in <strong>{rounds.find(r => r.id === bulkRoundId)?.name}</strong>:
               </p>
               <div className="border border-gray-200 rounded-lg overflow-hidden max-h-80 overflow-y-auto">
                 <table className="w-full text-sm">
@@ -389,14 +389,14 @@ export function SlotsClient({ slots, rounds }: {
                     </tr>
                   </thead>
                   <tbody>
-                    {generatedSlots.map((slot, i) => (
+                    {generatedWalks.map((walk, i) => (
                       <tr key={i} className="border-t border-gray-100">
                         <td className="px-3 py-2 text-gray-400">{i + 1}</td>
-                        <td className="px-3 py-2">{slot.locationName}</td>
-                        <td className="px-3 py-2">{slot.walkDate}</td>
-                        <td className="px-3 py-2 text-gray-500">{DAY_LABELS[new Date(slot.walkDate + 'T00:00:00').getDay()]}</td>
-                        <td className="px-3 py-2">{slot.startTime} - {slot.endTime}</td>
-                        <td className="px-3 py-2">{slot.maxVolunteers}</td>
+                        <td className="px-3 py-2">{walk.locationName}</td>
+                        <td className="px-3 py-2">{walk.walkDate}</td>
+                        <td className="px-3 py-2 text-gray-500">{DAY_LABELS[new Date(walk.walkDate + 'T00:00:00').getDay()]}</td>
+                        <td className="px-3 py-2">{walk.startTime} - {walk.endTime}</td>
+                        <td className="px-3 py-2">{walk.maxVolunteers}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -409,7 +409,7 @@ export function SlotsClient({ slots, rounds }: {
                 </button>
                 <button type="button" onClick={handleBulkConfirm} disabled={bulkLoading}
                   className="flex-1 bg-blue-600 text-white py-3 rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-                  {bulkLoading ? 'Creating...' : `Confirm & Create ${generatedSlots.length} Walk${generatedSlots.length !== 1 ? 's' : ''}`}
+                  {bulkLoading ? 'Creating...' : `Confirm & Create ${generatedWalks.length} Walk${generatedWalks.length !== 1 ? 's' : ''}`}
                 </button>
               </div>
             </>
@@ -418,27 +418,27 @@ export function SlotsClient({ slots, rounds }: {
       )}
 
       <div className="space-y-2">
-        {slots.map(slot => (
-          <div key={slot.id}>
-            {editingSlotId === slot.id ? (
-              slotForm(handleUpdate, 'Save Changes', cancelEdit)
+        {walks.map(walk => (
+          <div key={walk.id}>
+            {editingWalkId === walk.id ? (
+              walkForm(handleUpdate, 'Save Changes', cancelEdit)
             ) : (
               <div className="bg-white rounded-xl p-4 shadow-sm flex items-center justify-between">
                 <div>
-                  <p className="font-medium text-gray-900">{slot.locationName}</p>
+                  <p className="font-medium text-gray-900">{walk.locationName}</p>
                   <p className="text-sm text-gray-500">
-                    {formatDate(slot.walkDate, 'compact')}
-                    {" "}&middot; {slot.startTime.slice(0, 5)} - {slot.endTime.slice(0, 5)}
+                    {formatDate(walk.walkDate, 'compact')}
+                    {" "}&middot; {walk.startTime.slice(0, 5)} - {walk.endTime.slice(0, 5)}
                   </p>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    {slot.roundName} &middot; {slot.memberCount}/{slot.maxVolunteers} volunteers
+                    {walk.roundName} &middot; {walk.memberCount}/{walk.maxVolunteers} volunteers
                   </p>
                 </div>
                 <div className="flex gap-1">
-                  <button onClick={() => startEdit(slot)} className="text-blue-400 hover:text-blue-600 p-2">
+                  <button onClick={() => startEdit(walk)} className="text-blue-400 hover:text-blue-600 p-2">
                     <Pencil className="w-4 h-4" />
                   </button>
-                  <button onClick={() => handleDelete(slot.id)} className="text-red-400 hover:text-red-600 p-2">
+                  <button onClick={() => handleDelete(walk.id)} className="text-red-400 hover:text-red-600 p-2">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -446,9 +446,9 @@ export function SlotsClient({ slots, rounds }: {
             )}
           </div>
         ))}
-        {slots.length === 0 && (
+        {walks.length === 0 && (
           <div className="bg-white rounded-xl p-8 text-center shadow-sm">
-            <p className="text-gray-500">No walk slots yet.</p>
+            <p className="text-gray-500">No walks yet.</p>
           </div>
         )}
       </div>

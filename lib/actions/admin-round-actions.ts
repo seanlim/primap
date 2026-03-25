@@ -110,7 +110,7 @@ export async function deleteRound(roundId: string) {
   return { success: true }
 }
 
-function validateSlotData(data: {
+function validateWalkData(data: {
   roundId: string
   locationName: string
   walkDate: string
@@ -131,7 +131,7 @@ function validateSlotData(data: {
   return errors
 }
 
-export async function createSlot(data: {
+export async function createWalk(data: {
   roundId: string
   locationName: string
   walkDate: string
@@ -139,7 +139,7 @@ export async function createSlot(data: {
   endTime: string
   maxVolunteers?: number
 }) {
-  const errors = validateSlotData(data)
+  const errors = validateWalkData(data)
   if (errors.length > 0) return { error: errors.join('; ') }
 
   const { supabase } = await requireAdmin()
@@ -156,12 +156,12 @@ export async function createSlot(data: {
     })
 
   if (error) return { error: error.message }
-  revalidatePath('/admin/slots')
+  revalidatePath('/admin/walks')
   revalidatePath('/walk')
   return { success: true }
 }
 
-export async function updateSlot(slotId: string, data: {
+export async function updateWalk(walkId: string, data: {
   roundId: string
   locationName: string
   walkDate: string
@@ -169,8 +169,8 @@ export async function updateSlot(slotId: string, data: {
   endTime: string
   maxVolunteers?: number
 }) {
-  if (!slotId) return { error: 'Slot ID is required' }
-  const errors = validateSlotData(data)
+  if (!walkId) return { error: 'Walk ID is required' }
+  const errors = validateWalkData(data)
   if (errors.length > 0) return { error: errors.join('; ') }
 
   const { supabase } = await requireAdmin()
@@ -185,29 +185,29 @@ export async function updateSlot(slotId: string, data: {
       end_time: data.endTime,
       max_volunteers: data.maxVolunteers || 3,
     })
-    .eq('id', slotId)
+    .eq('id', walkId)
 
   if (error) return { error: error.message }
-  revalidatePath('/admin/slots')
+  revalidatePath('/admin/walks')
   revalidatePath('/walk')
   return { success: true }
 }
 
-export async function deleteSlot(slotId: string) {
+export async function deleteWalk(walkId: string) {
   const { supabase } = await requireAdmin()
 
   const { error } = await supabase
     .from('walk_slots')
     .delete()
-    .eq('id', slotId)
+    .eq('id', walkId)
 
   if (error) return { error: error.message }
-  revalidatePath('/admin/slots')
+  revalidatePath('/admin/walks')
   revalidatePath('/walk')
   return { success: true }
 }
 
-export async function bulkCreateSlots(data: {
+export async function bulkCreateWalks(data: {
   roundId: string
   slots: {
     locationName: string
@@ -221,7 +221,7 @@ export async function bulkCreateSlots(data: {
   if (!data.slots || data.slots.length === 0) return { error: 'At least one walk is required' }
 
   for (let i = 0; i < data.slots.length; i++) {
-    const errors = validateSlotData({ roundId: data.roundId, ...data.slots[i] })
+    const errors = validateWalkData({ roundId: data.roundId, ...data.slots[i] })
     if (errors.length > 0) return { error: `Walk ${i + 1}: ${errors.join('; ')}` }
   }
 
@@ -232,7 +232,7 @@ export async function bulkCreateSlots(data: {
   })
 
   if (error) return { error: error.message }
-  revalidatePath('/admin/slots')
+  revalidatePath('/admin/walks')
   revalidatePath('/walk')
   return result as { success: true; created: number }
 }

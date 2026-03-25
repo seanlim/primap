@@ -37,10 +37,10 @@ import {
   updateRound,
   updateRoundStatus,
   deleteRound,
-  createSlot,
-  updateSlot,
-  deleteSlot,
-  bulkCreateSlots,
+  createWalk,
+  updateWalk,
+  deleteWalk,
+  bulkCreateWalks,
   updateSettings,
   resolveIncident,
 } from '@/lib/actions/admin-round-actions'
@@ -72,7 +72,7 @@ const roundData = {
   endDate: '2026-04-30',
 }
 
-const slotData = {
+const walkData = {
   roundId: 'round-1',
   locationName: 'Central Park',
   walkDate: '2026-04-15',
@@ -190,25 +190,25 @@ describe('admin-round-actions', () => {
     })
   })
 
-  describe('createSlot', () => {
+  describe('createWalk', () => {
     it('creates a slot with default maxVolunteers of 3', async () => {
       setupAdmin()
 
-      const result = await createSlot(slotData)
+      const result = await createWalk(walkData)
 
       expect(result).toEqual({ success: true })
       expect(mockSupabase.from).toHaveBeenCalledWith('walk_slots')
       expect(methods.insert).toHaveBeenCalledWith(
         expect.objectContaining({ max_volunteers: 3 })
       )
-      expect(revalidatePath).toHaveBeenCalledWith('/admin/slots')
+      expect(revalidatePath).toHaveBeenCalledWith('/admin/walks')
       expect(revalidatePath).toHaveBeenCalledWith('/walk')
     })
 
     it('creates a slot with custom maxVolunteers', async () => {
       setupAdmin()
 
-      const result = await createSlot({ ...slotData, maxVolunteers: 5 })
+      const result = await createWalk({ ...walkData, maxVolunteers: 5 })
 
       expect(result).toEqual({ success: true })
       expect(methods.insert).toHaveBeenCalledWith(
@@ -222,21 +222,21 @@ describe('admin-round-actions', () => {
         error: { message: 'Slot insert failed' },
       })
 
-      const result = await createSlot(slotData)
+      const result = await createWalk(walkData)
 
       expect(result).toEqual({ error: 'Slot insert failed' })
     })
   })
 
-  describe('deleteSlot', () => {
+  describe('deleteWalk', () => {
     it('deletes a slot and revalidates', async () => {
       setupAdmin()
 
-      const result = await deleteSlot('slot-1')
+      const result = await deleteWalk('slot-1')
 
       expect(result).toEqual({ success: true })
       expect(mockSupabase.from).toHaveBeenCalledWith('walk_slots')
-      expect(revalidatePath).toHaveBeenCalledWith('/admin/slots')
+      expect(revalidatePath).toHaveBeenCalledWith('/admin/walks')
       expect(revalidatePath).toHaveBeenCalledWith('/walk')
     })
 
@@ -246,7 +246,7 @@ describe('admin-round-actions', () => {
         .mockReturnValueOnce(methods) // requireAdmin's eq
         .mockReturnValueOnce({ error: { message: 'Delete failed' } }) // action's eq
 
-      const result = await deleteSlot('slot-1')
+      const result = await deleteWalk('slot-1')
 
       expect(result).toEqual({ error: 'Delete failed' })
     })
@@ -347,11 +347,11 @@ describe('admin-round-actions', () => {
     })
   })
 
-  describe('updateSlot', () => {
+  describe('updateWalk', () => {
     it('updates a slot and revalidates', async () => {
       setupAdmin()
 
-      const result = await updateSlot('slot-1', slotData)
+      const result = await updateWalk('slot-1', walkData)
 
       expect(result).toEqual({ success: true })
       expect(mockSupabase.from).toHaveBeenCalledWith('walk_slots')
@@ -362,18 +362,18 @@ describe('admin-round-actions', () => {
           max_volunteers: 3,
         })
       )
-      expect(revalidatePath).toHaveBeenCalledWith('/admin/slots')
+      expect(revalidatePath).toHaveBeenCalledWith('/admin/walks')
       expect(revalidatePath).toHaveBeenCalledWith('/walk')
     })
 
-    it('returns validation error for missing slot ID', async () => {
-      const result = await updateSlot('', slotData)
-      expect(result).toEqual({ error: 'Slot ID is required' })
+    it('returns validation error for missing walk ID', async () => {
+      const result = await updateWalk('', walkData)
+      expect(result).toEqual({ error: 'Walk ID is required' })
     })
 
     it('returns validation error when start time >= end time', async () => {
-      const result = await updateSlot('slot-1', {
-        ...slotData,
+      const result = await updateWalk('slot-1', {
+        ...walkData,
         startTime: '10:00',
         endTime: '08:00',
       })
@@ -381,8 +381,8 @@ describe('admin-round-actions', () => {
     })
 
     it('returns validation error for invalid maxVolunteers', async () => {
-      const result = await updateSlot('slot-1', {
-        ...slotData,
+      const result = await updateWalk('slot-1', {
+        ...walkData,
         maxVolunteers: 15,
       })
       expect(result).toEqual({ error: expect.stringContaining('Max volunteers must be between 1 and 10') })
@@ -394,13 +394,13 @@ describe('admin-round-actions', () => {
         .mockReturnValueOnce(methods)
         .mockReturnValueOnce({ error: { message: 'Update failed' } })
 
-      const result = await updateSlot('slot-1', slotData)
+      const result = await updateWalk('slot-1', walkData)
 
       expect(result).toEqual({ error: 'Update failed' })
     })
   })
 
-  describe('bulkCreateSlots', () => {
+  describe('bulkCreateWalks', () => {
     it('invokes edge function and revalidates', async () => {
       setupAdmin()
       mockSupabase.functions = {
@@ -410,7 +410,7 @@ describe('admin-round-actions', () => {
         }),
       }
 
-      const result = await bulkCreateSlots({
+      const result = await bulkCreateWalks({
         roundId: 'round-1',
         slots: [
           { locationName: 'Park A', walkDate: '2026-04-15', startTime: '08:00', endTime: '10:00' },
@@ -422,22 +422,22 @@ describe('admin-round-actions', () => {
       expect(mockSupabase.functions.invoke).toHaveBeenCalledWith('bulk-create-walks', {
         body: expect.objectContaining({ roundId: 'round-1' }),
       })
-      expect(revalidatePath).toHaveBeenCalledWith('/admin/slots')
+      expect(revalidatePath).toHaveBeenCalledWith('/admin/walks')
       expect(revalidatePath).toHaveBeenCalledWith('/walk')
     })
 
     it('returns error for missing roundId', async () => {
-      const result = await bulkCreateSlots({ roundId: '', slots: [] })
+      const result = await bulkCreateWalks({ roundId: '', slots: [] })
       expect(result).toEqual({ error: 'Round is required' })
     })
 
     it('returns error for empty slots array', async () => {
-      const result = await bulkCreateSlots({ roundId: 'round-1', slots: [] })
+      const result = await bulkCreateWalks({ roundId: 'round-1', slots: [] })
       expect(result).toEqual({ error: 'At least one walk is required' })
     })
 
     it('validates individual slot data', async () => {
-      const result = await bulkCreateSlots({
+      const result = await bulkCreateWalks({
         roundId: 'round-1',
         slots: [
           { locationName: '', walkDate: '2026-04-15', startTime: '08:00', endTime: '10:00' },
@@ -456,7 +456,7 @@ describe('admin-round-actions', () => {
         }),
       }
 
-      const result = await bulkCreateSlots({
+      const result = await bulkCreateWalks({
         roundId: 'round-1',
         slots: [
           { locationName: 'Park A', walkDate: '2026-04-15', startTime: '08:00', endTime: '10:00' },
@@ -488,19 +488,19 @@ describe('admin-round-actions', () => {
     })
   })
 
-  describe('createSlot validation', () => {
+  describe('createWalk validation', () => {
     it('returns error for missing location name', async () => {
-      const result = await createSlot({ ...slotData, locationName: '' })
+      const result = await createWalk({ ...walkData, locationName: '' })
       expect(result).toEqual({ error: expect.stringContaining('Location name is required') })
     })
 
     it('returns error for invalid time order', async () => {
-      const result = await createSlot({ ...slotData, startTime: '12:00', endTime: '08:00' })
+      const result = await createWalk({ ...walkData, startTime: '12:00', endTime: '08:00' })
       expect(result).toEqual({ error: expect.stringContaining('Start time must be before end time') })
     })
 
     it('returns error for maxVolunteers out of range', async () => {
-      const result = await createSlot({ ...slotData, maxVolunteers: 0 })
+      const result = await createWalk({ ...walkData, maxVolunteers: 0 })
       expect(result).toEqual({ error: expect.stringContaining('Max volunteers must be between 1 and 10') })
     })
   })

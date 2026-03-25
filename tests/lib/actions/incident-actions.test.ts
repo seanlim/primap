@@ -45,7 +45,7 @@ function resetChain() {
 }
 
 const validInput = {
-  slotId: 'slot-1',
+  walkId: 'slot-1',
   incidentType: 'INJURED_ANIMAL' as const,
   description: 'Found injured monkey',
 }

@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { ProfileClient } from './profile-client'
-import type { SlotRef, HistoryObservation } from '@/lib/types/supabase-helpers'
+import type { WalkRef, HistoryObservation } from '@/lib/types/supabase-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,7 +58,7 @@ export default async function ProfilePage() {
 
   // Get observations for walk history items
   const walkSlotIds = (walkHistory || [])
-    .map(w => (w.walk_slots as unknown as SlotRef)?.id)
+    .map(w => (w.walk_slots as unknown as WalkRef)?.id)
     .filter(Boolean)
 
   const { data: historyObservations } = walkSlotIds.length > 0
@@ -98,7 +98,7 @@ export default async function ProfilePage() {
         requiredWalks: settings?.required_walks_per_round || 4,
       }}
       walkHistory={(walkHistory || []).map(w => {
-        const slot = w.walk_slots as unknown as SlotRef
+        const slot = w.walk_slots as unknown as WalkRef
         const obs = obsMap.get(slot?.id)
         return {
           membershipId: w.id,

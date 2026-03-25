@@ -1,13 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
-import { SlotsClient } from './slots-client'
-import type { SlotWithCount } from '@/lib/types/supabase-helpers'
+import { WalksClient } from './walks-client'
+import type { WalkWithCount } from '@/lib/types/supabase-helpers'
 
 export const dynamic = 'force-dynamic'
 
-export default async function AdminSlotsPage() {
+export default async function AdminWalksPage() {
   const supabase = await createClient()
 
-  const { data: slots } = await supabase
+  const { data: walks } = await supabase
     .from('walk_slots')
     .select('*, survey_rounds(name, status), slot_memberships(count)')
     .order('walk_date', { ascending: false })
@@ -18,11 +18,11 @@ export default async function AdminSlotsPage() {
     .in('status', ['DRAFT', 'OPEN'])
     .order('start_date', { ascending: false })
 
-  const typed = (slots || []) as unknown as SlotWithCount[]
+  const typed = (walks || []) as unknown as WalkWithCount[]
 
   return (
-    <SlotsClient
-      slots={typed.map(s => ({
+    <WalksClient
+      walks={typed.map(s => ({
         id: s.id,
         roundId: s.round_id,
         roundName: s.survey_rounds?.name || '',

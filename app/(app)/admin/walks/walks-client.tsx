@@ -88,6 +88,13 @@ export function WalksClient({ walks, rounds }: {
 
   const router = useRouter()
 
+  // When editing a walk whose round is closed (not in the active rounds list),
+  // include it so the dropdown still shows the current round.
+  const editingWalk = editingWalkId ? walks.find(w => w.id === editingWalkId) : null
+  const effectiveRounds = editingWalk && !rounds.some(r => r.id === editingWalk.roundId)
+    ? [...rounds, { id: editingWalk.roundId, name: `${editingWalk.roundName} (Closed)` }]
+    : rounds
+
   const handleCreate = async (e: React.SubmitEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -202,7 +209,7 @@ export function WalksClient({ walks, rounds }: {
         <label className="text-xs font-medium text-gray-500 mb-1">Round</label>
         <select value={roundId} onChange={e => setRoundId(e.target.value)}
           className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500" required>
-          {rounds.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+          {effectiveRounds.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
         </select>
       </div>
       <input type="text" placeholder="Location name" value={locationName}

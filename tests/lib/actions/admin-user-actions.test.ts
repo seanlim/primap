@@ -34,6 +34,8 @@ vi.mock('@/lib/email', () => ({
   sendAccountRejectedEmail: vi.fn(),
   sendAccountDisabledEmail: vi.fn(),
   sendAccountEnabledEmail: vi.fn(),
+  sendRolePromotedEmail: vi.fn(),
+  sendRoleDemotedEmail: vi.fn(),
 }))
 
 import {
@@ -48,6 +50,8 @@ import {
   sendAccountRejectedEmail,
   sendAccountDisabledEmail,
   sendAccountEnabledEmail,
+  sendRolePromotedEmail,
+  sendRoleDemotedEmail,
 } from '@/lib/email'
 
 function resetChain() {
@@ -254,8 +258,14 @@ describe('admin-user-actions', () => {
   })
 
   describe('setUserRole', () => {
-    it('sets role to ADMIN for another user', async () => {
+    it('promotes to ADMIN, sends promotion email, and revalidates', async () => {
       setupAdmin()
+      // First .single() → fetch target profile
+      methods.single.mockResolvedValueOnce({
+        data: { status: 'ACTIVE', email: 'user@test.com', full_name: 'Test User' },
+        error: null,
+      })
+      // Second .single() → update role
       methods.single.mockResolvedValueOnce({
         data: { id: 'user-2' },
         error: null,
@@ -267,11 +277,17 @@ describe('admin-user-actions', () => {
       expect(methods.update).toHaveBeenCalledWith(
         expect.objectContaining({ role: 'ADMIN' })
       )
+      expect(sendRolePromotedEmail).toHaveBeenCalledWith('user@test.com', 'Test User')
+      expect(sendRoleDemotedEmail).not.toHaveBeenCalled()
       expect(revalidatePath).toHaveBeenCalledWith('/admin/users')
     })
 
-    it('sets role to VOLUNTEER for another user', async () => {
+    it('demotes to VOLUNTEER, sends demotion email, and revalidates', async () => {
       setupAdmin()
+      methods.single.mockResolvedValueOnce({
+        data: { status: 'ACTIVE', email: 'user@test.com', full_name: 'Test User' },
+        error: null,
+      })
       methods.single.mockResolvedValueOnce({
         data: { id: 'user-2' },
         error: null,
@@ -283,6 +299,22 @@ describe('admin-user-actions', () => {
       expect(methods.update).toHaveBeenCalledWith(
         expect.objectContaining({ role: 'VOLUNTEER' })
       )
+      expect(sendRoleDemotedEmail).toHaveBeenCalledWith('user@test.com', 'Test User')
+      expect(sendRolePromotedEmail).not.toHaveBeenCalled()
+    })
+
+    it('blocks role change for non-ACTIVE users', async () => {
+      setupAdmin()
+      methods.single.mockResolvedValueOnce({
+        data: { status: 'PENDING', email: 'user@test.com', full_name: 'Test User' },
+        error: null,
+      })
+
+      const result = await setUserRole('user-2', 'ADMIN')
+
+      expect(result).toEqual({ error: 'Can only change role for active users' })
+      expect(methods.update).not.toHaveBeenCalled()
+      expect(sendRolePromotedEmail).not.toHaveBeenCalled()
     })
 
     it('blocks self-demotion to VOLUNTEER', async () => {
@@ -293,8 +325,25 @@ describe('admin-user-actions', () => {
       expect(result).toEqual({ error: 'Cannot demote your own account' })
     })
 
-    it('returns error on DB failure', async () => {
+    it('returns error when target user fetch fails', async () => {
       setupAdmin()
+      methods.single.mockResolvedValueOnce({
+        data: null,
+        error: { message: 'User not found' },
+      })
+
+      const result = await setUserRole('user-2', 'ADMIN')
+
+      expect(result).toEqual({ error: 'User not found' })
+      expect(methods.update).not.toHaveBeenCalled()
+    })
+
+    it('returns error on update DB failure', async () => {
+      setupAdmin()
+      methods.single.mockResolvedValueOnce({
+        data: { status: 'ACTIVE', email: 'user@test.com', full_name: 'Test User' },
+        error: null,
+      })
       methods.single.mockResolvedValueOnce({
         data: null,
         error: { message: 'DB error' },
@@ -303,6 +352,7 @@ describe('admin-user-actions', () => {
       const result = await setUserRole('user-2', 'ADMIN')
 
       expect(result).toEqual({ error: 'DB error' })
+      expect(sendRolePromotedEmail).not.toHaveBeenCalled()
     })
   })
 })

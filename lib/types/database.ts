@@ -158,13 +158,13 @@ export type Database = {
           lat: number | null
           lng: number | null
           notes: string | null
-          outcome: Database["public"]["Enums"]["observation_outcome"] | null
+          outcome: Database["public"]["Enums"]["observation_outcome"]
           slot_id: string
           status: Database["public"]["Enums"]["observation_status"]
           submitted_at: string | null
           updated_at: string
           user_id: string
-          walk_completion: Database["public"]["Enums"]["walk_completion"] | null
+          walk_completion: Database["public"]["Enums"]["walk_completion"]
         }
         Insert: {
           client_draft_id?: string | null
@@ -173,7 +173,7 @@ export type Database = {
           lat?: number | null
           lng?: number | null
           notes?: string | null
-          outcome?: Database["public"]["Enums"]["observation_outcome"] | null
+          outcome?: Database["public"]["Enums"]["observation_outcome"]
           slot_id: string
           status?: Database["public"]["Enums"]["observation_status"]
           submitted_at?: string | null
@@ -181,7 +181,6 @@ export type Database = {
           user_id: string
           walk_completion?:
             | Database["public"]["Enums"]["walk_completion"]
-            | null
         }
         Update: {
           client_draft_id?: string | null
@@ -190,7 +189,7 @@ export type Database = {
           lat?: number | null
           lng?: number | null
           notes?: string | null
-          outcome?: Database["public"]["Enums"]["observation_outcome"] | null
+          outcome?: Database["public"]["Enums"]["observation_outcome"]
           slot_id?: string
           status?: Database["public"]["Enums"]["observation_status"]
           submitted_at?: string | null
@@ -198,7 +197,6 @@ export type Database = {
           user_id?: string
           walk_completion?:
             | Database["public"]["Enums"]["walk_completion"]
-            | null
         }
         Relationships: [
           {

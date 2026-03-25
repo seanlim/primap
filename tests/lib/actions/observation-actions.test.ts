@@ -189,36 +189,7 @@ describe('observation-actions', () => {
       expect(result).toEqual({ error: 'Update failed' })
     })
 
-    it('derives outcome as SIGHTED when sightings present', async () => {
-      setupUser()
-      // New draft insert
-      methods.single.mockResolvedValueOnce({
-        data: { id: 'obs-1' },
-        error: null,
-      })
-      // New sighting insert: insert().select('id').single()
-      methods.single.mockResolvedValueOnce({
-        data: { id: 'sight-1' },
-        error: null,
-      })
-
-      const result = await saveDraft({
-        ...baseDraftInput,
-        outcome: undefined,
-        sightings: [sightingInput],
-      })
-
-      expect(result).toEqual({
-        success: true,
-        observationId: 'obs-1',
-        sightingIds: ['sight-1'],
-      })
-      expect(methods.insert).toHaveBeenCalledWith(
-        expect.objectContaining({ outcome: 'SIGHTED' })
-      )
-    })
-
-    it('derives outcome as NOT_SIGHTED when no sightings and input says NOT_SIGHTED', async () => {
+    it('derives outcome as NOT_SIGHTED when input says NOT_SIGHTED', async () => {
       setupUser()
       methods.single.mockResolvedValueOnce({
         data: { id: 'obs-1' },
@@ -234,24 +205,6 @@ describe('observation-actions', () => {
       expect(result).toEqual(expect.objectContaining({ success: true }))
       expect(methods.insert).toHaveBeenCalledWith(
         expect.objectContaining({ outcome: 'NOT_SIGHTED' })
-      )
-    })
-
-    it('derives outcome as null when no sightings and no outcome', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: { id: 'obs-1' },
-        error: null,
-      })
-
-      const result = await saveDraft({
-        walkId: 'slot-1',
-        sightings: [],
-      })
-
-      expect(result).toEqual(expect.objectContaining({ success: true }))
-      expect(methods.insert).toHaveBeenCalledWith(
-        expect.objectContaining({ outcome: null })
       )
     })
 

@@ -49,8 +49,6 @@ export default async function EditReportPage({
     redirect(`/report/${walkId}`)
   }
 
-  const round = walk.survey_rounds as unknown as { name: string }
-
   return (
     <ObservationFormClient
       slot={{
@@ -59,30 +57,26 @@ export default async function EditReportPage({
         walkDate: walk.walk_date,
         startTime: walk.start_time,
         endTime: walk.end_time,
-        roundName: round?.name || '',
+        roundName: walk.survey_rounds.name,
       }}
       existingObservation={existingObs ? {
         id: existingObs.id,
-        walkCompletion: existingObs.walk_completion as 'COMPLETED' | 'PARTIAL' | 'ABORTED' | null,
-        outcome: existingObs.outcome as 'SIGHTED' | 'NOT_SIGHTED' | null,
+        walkCompletion: existingObs.walk_completion,
+        outcome: existingObs.outcome,
         notes: existingObs.notes,
         lat: existingObs.lat,
         lng: existingObs.lng,
-        sightings: ((existingObs.sightings as unknown as Array<{
-          id: string; species: string; count: string;
-          observed_at: string | null; lat: number; lng: number; notes: string | null;
-          media: Array<{ id: string; file_path: string; file_name: string; media_type: string }>
-        }>) || []).map(s => ({
+        sightings: existingObs.sightings.map(s => ({
           id: s.id,
-          species: s.species as 'RBL' | 'LTM' | 'DUSKY',
+          species: s.species,
           count: s.count,
           observedAt: s.observed_at,
           lat: s.lat,
           lng: s.lng,
           notes: s.notes,
-          media: s.media || [],
+          media: s.media,
         })),
-        media: (existingObs.media as unknown as Array<{ id: string; file_path: string; file_name: string; media_type: string }>) || [],
+        media: existingObs.media,
       } : null}
     />
   )

@@ -8,6 +8,7 @@ import { formatDate, toLocalDateString } from '@/lib/utils/format-date'
 import { saveDraft, submitObservation } from '@/lib/actions/observation-actions'
 import { LocationPicker } from '@/components/map/location-picker'
 import { MediaUploader, type MediaItem } from '@/components/report/media-uploader'
+import { deleteDraft, getDraftByWalk, saveDraftLocally } from '@/lib/offline/db'
 
 interface SightingForm {
   id?: string
@@ -84,7 +85,28 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [savedMessage, setSavedMessage] = useState('')
+  const isOnline = navigator.onLine
   const router = useRouter()
+
+  useEffect(() => {
+    async function checkForOfflineDraft() {
+      const draft = await getDraftByWalk(slot.id)
+
+      if (draft) {
+        const data = draft.data
+
+        setWalkCompletion(data.walkCompletion)
+        setNotes(data.notes ?? "")
+        setLat(data.lat ?? null)
+        setLng(data.lng ?? null)
+        setObservationId(data.observationId)
+        setSightings(data.sightings ?? [])
+
+      }
+    }
+
+    checkForOfflineDraft()
+  }, [slot.id]);
 
   const addSighting = () => {
     const now = new Date()
@@ -145,6 +167,32 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
     const validSightings = buildSightingsPayload()
     const hasSightings = validSightings.length > 0
 
+    // If offline, save to local storage instead. We don't use isOnline here in case network connection was lost between renders.
+    if (!navigator.onLine) {
+      try {
+        await saveDraftLocally(slot.id, {
+          walkId: slot.id,
+          observationId: observationId,
+          walkCompletion: walkCompletion,
+          outcome: hasSightings ? 'SIGHTED' : 'NOT_SIGHTED',
+          notes: notes,
+          lat: lat ?? undefined,
+          lng: lng ?? undefined,
+          sightings: sightings.filter(s => s.species)
+        })
+
+        if (!silent) {
+          setSavedMessage('Draft saved offline')
+          setTimeout(() => setSavedMessage(''), 3000)
+        }
+      } catch (err) {
+        if (!silent) setError('Failed to save offline: ' + String(err))
+      }
+      setSaving(false)
+      return
+    }
+
+    // Normal online save
     const result = await saveDraft({
       walkId: slot.id,
       observationId,
@@ -159,6 +207,10 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
     if (result.error) {
       if (!silent) setError(result.error)
     } else {
+
+      // Delete offline draft, won't throw error even if it does not exist
+      await deleteDraft(slot.id)
+        
       // Update local state with server-assigned IDs
       if (result.observationId) setObservationId(result.observationId)
       if (result.sightingIds && result.sightingIds.length > 0) {
@@ -403,6 +455,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
                         updateSighting(index, 'observedAt', datetime)
                       }
                     }}
+                    offline={!isOnline}
                   />
                 </div>
               </>
@@ -458,6 +511,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
                 setLng(exifLng)
               }
             }}
+            offline={!isOnline}
           />
         </div>
       )}
@@ -468,6 +522,13 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
 
       {savedMessage && (
         <p className="text-sm text-green-600 bg-green-50 p-3 rounded-lg">{savedMessage}</p>
+      )}
+
+      {!isOnline && (
+        <p className="text-sm text-amber-700 bg-amber-50 p-3 rounded-lg flex items-center gap-2">
+          <span className="w-2 h-2 bg-amber-600 rounded-full"></span>
+          You are offline. Click Save Draft to save changes locally.
+        </p>
       )}
 
       {/* Actions */}
@@ -481,7 +542,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
         </button>
         <button
           onClick={handleSubmit}
-          disabled={saving || !walkCompletion}
+          disabled={!isOnline|| saving || !walkCompletion}
           className="flex-1 bg-green-600 text-white py-3 px-4 rounded-xl hover:bg-green-700 disabled:opacity-50 font-medium transition-colors"
         >
           {submitting ? 'Submitting...' : 'Submit Report'}

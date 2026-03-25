@@ -1,15 +1,37 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
+import { type MediaItem } from '@/components/report/media-uploader'
+
+interface SightingForm {
+  id?: string
+  species: 'RBL' | 'LTM' | 'DUSKY' | ''
+  count: string
+  observedAt: string
+  lat: number | null
+  lng: number | null
+  notes: string
+  media: MediaItem[]
+}
+
+interface OfflineDraftInput {
+  walkId: string
+  observationId?: string
+  walkCompletion: 'COMPLETED' | 'PARTIAL' | 'ABORTED'
+  outcome: 'SIGHTED' | 'NOT_SIGHTED'
+  notes?: string
+  lat?: number
+  lng?: number
+  clientDraftId?: string
+  sightings?: SightingForm[]
+}
 
 interface PrimapDB extends DBSchema {
   drafts: {
     key: string
     value: {
-      id: string
       walkId: string
-      data: Record<string, unknown>
+      data: OfflineDraftInput
       updatedAt: number
     }
-    indexes: { 'by-walk': string }
   }
   outbox: {
     key: number
@@ -38,8 +60,7 @@ function getDB() {
   if (!dbPromise) {
     dbPromise = openDB<PrimapDB>('primap', 1, {
       upgrade(db) {
-        const draftStore = db.createObjectStore('drafts', { keyPath: 'id' })
-        draftStore.createIndex('by-walk', 'walkId')
+        db.createObjectStore('drafts', { keyPath: 'walkId' })
 
         db.createObjectStore('outbox', {
           keyPath: 'id',
@@ -55,22 +76,21 @@ function getDB() {
 
 // Drafts
 export async function saveDraftLocally(
-  id: string,
   walkId: string,
-  data: Record<string, unknown>
+  data: OfflineDraftInput
 ) {
   const db = await getDB()
-  await db.put('drafts', { id, walkId, data, updatedAt: Date.now() })
+  await db.put('drafts', { walkId, data, updatedAt: Date.now() })
 }
 
 export async function getDraftByWalk(walkId: string) {
   const db = await getDB()
-  return db.getFromIndex('drafts', 'by-walk', walkId)
+  return db.get('drafts', walkId)
 }
 
-export async function deleteDraft(id: string) {
+export async function deleteDraft(walkId: string) {
   const db = await getDB()
-  await db.delete('drafts', id)
+  await db.delete('drafts', walkId)
 }
 
 export async function getAllDrafts() {

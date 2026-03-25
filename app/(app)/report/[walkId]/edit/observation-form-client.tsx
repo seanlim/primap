@@ -8,7 +8,7 @@ import { formatDate, toLocalDateString } from '@/lib/utils/format-date'
 import { saveDraft, submitObservation } from '@/lib/actions/observation-actions'
 import { LocationPicker } from '@/components/map/location-picker'
 import { MediaUploader, type MediaItem } from '@/components/report/media-uploader'
-import { deleteDraft, getDraftByWalk, saveDraftLocally } from '@/lib/offline/db'
+import { deleteDraft, getDraft, putDraft } from '@/lib/offline/db'
 
 interface SightingForm {
   id?: string
@@ -90,7 +90,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
 
   useEffect(() => {
     async function checkForOfflineDraft() {
-      const draft = await getDraftByWalk(slot.id)
+      const draft = await getDraft(slot.id)
 
       if (draft) {
         const data = draft.data
@@ -170,7 +170,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
     // If offline, save to local storage instead. We don't use isOnline here in case network connection was lost between renders.
     if (!navigator.onLine) {
       try {
-        await saveDraftLocally(slot.id, {
+        await putDraft(slot.id, {
           walkId: slot.id,
           observationId: observationId,
           walkCompletion: walkCompletion,

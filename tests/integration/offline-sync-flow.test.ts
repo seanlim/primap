@@ -47,7 +47,7 @@ beforeEach(() => {
 
 describe('offline-sync-flow (integration)', () => {
   it('saveDraftLocally → addToOutbox(FINALIZE_SUBMIT) → processOutbox → supabase update with SUBMITTED', async () => {
-    const { saveDraftLocally, addToOutbox } = await import('@/lib/offline/db')
+    const { putDraft: saveDraftLocally, addToOutbox } = await import('@/lib/offline/db')
     const { processOutbox } = await import('@/lib/offline/sync-engine')
 
     await saveDraftLocally('draft-1', 'slot-A', { species: 'macaque' })
@@ -188,7 +188,7 @@ describe('offline-sync-flow (integration)', () => {
   })
 
   it('full flow: saveDraftLocally + addToOutbox + processOutbox → outbox empty', async () => {
-    const { saveDraftLocally, addToOutbox, getOutboxItems, getDraftByWalk } =
+    const { putDraft: saveDraftLocally, addToOutbox, getOutboxItems, getDraft: getDraftByWalk } =
       await import('@/lib/offline/db')
     const { processOutbox } = await import('@/lib/offline/sync-engine')
 

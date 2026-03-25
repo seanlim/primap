@@ -75,7 +75,7 @@ function getDB() {
 }
 
 // Drafts
-export async function saveDraftLocally(
+export async function putDraft(
   walkId: string,
   data: OfflineDraftInput
 ) {
@@ -83,7 +83,7 @@ export async function saveDraftLocally(
   await db.put('drafts', { walkId, data, updatedAt: Date.now() })
 }
 
-export async function getDraftByWalk(walkId: string) {
+export async function getDraft(walkId: string) {
   const db = await getDB()
   return db.get('drafts', walkId)
 }

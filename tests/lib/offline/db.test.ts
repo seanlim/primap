@@ -10,7 +10,7 @@ beforeEach(() => {
 
 describe('Drafts', () => {
   it('saveDraftLocally + getDraftByWalk round trip', async () => {
-    const { saveDraftLocally, getDraftByWalk } = await import('@/lib/offline/db')
+    const { putDraft: saveDraftLocally, getDraft: getDraftByWalk } = await import('@/lib/offline/db')
 
     await saveDraftLocally('draft-1', 'slot-A', { species: 'macaque' })
     const result = await getDraftByWalk('slot-A')
@@ -23,7 +23,7 @@ describe('Drafts', () => {
   })
 
   it('saveDraftLocally overwrites existing with same id', async () => {
-    const { saveDraftLocally, getDraftByWalk } = await import('@/lib/offline/db')
+    const { putDraft: saveDraftLocally, getDraft: getDraftByWalk } = await import('@/lib/offline/db')
 
     await saveDraftLocally('draft-1', 'slot-A', { species: 'macaque' })
     await saveDraftLocally('draft-1', 'slot-A', { species: 'gibbon' })
@@ -33,14 +33,14 @@ describe('Drafts', () => {
   })
 
   it('getDraftByWalk returns undefined for missing slot', async () => {
-    const { getDraftByWalk } = await import('@/lib/offline/db')
+    const { getDraft: getDraftByWalk } = await import('@/lib/offline/db')
 
     const result = await getDraftByWalk('nonexistent-slot')
     expect(result).toBeUndefined()
   })
 
   it('deleteDraft removes draft', async () => {
-    const { saveDraftLocally, getDraftByWalk, deleteDraft } = await import('@/lib/offline/db')
+    const { putDraft: saveDraftLocally, getDraft: getDraftByWalk, deleteDraft } = await import('@/lib/offline/db')
 
     await saveDraftLocally('draft-1', 'slot-A', { species: 'macaque' })
     await deleteDraft('draft-1')
@@ -50,7 +50,7 @@ describe('Drafts', () => {
   })
 
   it('getAllDrafts returns all saved drafts', async () => {
-    const { saveDraftLocally, getAllDrafts } = await import('@/lib/offline/db')
+    const { putDraft: saveDraftLocally, getAllDrafts } = await import('@/lib/offline/db')
 
     await saveDraftLocally('draft-1', 'slot-A', { species: 'macaque' })
     await saveDraftLocally('draft-2', 'slot-B', { species: 'gibbon' })

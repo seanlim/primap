@@ -9,56 +9,82 @@ beforeEach(() => {
 })
 
 describe('Drafts', () => {
-  it('saveDraftLocally + getDraftByWalk round trip', async () => {
-    const { putDraft: saveDraftLocally, getDraft: getDraftByWalk } = await import('@/lib/offline/db')
+  it('putDraft + getDraft round trip', async () => {
+    const { putDraft, getDraft } = await import('@/lib/offline/db')
 
-    await saveDraftLocally('draft-1', 'slot-A', { species: 'macaque' })
-    const result = await getDraftByWalk('slot-A')
+    await putDraft('slot-A', {
+      walkCompletion: "PARTIAL",
+      outcome: 'SIGHTED' 
+    })
+    const result = await getDraft('slot-A')
 
     expect(result).toBeDefined()
-    expect(result!.id).toBe('draft-1')
     expect(result!.walkId).toBe('slot-A')
-    expect(result!.data).toEqual({ species: 'macaque' })
+    expect(result!.data).toEqual({
+      walkCompletion: "PARTIAL",
+      outcome: 'SIGHTED' 
+    })
     expect(result!.updatedAt).toBeTypeOf('number')
   })
 
-  it('saveDraftLocally overwrites existing with same id', async () => {
-    const { putDraft: saveDraftLocally, getDraft: getDraftByWalk } = await import('@/lib/offline/db')
+  it('putDraft overwrites existing with same id', async () => {
+    const { putDraft, getDraft } = await import('@/lib/offline/db')
 
-    await saveDraftLocally('draft-1', 'slot-A', { species: 'macaque' })
-    await saveDraftLocally('draft-1', 'slot-A', { species: 'gibbon' })
+    await putDraft('slot-A', {
+      walkCompletion: "PARTIAL",
+      outcome: 'SIGHTED' 
+    })
+    await putDraft('slot-A',  {
+      walkCompletion: "COMPLETED",
+      outcome: 'SIGHTED' 
+    })
 
-    const result = await getDraftByWalk('slot-A')
-    expect(result!.data).toEqual({ species: 'gibbon' })
+    const result = await getDraft('slot-A')
+    expect(result!.data).toEqual({
+      walkCompletion: "COMPLETED",
+      outcome: 'SIGHTED' 
+    })
   })
 
-  it('getDraftByWalk returns undefined for missing slot', async () => {
-    const { getDraft: getDraftByWalk } = await import('@/lib/offline/db')
+  it('getDraft returns undefined for missing slot', async () => {
+    const { getDraft } = await import('@/lib/offline/db')
 
-    const result = await getDraftByWalk('nonexistent-slot')
+    const result = await getDraft('nonexistent-slot')
     expect(result).toBeUndefined()
   })
 
   it('deleteDraft removes draft', async () => {
-    const { putDraft: saveDraftLocally, getDraft: getDraftByWalk, deleteDraft } = await import('@/lib/offline/db')
+    const { putDraft, getDraft, deleteDraft } = await import('@/lib/offline/db')
 
-    await saveDraftLocally('draft-1', 'slot-A', { species: 'macaque' })
+    await putDraft('slot-A', {
+      walkCompletion: "PARTIAL",
+      outcome: 'SIGHTED' 
+    })
     await deleteDraft('draft-1')
 
-    const result = await getDraftByWalk('slot-A')
+    const result = await getDraft('slot-A')
     expect(result).toBeUndefined()
   })
 
   it('getAllDrafts returns all saved drafts', async () => {
-    const { putDraft: saveDraftLocally, getAllDrafts } = await import('@/lib/offline/db')
+    const { putDraft, getAllDrafts } = await import('@/lib/offline/db')
 
-    await saveDraftLocally('draft-1', 'slot-A', { species: 'macaque' })
-    await saveDraftLocally('draft-2', 'slot-B', { species: 'gibbon' })
-    await saveDraftLocally('draft-3', 'slot-C', { species: 'langur' })
+    await putDraft('slot-A', {
+      walkCompletion: "PARTIAL",
+      outcome: 'SIGHTED',
+    })
+    await putDraft('', {
+      walkCompletion: "PARTIAL",
+      outcome: 'SIGHTED',
+    })
+    await putDraft('slot-C', {
+      walkCompletion: "PARTIAL",
+      outcome: 'SIGHTED',
+    })
 
     const drafts = await getAllDrafts()
     expect(drafts).toHaveLength(3)
-    expect(drafts.map((d) => d.id).sort()).toEqual(['draft-1', 'draft-2', 'draft-3'])
+    expect(drafts.map((d) => d.walkId).sort()).toEqual(['slot-A', 'slot-B', 'slot-C'])
   })
 
   it('getAllDrafts returns empty array when none', async () => {

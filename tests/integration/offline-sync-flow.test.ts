@@ -193,12 +193,12 @@ describe('offline-sync-flow (integration)', () => {
     const { processOutbox } = await import('@/lib/offline/sync-engine')
 
     // Save draft locally
-    await saveDraftLocally('draft-1', 'slot-A', { species: 'macaque', count: 3 })
+    await saveDraftLocally('slot-A', { walkCompletion: "COMPLETED", outcome: "NOT_SIGHTED", notes: 'macaque' })
 
     // Verify draft exists
     const draft = await getDraftByWalk('slot-A')
     expect(draft).toBeDefined()
-    expect(draft!.data).toEqual({ species: 'macaque', count: 3 })
+    expect(draft!.data).toEqual({ walkCompletion: "COMPLETED", outcome: "NOT_SIGHTED", notes: 'macaque' })
 
     // Queue for sync
     await addToOutbox(

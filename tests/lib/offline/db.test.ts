@@ -60,7 +60,7 @@ describe('Drafts', () => {
       walkCompletion: "PARTIAL",
       outcome: 'SIGHTED' 
     })
-    await deleteDraft('draft-1')
+    await deleteDraft('slot-A')
 
     const result = await getDraft('slot-A')
     expect(result).toBeUndefined()
@@ -73,7 +73,7 @@ describe('Drafts', () => {
       walkCompletion: "PARTIAL",
       outcome: 'SIGHTED',
     })
-    await putDraft('', {
+    await putDraft('slot-B', {
       walkCompletion: "PARTIAL",
       outcome: 'SIGHTED',
     })

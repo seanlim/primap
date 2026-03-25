@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Plus, Trash2, Loader2 } from 'lucide-react'
-import { formatDate } from '@/lib/utils/format-date'
+import { formatDate, toLocalDateString } from '@/lib/utils/format-date'
 import { saveDraft, submitObservation } from '@/lib/actions/observation-actions'
 import { LocationPicker } from '@/components/map/location-picker'
 import { MediaUploader, type MediaItem } from '@/components/report/media-uploader'
@@ -89,12 +89,9 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
   const addSighting = () => {
     const now = new Date()
     // Format as datetime-local value: YYYY-MM-DDTHH:MM
-    const yyyy = now.getFullYear()
-    const mm = String(now.getMonth() + 1).padStart(2, '0')
-    const dd = String(now.getDate()).padStart(2, '0')
     const hh = String(now.getHours()).padStart(2, '0')
     const min = String(now.getMinutes()).padStart(2, '0')
-    const currentTime = `${yyyy}-${mm}-${dd}T${hh}:${min}`
+    const currentTime = `${toLocalDateString(now)}T${hh}:${min}`
 
     setSightings(prev => [...prev, {
       species: '',

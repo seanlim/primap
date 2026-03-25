@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Plus, Trash2, Pencil, X, Layers } from 'lucide-react'
 import { createWalk, updateWalk, deleteWalk, bulkCreateWalks } from '@/lib/actions/admin-round-actions'
-import { formatDate } from '@/lib/utils/format-date'
+import { formatDate, toLocalDateString } from '@/lib/utils/format-date'
 
 interface WalkData {
   id: string
@@ -46,7 +46,7 @@ function generateWalksFromRules(rule: BulkRule): GeneratedWalk[] {
 
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
     if (!rule.daysOfWeek.includes(d.getDay())) continue
-    const dateStr = d.toISOString().slice(0, 10)
+    const dateStr = toLocalDateString(d)
     for (const loc of rule.locations) {
       walks.push({
         locationName: loc,
@@ -109,6 +109,8 @@ export function WalksClient({ walks, rounds }: {
   }
 
   const startEdit = (walk: WalkData) => {
+    setShowForm(false)
+    setShowBulkForm(false)
     setEditingWalkId(walk.id)
     setRoundId(walk.roundId)
     setLocationName(walk.locationName)
@@ -252,14 +254,14 @@ export function WalksClient({ walks, rounds }: {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => { setShowBulkForm(!showBulkForm); setShowForm(false) }}
+            onClick={() => { setShowBulkForm(!showBulkForm); setShowForm(false); setEditingWalkId(null) }}
             className="flex items-center gap-1 bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-blue-700"
           >
             <Layers className="w-4 h-4" />
             Bulk Create
           </button>
           <button
-            onClick={() => { setShowForm(!showForm); setShowBulkForm(false) }}
+            onClick={() => { setShowForm(!showForm); setShowBulkForm(false); setEditingWalkId(null) }}
             className="flex items-center gap-1 bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-green-700"
           >
             <Plus className="w-4 h-4" />

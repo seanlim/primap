@@ -171,7 +171,6 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
     if (!navigator.onLine) {
       try {
         await putDraft(slot.id, {
-          walkId: slot.id,
           observationId: observationId,
           walkCompletion: walkCompletion,
           outcome: hasSightings ? 'SIGHTED' : 'NOT_SIGHTED',

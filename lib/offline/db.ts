@@ -13,7 +13,6 @@ interface SightingForm {
 }
 
 interface OfflineDraftInput {
-  walkId: string
   observationId?: string
   walkCompletion: 'COMPLETED' | 'PARTIAL' | 'ABORTED'
   outcome: 'SIGHTED' | 'NOT_SIGHTED'

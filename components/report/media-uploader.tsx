@@ -20,7 +20,7 @@ interface MediaUploaderProps {
   maxFiles?: number
   onExifGps?: (lat: number, lng: number) => void
   onExifDatetime?: (datetime: string) => void
-  disabled?: boolean
+  offline?: boolean
 }
 
 export function MediaUploader({
@@ -30,7 +30,7 @@ export function MediaUploader({
   maxFiles = 10,
   onExifGps,
   onExifDatetime,
-  disabled = false,
+  offline = false,
 }: MediaUploaderProps) {
   const [media, setMedia] = useState<MediaItem[]>(existingMedia)
   const [uploading, setUploading] = useState<Set<string>>(new Set())
@@ -158,7 +158,7 @@ export function MediaUploader({
                   <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
                 </div>
               )}
-              {!disabled && (
+              {!offline && (
                 <button
                   type="button"
                   onClick={() => handleDelete(item.id)}
@@ -176,9 +176,14 @@ export function MediaUploader({
           ))}
         </div>
       )}
+      
+      {offline && 
+        (<div className="text-xs text-gray-400 text-center py-3 bg-gray-50 rounded-xl">
+          Media can only be uploaded when you&apos;re online.
+        </div>)
+      }
 
-      {/* Upload button */}
-      {!disabled && media.length < maxFiles && (
+      {!offline && media.length < maxFiles && (
         <button
           type="button"
           onClick={() => inputRef.current?.click()}

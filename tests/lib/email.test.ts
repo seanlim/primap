@@ -15,7 +15,7 @@ import {
   sendAccountEnabledEmail,
   sendRolePromotedEmail,
   sendRoleDemotedEmail,
-  sendSlotCancellationEmail,
+  sendWalkCancellationEmail,
   sendWalkReminderEmail,
 } from '@/lib/email'
 
@@ -224,17 +224,17 @@ describe('email utilities', () => {
     })
   })
 
-  describe('sendSlotCancellationEmail', () => {
+  describe('sendWalkCancellationEmail', () => {
     const slotInfo = { date: '2025-07-01', time: '09:00', location: 'Bukit Timah' }
 
     it('returns early on empty recipients without sending', async () => {
-      await sendSlotCancellationEmail([], slotInfo, 'Jane Doe')
+      await sendWalkCancellationEmail([], slotInfo, 'Jane Doe')
 
       expect(mockSend).not.toHaveBeenCalled()
     })
 
     it('sends to each recipient individually', async () => {
-      await sendSlotCancellationEmail(
+      await sendWalkCancellationEmail(
         ['a@example.com', 'b@example.com', 'c@example.com'],
         slotInfo,
         'Jane Doe'
@@ -247,10 +247,10 @@ describe('email utilities', () => {
     })
 
     it('includes slot info and cancellation details in email body', async () => {
-      await sendSlotCancellationEmail(['a@example.com'], slotInfo, 'Jane Doe')
+      await sendWalkCancellationEmail(['a@example.com'], slotInfo, 'Jane Doe')
 
       const call = mockSend.mock.calls[0][0]
-      expect(call.subject).toBe('Walk Slot Cancellation Update')
+      expect(call.subject).toBe('Walk Cancellation Update')
       expect(call.html).toContain('2025-07-01')
       expect(call.html).toContain('09:00')
       expect(call.html).toContain('Bukit Timah')

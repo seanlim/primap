@@ -32,11 +32,11 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 vi.mock('@/lib/email', () => ({
-  sendSlotCancellationEmail: vi.fn(),
+  sendWalkCancellationEmail: vi.fn(),
 }))
 
-import { joinSlot, cancelSlot } from '@/lib/actions/walk-actions'
-import { sendSlotCancellationEmail } from '@/lib/email'
+import { joinWalk, cancelWalk } from '@/lib/actions/walk-actions'
+import { sendWalkCancellationEmail } from '@/lib/email'
 
 function resetChain() {
   methods.select.mockReturnThis()
@@ -64,11 +64,11 @@ describe('walk-actions', () => {
     resetChain()
   })
 
-  describe('joinSlot', () => {
+  describe('joinWalk', () => {
     it('returns error when not authenticated', async () => {
       mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
 
-      const result = await joinSlot('slot-1')
+      const result = await joinWalk('slot-1')
 
       expect(result).toEqual({ error: 'Not authenticated' })
     })
@@ -80,7 +80,7 @@ describe('walk-actions', () => {
         error: null,
       })
 
-      const result = await joinSlot('slot-1')
+      const result = await joinWalk('slot-1')
 
       expect(result).toEqual({ success: true })
       expect(mockSupabase.rpc).toHaveBeenCalledWith('join_slot_with_observation', {
@@ -101,7 +101,7 @@ describe('walk-actions', () => {
         error: null,
       })
 
-      const result = await joinSlot('slot-1')
+      const result = await joinWalk('slot-1')
 
       expect(result).toEqual({ error: 'This walk slot is full.' })
     })
@@ -113,7 +113,7 @@ describe('walk-actions', () => {
         error: null,
       })
 
-      const result = await joinSlot('slot-1')
+      const result = await joinWalk('slot-1')
 
       expect(result).toEqual({ error: 'You have already joined this walk.' })
     })
@@ -125,7 +125,7 @@ describe('walk-actions', () => {
         error: { message: 'Unexpected error' },
       })
 
-      const result = await joinSlot('slot-1')
+      const result = await joinWalk('slot-1')
 
       expect(result).toEqual({ error: 'Unexpected error' })
     })
@@ -137,7 +137,7 @@ describe('walk-actions', () => {
         error: null,
       })
 
-      const result = await joinSlot('slot-1')
+      const result = await joinWalk('slot-1')
 
       expect(result).toEqual({ success: true })
       expect(mockSupabase.rpc).toHaveBeenCalledWith('join_slot_with_observation', {
@@ -147,11 +147,11 @@ describe('walk-actions', () => {
     })
   })
 
-  describe('cancelSlot', () => {
+  describe('cancelWalk', () => {
     it('returns error when not authenticated', async () => {
       mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
 
-      const result = await cancelSlot('slot-1')
+      const result = await cancelWalk('slot-1')
 
       expect(result).toEqual({ error: 'Not authenticated' })
     })
@@ -173,14 +173,14 @@ describe('walk-actions', () => {
         data: [{ user_id: 'other-1', profiles: { email: 'other@test.com' } }],
       })
 
-      const result = await cancelSlot('slot-1')
+      const result = await cancelWalk('slot-1')
 
       expect(result).toEqual({ success: true })
       expect(mockSupabase.from).toHaveBeenCalledWith('slot_memberships')
       expect(methods.update).toHaveBeenCalledWith(
         expect.objectContaining({ status: 'CANCELLED' })
       )
-      expect(sendSlotCancellationEmail).toHaveBeenCalledWith(
+      expect(sendWalkCancellationEmail).toHaveBeenCalledWith(
         ['other@test.com'],
         { date: '2026-04-15', time: '08:00', location: 'Central Park' },
         'Test User'
@@ -198,7 +198,7 @@ describe('walk-actions', () => {
         .mockReturnValueOnce(methods) // eq('user_id', user.id)
         .mockReturnValueOnce({ error: { message: 'Update failed' } }) // eq('status', 'ACTIVE')
 
-      const result = await cancelSlot('slot-1')
+      const result = await cancelWalk('slot-1')
 
       expect(result).toEqual({ error: 'Update failed' })
     })
@@ -207,10 +207,10 @@ describe('walk-actions', () => {
       setupUser()
       methods.single.mockResolvedValueOnce({ data: null, error: null })
 
-      const result = await cancelSlot('slot-1')
+      const result = await cancelWalk('slot-1')
 
       expect(result).toEqual({ success: true })
-      expect(sendSlotCancellationEmail).not.toHaveBeenCalled()
+      expect(sendWalkCancellationEmail).not.toHaveBeenCalled()
     })
 
     it('still succeeds when no other members', async () => {
@@ -226,10 +226,10 @@ describe('walk-actions', () => {
         })
       methods.neq.mockReturnValueOnce({ data: [] })
 
-      const result = await cancelSlot('slot-1')
+      const result = await cancelWalk('slot-1')
 
       expect(result).toEqual({ success: true })
-      expect(sendSlotCancellationEmail).not.toHaveBeenCalled()
+      expect(sendWalkCancellationEmail).not.toHaveBeenCalled()
     })
 
     it('still succeeds when recipients are empty after filter', async () => {
@@ -247,10 +247,10 @@ describe('walk-actions', () => {
         data: [{ user_id: 'other-1', profiles: { email: null } }],
       })
 
-      const result = await cancelSlot('slot-1')
+      const result = await cancelWalk('slot-1')
 
       expect(result).toEqual({ success: true })
-      expect(sendSlotCancellationEmail).not.toHaveBeenCalled()
+      expect(sendWalkCancellationEmail).not.toHaveBeenCalled()
     })
 
     it('returns success with warning when email notification throws', async () => {
@@ -267,11 +267,11 @@ describe('walk-actions', () => {
       methods.neq.mockReturnValueOnce({
         data: [{ user_id: 'other-1', profiles: { email: 'other@test.com' } }],
       })
-      vi.mocked(sendSlotCancellationEmail).mockRejectedValueOnce(
+      vi.mocked(sendWalkCancellationEmail).mockRejectedValueOnce(
         new Error('Email service down')
       )
 
-      const result = await cancelSlot('slot-1')
+      const result = await cancelWalk('slot-1')
 
       expect(result).toEqual({
         success: true,
@@ -294,9 +294,9 @@ describe('walk-actions', () => {
         data: [{ user_id: 'other-1', profiles: { email: 'other@test.com' } }],
       })
 
-      await cancelSlot('slot-1')
+      await cancelWalk('slot-1')
 
-      expect(sendSlotCancellationEmail).toHaveBeenCalledWith(
+      expect(sendWalkCancellationEmail).toHaveBeenCalledWith(
         expect.anything(),
         expect.anything(),
         'Jane Doe'
@@ -318,9 +318,9 @@ describe('walk-actions', () => {
         data: [{ user_id: 'other-1', profiles: { email: 'other@test.com' } }],
       })
 
-      await cancelSlot('slot-1')
+      await cancelWalk('slot-1')
 
-      expect(sendSlotCancellationEmail).toHaveBeenCalledWith(
+      expect(sendWalkCancellationEmail).toHaveBeenCalledWith(
         expect.anything(),
         expect.anything(),
         'jane@test.com'
@@ -342,9 +342,9 @@ describe('walk-actions', () => {
         data: [{ user_id: 'other-1', profiles: { email: 'other@test.com' } }],
       })
 
-      await cancelSlot('slot-1')
+      await cancelWalk('slot-1')
 
-      expect(sendSlotCancellationEmail).toHaveBeenCalledWith(
+      expect(sendWalkCancellationEmail).toHaveBeenCalledWith(
         expect.anything(),
         expect.anything(),
         'A volunteer'

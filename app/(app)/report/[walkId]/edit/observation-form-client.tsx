@@ -158,7 +158,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
     const hasSightings = validSightings.length > 0
 
     const result = await saveDraft({
-      slotId: slot.id,
+      walkId: slot.id,
       observationId,
       walkCompletion: walkCompletion as 'COMPLETED' | 'PARTIAL' | 'ABORTED' | undefined,
       outcome: hasSightings ? 'SIGHTED' : undefined,
@@ -211,7 +211,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
     const outcome = hasSightings ? 'SIGHTED' : 'NOT_SIGHTED'
 
     const saveResult = await saveDraft({
-      slotId: slot.id,
+      walkId: slot.id,
       observationId,
       walkCompletion: walkCompletion as 'COMPLETED' | 'PARTIAL' | 'ABORTED' | undefined,
       outcome,

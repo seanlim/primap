@@ -5,11 +5,11 @@ interface PrimapDB extends DBSchema {
     key: string
     value: {
       id: string
-      slotId: string
+      walkId: string
       data: Record<string, unknown>
       updatedAt: number
     }
-    indexes: { 'by-slot': string }
+    indexes: { 'by-walk': string }
   }
   outbox: {
     key: number
@@ -39,7 +39,7 @@ function getDB() {
     dbPromise = openDB<PrimapDB>('primap', 1, {
       upgrade(db) {
         const draftStore = db.createObjectStore('drafts', { keyPath: 'id' })
-        draftStore.createIndex('by-slot', 'slotId')
+        draftStore.createIndex('by-walk', 'walkId')
 
         db.createObjectStore('outbox', {
           keyPath: 'id',
@@ -56,16 +56,16 @@ function getDB() {
 // Drafts
 export async function saveDraftLocally(
   id: string,
-  slotId: string,
+  walkId: string,
   data: Record<string, unknown>
 ) {
   const db = await getDB()
-  await db.put('drafts', { id, slotId, data, updatedAt: Date.now() })
+  await db.put('drafts', { id, walkId, data, updatedAt: Date.now() })
 }
 
-export async function getDraftBySlot(slotId: string) {
+export async function getDraftByWalk(walkId: string) {
   const db = await getDB()
-  return db.getFromIndex('drafts', 'by-slot', slotId)
+  return db.getFromIndex('drafts', 'by-walk', walkId)
 }
 
 export async function deleteDraft(id: string) {

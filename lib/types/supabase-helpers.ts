@@ -12,21 +12,21 @@ export type MembershipWithProfile = Pick<SlotMembership, 'id' | 'user_id' | 'sta
   profiles: ProfileRef
 }
 
-// --- Slot with nested memberships and round ---
+// --- Walk with nested memberships and round ---
 
-export type SlotWithMemberships = WalkSlot & {
+export type WalkWithMemberships = WalkSlot & {
   slot_memberships: MembershipWithProfile[]
   survey_rounds: Pick<SurveyRound, 'name' | 'status'>
 }
 
-// --- Membership with nested slot and round ---
+// --- Membership with nested walk and round ---
 
-export type SlotRef = Pick<WalkSlot, 'id' | 'location_name' | 'walk_date' | 'start_time' | 'end_time'> & {
+export type WalkRef = Pick<WalkSlot, 'id' | 'location_name' | 'walk_date' | 'start_time' | 'end_time'> & {
   survey_rounds: Pick<SurveyRound, 'name'> | null
 }
 
 export type MembershipWithSlot = Pick<SlotMembership, 'id' | 'status'> & {
-  walk_slots: SlotRef
+  walk_slots: WalkRef
 }
 
 // --- Observation with nested relations ---
@@ -48,9 +48,9 @@ export type IncidentWithRelations = Incident & {
   walk_slots: Pick<WalkSlot, 'location_name' | 'walk_date'>
 }
 
-// --- Slot with membership count (admin) ---
+// --- Walk with membership count (admin) ---
 
-export type SlotWithCount = WalkSlot & {
+export type WalkWithCount = WalkSlot & {
   survey_rounds: Pick<SurveyRound, 'name' | 'status'>
   slot_memberships: { count: number }[]
 }

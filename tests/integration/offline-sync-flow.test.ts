@@ -69,7 +69,7 @@ describe('offline-sync-flow (integration)', () => {
 
     await addToOutbox(
       'UPSERT_DRAFT',
-      { slotId: 'slot-A', observationId: 'obs-1', species: 'gibbon' },
+      { walkId: 'slot-A', observationId: 'obs-1', species: 'gibbon' },
       'draft-1',
     )
 
@@ -88,7 +88,7 @@ describe('offline-sync-flow (integration)', () => {
 
     await addToOutbox(
       'UPSERT_DRAFT',
-      { slotId: 'slot-A', species: 'langur' },
+      { walkId: 'slot-A', species: 'langur' },
       'client-1',
     )
 
@@ -188,7 +188,7 @@ describe('offline-sync-flow (integration)', () => {
   })
 
   it('full flow: saveDraftLocally + addToOutbox + processOutbox → outbox empty', async () => {
-    const { saveDraftLocally, addToOutbox, getOutboxItems, getDraftBySlot } =
+    const { saveDraftLocally, addToOutbox, getOutboxItems, getDraftByWalk } =
       await import('@/lib/offline/db')
     const { processOutbox } = await import('@/lib/offline/sync-engine')
 
@@ -196,7 +196,7 @@ describe('offline-sync-flow (integration)', () => {
     await saveDraftLocally('draft-1', 'slot-A', { species: 'macaque', count: 3 })
 
     // Verify draft exists
-    const draft = await getDraftBySlot('slot-A')
+    const draft = await getDraftByWalk('slot-A')
     expect(draft).toBeDefined()
     expect(draft!.data).toEqual({ species: 'macaque', count: 3 })
 

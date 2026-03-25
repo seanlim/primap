@@ -38,14 +38,14 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn().mockResolvedValue(mockSupabase),
 }))
 
-import { cancelSlot } from '@/lib/actions/walk-actions'
+import { cancelWalk } from '@/lib/actions/walk-actions'
 import {
   approveUser,
   rejectUser,
   disableUser,
   enableUser,
 } from '@/lib/actions/admin-user-actions'
-import { sendSlotCancellationEmail } from '@/lib/email'
+import { sendWalkCancellationEmail } from '@/lib/email'
 
 function resetChain() {
   mockChain.select.mockReturnThis()
@@ -57,16 +57,16 @@ function resetChain() {
   mockSupabase.from.mockReturnValue(mockChain)
 }
 
-describe('cancel-slot-email-flow (integration)', () => {
+describe('cancel-walk-email-flow (integration)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetChain()
     process.env.RESEND_API_KEY = 'test-key'
   })
 
-  // ---- cancelSlot -> sendSlotCancellationEmail -> Resend ----
+  // ---- cancelWalk -> sendWalkCancellationEmail -> Resend ----
 
-  it('cancelSlot sends cancellation email to other slot members via real email module', async () => {
+  it('cancelWalk sends cancellation email to other slot members via real email module', async () => {
     mockSupabase.auth.getUser.mockResolvedValue({
       data: { user: { id: 'user-1' } },
     })
@@ -130,18 +130,18 @@ describe('cancel-slot-email-flow (integration)', () => {
       return mockChain
     })
 
-    const result = await cancelSlot('slot-1')
+    const result = await cancelWalk('slot-1')
 
     expect(result).toEqual({ success: true })
     expect(mockSend).toHaveBeenCalledWith(
       expect.objectContaining({
-        subject: 'Walk Slot Cancellation Update',
+        subject: 'Walk Cancellation Update',
         to: 'bob@test.com',
       }),
     )
   })
 
-  it('cancelSlot with no other members does not send email', async () => {
+  it('cancelWalk with no other members does not send email', async () => {
     mockSupabase.auth.getUser.mockResolvedValue({
       data: { user: { id: 'user-1' } },
     })
@@ -199,13 +199,13 @@ describe('cancel-slot-email-flow (integration)', () => {
       return mockChain
     })
 
-    const result = await cancelSlot('slot-1')
+    const result = await cancelWalk('slot-1')
 
     expect(result).toEqual({ success: true })
     expect(mockSend).not.toHaveBeenCalled()
   })
 
-  it('cancelSlot still succeeds when Resend.send throws (email error is swallowed)', async () => {
+  it('cancelWalk still succeeds when Resend.send throws (email error is swallowed)', async () => {
     mockSupabase.auth.getUser.mockResolvedValue({
       data: { user: { id: 'user-1' } },
     })
@@ -269,7 +269,7 @@ describe('cancel-slot-email-flow (integration)', () => {
       return mockChain
     })
 
-    const result = await cancelSlot('slot-1')
+    const result = await cancelWalk('slot-1')
 
     // Action succeeds even though the email failed
     expect(result).toEqual({ success: true })
@@ -345,8 +345,8 @@ describe('cancel-slot-email-flow (integration)', () => {
     )
   })
 
-  it('sendSlotCancellationEmail with multiple recipients -> multiple Resend.send calls', async () => {
-    await sendSlotCancellationEmail(
+  it('sendWalkCancellationEmail with multiple recipients -> multiple Resend.send calls', async () => {
+    await sendWalkCancellationEmail(
       ['a@test.com', 'b@test.com', 'c@test.com'],
       { date: '2026-04-01', time: '08:00', location: 'Bukit Timah' },
       'Alice',
@@ -354,13 +354,13 @@ describe('cancel-slot-email-flow (integration)', () => {
 
     expect(mockSend).toHaveBeenCalledTimes(3)
     expect(mockSend).toHaveBeenCalledWith(
-      expect.objectContaining({ to: 'a@test.com', subject: 'Walk Slot Cancellation Update' }),
+      expect.objectContaining({ to: 'a@test.com', subject: 'Walk Cancellation Update' }),
     )
     expect(mockSend).toHaveBeenCalledWith(
-      expect.objectContaining({ to: 'b@test.com', subject: 'Walk Slot Cancellation Update' }),
+      expect.objectContaining({ to: 'b@test.com', subject: 'Walk Cancellation Update' }),
     )
     expect(mockSend).toHaveBeenCalledWith(
-      expect.objectContaining({ to: 'c@test.com', subject: 'Walk Slot Cancellation Update' }),
+      expect.objectContaining({ to: 'c@test.com', subject: 'Walk Cancellation Update' }),
     )
   })
 })

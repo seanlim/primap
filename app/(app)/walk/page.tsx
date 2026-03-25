@@ -110,7 +110,7 @@ export default async function WalkPage({
               return (
                 <Link
                   key={slot.id}
-                  href={`/report/${slot.id}`}
+                  href={`/walk/${slot.id}`}
                   className="block bg-green-50 border border-green-200 rounded-xl p-4 hover:shadow-md transition-shadow"
                 >
                   <div className="flex justify-between items-start">

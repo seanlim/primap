@@ -38,7 +38,7 @@ function makeOutboxItem(overrides: Record<string, unknown> = {}) {
   return {
     id: 1,
     action: 'UPSERT_DRAFT' as const,
-    payload: { slotId: 'slot-A' },
+    payload: { walkId: 'slot-A' },
     clientDraftId: 'client-1',
     createdAt: Date.now(),
     retries: 0,
@@ -84,7 +84,7 @@ describe('processOutbox', () => {
     mockGetOutboxItems.mockResolvedValue([
       makeOutboxItem({
         id: 1,
-        payload: { slotId: 'slot-A', observationId: 'obs-1', species: 'macaque' },
+        payload: { walkId: 'slot-A', observationId: 'obs-1', species: 'macaque' },
       }),
     ])
 
@@ -103,7 +103,7 @@ describe('processOutbox', () => {
     mockGetOutboxItems.mockResolvedValue([
       makeOutboxItem({
         id: 1,
-        payload: { slotId: 'slot-A', species: 'gibbon' },
+        payload: { walkId: 'slot-A', species: 'gibbon' },
         clientDraftId: 'client-1',
       }),
     ])
@@ -129,7 +129,7 @@ describe('processOutbox', () => {
     mockGetOutboxItems.mockResolvedValue([
       makeOutboxItem({
         id: 1,
-        payload: { slotId: 'slot-A' },
+        payload: { walkId: 'slot-A' },
       }),
     ])
     mockGetUser.mockResolvedValue({ data: { user: null } })

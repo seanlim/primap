@@ -67,6 +67,7 @@ export default async function ReportListPage() {
   for (const membership of memberships) {
     const slot = membership.walk_slots as unknown as WalkRef
     if (!slot) continue
+
     reportItems.set(slot.id, {
       key: membership.id,
       href: `/report/${slot.id}`,
@@ -80,9 +81,8 @@ export default async function ReportListPage() {
     })
   }
 
-  // Get user's observations to check report status per active slot
-  const slotIds = memberships.map(m => {
-    const slot = m.walk_slots as unknown as WalkRef
+  const slotIds = memberships.map((membership) => {
+    const slot = membership.walk_slots as unknown as WalkRef
     return slot?.id
   }).filter(Boolean)
 
@@ -91,24 +91,29 @@ export default async function ReportListPage() {
         .from('observations')
         .select('id, slot_id, status')
         .eq('user_id', user.id)
+        .in('slot_id', slotIds)
+    : { data: [] }
 
   const observationMap = new Map(
-    (observations || []).map(o => [o.slot_id,  o.status ])
+    (observations || []).map((observation) => [
+      observation.slot_id,
+      { id: observation.id, status: observation.status },
+    ])
   )
 
   for (const membership of memberships) {
     const slot = membership.walk_slots as unknown as WalkRef
     if (!slot) continue
 
-    const obs = observationMap.get(slot.id)
-    const statusLabel = !obs
+    const observation = observationMap.get(slot.id)
+    const statusLabel = !observation
       ? 'No Report'
-      : obs.status === 'DRAFT'
+      : observation.status === 'DRAFT'
       ? 'Draft'
       : 'Submitted'
-    const statusColor = !obs
+    const statusColor = !observation
       ? 'bg-gray-100 text-gray-500'
-      : obs.status === 'DRAFT'
+      : observation.status === 'DRAFT'
       ? 'bg-yellow-100 text-yellow-700'
       : 'bg-green-100 text-green-700'
 
@@ -154,7 +159,7 @@ export default async function ReportListPage() {
 
       {items.length === 0 ? (
         <div className="bg-white rounded-xl p-8 text-center shadow-sm">
-          <p className="text-gray-500">No walks to report on yet.</p>https://github.com/seanlim/primap/pull/46/conflict?name=lib%252Freport-slot-data.ts&ancestor_oid=9db1d3caf9c0078e8c1350e8c1a0a08ce4d1ca49&base_oid=843254da41a3e7aecf7d43aaf4a1e9dae30124f9&head_oid=5185b80d4bffb06f2b418830c4e7ce7df59cb6a5
+          <p className="text-gray-500">No walks to report on yet.</p>
           <Link href="/walk" className="text-green-600 font-medium text-sm hover:underline mt-2 inline-block">
             Join a walk first
           </Link>

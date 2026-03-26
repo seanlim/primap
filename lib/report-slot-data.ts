@@ -57,6 +57,7 @@ export interface SlotReportViewData {
   members: MemberData[]
   incidents: IncidentData[]
   isParticipant: boolean
+  hasSubmittedOwnObservation: boolean
 }
 
 export async function getSlotReportViewData(
@@ -98,7 +99,11 @@ export async function getSlotReportViewData(
   const observations = observationsResult.data
   const members = membersResult.data
   const incidents = incidentsResult.data
-  const round = slot.survey_rounds
+  const round = slot.survey_rounds as unknown as { name: string }
+  const isParticipant = (members || []).some(m => m.user_id === currentUserId)
+  const hasSubmittedOwnObservation = (observations || []).some(
+    obs => obs.user_id === currentUserId && obs.status === 'SUBMITTED'
+  )
 
   return {
     slot: {
@@ -145,6 +150,7 @@ export async function getSlotReportViewData(
       createdAt: inc.created_at,
       resolved: inc.resolved,
     })),
-    isParticipant: (members || []).some(m => m.user_id === currentUserId),
+    isParticipant,
+    hasSubmittedOwnObservation,
   }
 }

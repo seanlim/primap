@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils/format-date'
 import { WalkFilters } from './walk-filters-client'
-import type { MembershipWithProfile } from '@/lib/types/supabase-helpers'
+import { hasWalkStarted } from '@/lib/utils/walk-participation'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,7 +55,7 @@ export default async function WalkPage({
     ? await slotsQuery
     : { data: [], count: 0 }
 
-  const allSlots = slotsResult.data || []
+  const allSlots = (slotsResult.data || []).filter((slot) => !hasWalkStarted(slot.walk_date, slot.start_time))
 
   // Get user's active memberships
   const { data: myMemberships } = await supabase

@@ -19,6 +19,19 @@ export function toLocalDateString(d: Date): string {
   return `${yyyy}-${mm}-${dd}`
 }
 
+/** Returns a relative label like "Today", "Tomorrow", or "in 3 days". */
+export function getRelativeDay(dateStr: string): string {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const target = new Date(dateStr + 'T00:00:00')
+  target.setHours(0, 0, 0, 0)
+  const diffDays = Math.round((target.getTime() - today.getTime()) / 86_400_000)
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Tomorrow'
+  if (diffDays > 1) return `in ${diffDays} days`
+  return ''
+}
+
 export function formatDate(
   date: string | Date,
   preset: DatePreset = 'default',

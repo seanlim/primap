@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils/format-date'
+import { ClipboardList } from 'lucide-react'
+import { EmptyState } from '@/components/ui/empty-state'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,18 +41,19 @@ export default async function ReportListPage() {
   )
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
 
       {(!memberships || memberships.length === 0) ? (
-        <div className="bg-white rounded-xl p-8 text-center shadow-sm">
-          <p className="text-gray-500">No walks to report on yet.</p>
-          <Link href="/walk" className="text-green-600 font-medium text-sm hover:underline mt-2 inline-block">
-            Join a walk first
-          </Link>
-        </div>
+        <EmptyState
+          icon={ClipboardList}
+          title="No walks to report on yet"
+          description="Join a walk first to start submitting reports"
+          action={{ label: 'Browse Walks', href: '/walk' }}
+          color="green"
+        />
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2 stagger-children">
           {memberships.map((membership) => {
             const slot = membership.walk_slots;
             const status = observationMap.get(slot.id)
@@ -70,7 +73,7 @@ export default async function ReportListPage() {
               <Link
                 key={membership.id}
                 href={`/report/${slot.id}`}
-                className="block bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
+                className="block bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow"
               >
                 <div className="flex justify-between items-start">
                   <div>

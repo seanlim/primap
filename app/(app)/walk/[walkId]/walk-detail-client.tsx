@@ -3,9 +3,9 @@
 import { useState, useOptimistic, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { joinWalk, cancelWalk } from '@/lib/actions/walk-actions'
-import { ArrowLeft, MapPin, Calendar, Clock, Users } from 'lucide-react'
-import Link from 'next/link'
+import { MapPin, Calendar, Clock, Users } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
+import { Breadcrumb } from '@/components/ui/breadcrumb'
 import { useToast } from '@/components/ui/toast'
 import { formatDate } from '@/lib/utils/format-date'
 
@@ -86,12 +86,12 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
 
   return (
     <div className="space-y-6">
-      <Link href="/walk" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700">
-        <ArrowLeft className="w-4 h-4" />
-        Back to Walks
-      </Link>
+      <Breadcrumb items={[
+        { label: 'Walks', href: '/walk' },
+        { label: walk.locationName },
+      ]} />
 
-      <div className="bg-white rounded-xl p-6 shadow-sm space-y-4">
+      <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
         <div>
           <p className="text-xs text-green-600 font-medium">{walk.roundName}</p>
           <h1 className="text-xl font-bold text-gray-900 mt-1">{walk.locationName}</h1>
@@ -152,11 +152,15 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
           Group Members ({members.length})
         </h2>
         {members.length === 0 ? (
-          <div className="bg-white rounded-xl p-6 text-center shadow-sm">
-            <p className="text-gray-500 text-sm">No volunteers yet. Be the first to join!</p>
+          <div className="bg-white rounded-2xl p-6 text-center shadow-sm">
+            <div className="w-14 h-14 bg-green-50 ring-4 ring-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Users className="w-7 h-7 text-green-500" />
+            </div>
+            <p className="font-medium text-gray-700">No volunteers yet</p>
+            <p className="text-sm text-gray-400 mt-1">Be the first to join!</p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl shadow-sm divide-y divide-gray-100">
+          <div className="bg-white rounded-2xl shadow-sm divide-y divide-gray-100">
             {members.map((member) => (
               <div key={member.userId} className="flex items-center gap-3 p-4">
                 <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">

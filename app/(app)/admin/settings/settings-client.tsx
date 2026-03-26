@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { updateSettings } from '@/lib/actions/admin-round-actions'
+import { useToast } from '@/components/ui/toast'
 
 export function SettingsClient({ settings }: {
   settings: { requiredWalksPerRound: number; lateCancelHours: number }
@@ -14,6 +15,7 @@ export function SettingsClient({ settings }: {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const router = useRouter()
+  const { showToast } = useToast()
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -22,7 +24,7 @@ export function SettingsClient({ settings }: {
       requiredWalksPerRound: parseInt(requiredWalks),
       lateCancelHours: parseInt(lateCancelHours),
     })
-    if (result.error) alert(result.error)
+    if (result.error) showToast(result.error, 'error')
     else {
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
@@ -40,7 +42,7 @@ export function SettingsClient({ settings }: {
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
       </div>
 
-      <form onSubmit={handleSave} className="bg-white rounded-xl p-5 shadow-sm space-y-4">
+      <form onSubmit={handleSave} className="bg-white rounded-2xl p-5 shadow-sm space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Required Walks Per Round

@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { ArrowLeft, Plus, Pencil, X } from 'lucide-react'
 import { createRound, updateRound, updateRoundStatus, deleteRound } from '@/lib/actions/admin-round-actions'
 import { formatDate } from '@/lib/utils/format-date'
+import { useToast } from '@/components/ui/toast'
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 
 interface RoundData {
   id: string
@@ -29,13 +31,15 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
   const [editDescription, setEditDescription] = useState('')
   const [editStartDate, setEditStartDate] = useState('')
   const [editEndDate, setEditEndDate] = useState('')
+  const [deletingRoundId, setDeletingRoundId] = useState<string | null>(null)
   const router = useRouter()
+  const { showToast } = useToast()
 
   const handleCreate = async (e: React.SubmitEvent) => {
     e.preventDefault()
     setLoading(true)
     const result = await createRound({ name, description, startDate, endDate })
-    if (result.error) alert(result.error)
+    if (result.error) showToast(result.error, 'error')
     else {
       setShowForm(false)
       setName(''); setDescription(''); setStartDate(''); setEndDate('')
@@ -64,7 +68,7 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
       startDate: editStartDate,
       endDate: editEndDate,
     })
-    if (result.error) alert(result.error)
+    if (result.error) showToast(result.error, 'error')
     else {
       setEditingRoundId(null)
       router.refresh()
@@ -74,15 +78,16 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
 
   const handleStatusChange = async (roundId: string, status: 'DRAFT' | 'OPEN' | 'CLOSED') => {
     const result = await updateRoundStatus(roundId, status)
-    if (result.error) alert(result.error)
+    if (result.error) showToast(result.error, 'error')
     else router.refresh()
   }
 
-  const handleDelete = async (roundId: string) => {
-    if (!confirm('Delete this round and all its walks?')) return
-    const result = await deleteRound(roundId)
-    if (result.error) alert(result.error)
+  const confirmDeleteRound = async () => {
+    if (!deletingRoundId) return
+    const result = await deleteRound(deletingRoundId)
+    if (result.error) showToast(result.error, 'error')
     else router.refresh()
+    setDeletingRoundId(null)
   }
 
   return (
@@ -104,7 +109,7 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
       </div>
 
       {showForm && (
-        <form onSubmit={handleCreate} className="bg-white rounded-xl p-5 shadow-sm space-y-4">
+        <form onSubmit={handleCreate} className="bg-white rounded-2xl p-5 shadow-sm space-y-4">
           <input
             type="text"
             placeholder="Round name"
@@ -147,7 +152,7 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
 
       <div className="space-y-2">
         {rounds.map(round => (
-          <div key={round.id} className="bg-white rounded-xl p-4 shadow-sm">
+          <div key={round.id} className="bg-white rounded-2xl p-4 shadow-sm">
             {editingRoundId === round.id ? (
               <form onSubmit={handleUpdate} className="space-y-3">
                 <div className="flex items-center justify-between mb-1">
@@ -217,7 +222,7 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
                     <button onClick={() => handleStatusChange(round.id, 'OPEN')}
                       className="text-xs bg-green-100 text-green-700 px-3 py-1.5 rounded-lg hover:bg-green-200">Re-open</button>
                   )}
-                  <button onClick={() => handleDelete(round.id)}
+                  <button onClick={() => setDeletingRoundId(round.id)}
                     className="text-xs bg-red-100 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-200">Delete</button>
                 </div>
               </>
@@ -230,6 +235,16 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
           </div>
         )}
       </div>
+
+      <ConfirmationDialog
+        open={!!deletingRoundId}
+        title="Delete Round"
+        message="Delete this round and all its walks? This cannot be undone."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={confirmDeleteRound}
+        onCancel={() => setDeletingRoundId(null)}
+      />
     </div>
   )
 }

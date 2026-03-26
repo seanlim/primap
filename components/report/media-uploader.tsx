@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Camera, X, Loader2 } from 'lucide-react'
+import { Camera, X, Loader2, ImageOff } from 'lucide-react'
 import { deleteMedia } from '@/lib/actions/observation-actions'
 import { extractExifData } from '@/lib/utils/exif'
 import { getSignedMediaUrl } from '@/lib/utils/storage'
@@ -84,6 +84,12 @@ export function MediaUploader({
           // Cache miss or error, fall through to network
         }
 
+        // Skip network requests when offline — avoids timeout delays
+        if (!navigator.onLine) {
+          newUrls[item.id] = 'error'
+          continue
+        }
+
         // Network: get signed URL, fetch image, cache blob
         try {
           const signedUrl = await getSignedMediaUrl(item.file_path)
@@ -98,7 +104,8 @@ export function MediaUploader({
             }
           }).catch(() => {})
         } catch {
-          // Signed URL fetch failed (offline) — skip
+          // Signed URL fetch failed — mark as error so we don't show infinite spinner
+          newUrls[item.id] = 'error'
         }
       }
       if (Object.keys(newUrls).length > 0 && !cancelled) {
@@ -297,7 +304,7 @@ export function MediaUploader({
           {/* Server media */}
           {media.map(item => (
             <div key={item.id} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
-              {signedUrls[item.id] ? (
+              {signedUrls[item.id] && signedUrls[item.id] !== 'error' ? (
                 item.media_type === 'VIDEO' ? (
                   <video
                     src={signedUrls[item.id]}
@@ -310,6 +317,11 @@ export function MediaUploader({
                     className="w-full h-full object-cover"
                   />
                 )
+              ) : signedUrls[item.id] === 'error' ? (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-1">
+                  <ImageOff className="w-5 h-5 text-gray-300" />
+                  <span className="text-[10px] text-gray-400">Unavailable</span>
+                </div>
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />

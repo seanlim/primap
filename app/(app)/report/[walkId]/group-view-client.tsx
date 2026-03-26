@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, ChevronDown, ChevronUp, MapPin, Eye, AlertTriangle, Loader2 } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronUp, MapPin, Eye, AlertTriangle, Loader2, ImageOff } from 'lucide-react'
 import { submitObservation } from '@/lib/actions/observation-actions'
 import { reportIncident } from '@/lib/actions/incident-actions'
 import { getSignedMediaUrl } from '@/lib/utils/storage'
@@ -303,6 +303,12 @@ function MediaGallery({ media }: { media: { id: string; file_path: string; file_
           }
         } catch { /* cache miss */ }
 
+        // Skip network when offline
+        if (!navigator.onLine) {
+          urls[item.id] = 'error'
+          continue
+        }
+
         // Network: get signed URL, cache blob in background
         try {
           const signedUrl = await getSignedMediaUrl(item.file_path)
@@ -314,7 +320,9 @@ function MediaGallery({ media }: { media: { id: string; file_path: string; file_
               await cacheSet(cacheKey, blob, SEVEN_DAYS)
             }
           }).catch(() => {})
-        } catch { /* offline */ }
+        } catch {
+          urls[item.id] = 'error'
+        }
       }
       if (!cancelled) setSignedUrls(urls)
     }
@@ -332,7 +340,7 @@ function MediaGallery({ media }: { media: { id: string; file_path: string; file_
     <div className="grid grid-cols-3 gap-2 mt-2">
       {media.map(item => (
         <div key={item.id} className="aspect-square rounded-lg overflow-hidden bg-gray-100">
-          {signedUrls[item.id] ? (
+          {signedUrls[item.id] && signedUrls[item.id] !== 'error' ? (
             item.media_type === 'VIDEO' ? (
               <video
                 src={signedUrls[item.id]}
@@ -346,6 +354,11 @@ function MediaGallery({ media }: { media: { id: string; file_path: string; file_
                 className="w-full h-full object-cover"
               />
             )
+          ) : signedUrls[item.id] === 'error' ? (
+            <div className="w-full h-full flex flex-col items-center justify-center gap-1">
+              <ImageOff className="w-5 h-5 text-gray-300" />
+              <span className="text-[10px] text-gray-400">Unavailable</span>
+            </div>
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />

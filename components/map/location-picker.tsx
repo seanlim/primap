@@ -98,5 +98,17 @@ export function LocationPicker({
     )
   }
 
+  if (!loaded && typeof navigator !== 'undefined' && !navigator.onLine) {
+    return (
+      <div className={`${className} bg-gray-100 flex flex-col items-center justify-center gap-2`}>
+        <MapPin className="w-6 h-6 text-gray-300" />
+        <p className="text-xs text-gray-400">Map unavailable offline</p>
+        {lat && lng && (
+          <p className="text-xs text-gray-500">{lat.toFixed(5)}, {lng.toFixed(5)}</p>
+        )}
+      </div>
+    )
+  }
+
   return <div ref={mapContainer} className={className} />
 }

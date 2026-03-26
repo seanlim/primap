@@ -91,11 +91,9 @@ export default async function ReportListPage() {
         .from('observations')
         .select('id, slot_id, status')
         .eq('user_id', user.id)
-        .in('slot_id', slotIds)
-    : { data: [] }
 
   const observationMap = new Map(
-    (observations || []).map(o => [o.slot_id, { id: o.id, status: o.status }])
+    (observations || []).map(o => [o.slot_id,  o.status ])
   )
 
   for (const membership of memberships) {
@@ -156,7 +154,7 @@ export default async function ReportListPage() {
 
       {items.length === 0 ? (
         <div className="bg-white rounded-xl p-8 text-center shadow-sm">
-          <p className="text-gray-500">No walks to report on yet.</p>
+          <p className="text-gray-500">No walks to report on yet.</p>https://github.com/seanlim/primap/pull/46/conflict?name=lib%252Freport-slot-data.ts&ancestor_oid=9db1d3caf9c0078e8c1350e8c1a0a08ce4d1ca49&base_oid=843254da41a3e7aecf7d43aaf4a1e9dae30124f9&head_oid=5185b80d4bffb06f2b418830c4e7ce7df59cb6a5
           <Link href="/walk" className="text-green-600 font-medium text-sm hover:underline mt-2 inline-block">
             Join a walk first
           </Link>

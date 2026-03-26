@@ -18,8 +18,8 @@ interface SightingInput {
 interface SaveDraftInput {
   walkId: string
   observationId?: string
-  walkCompletion?: 'COMPLETED' | 'PARTIAL' | 'ABORTED'
-  outcome?: 'SIGHTED' | 'NOT_SIGHTED'
+  walkCompletion: 'COMPLETED' | 'PARTIAL' | 'ABORTED'
+  outcome: 'SIGHTED' | 'NOT_SIGHTED'
   notes?: string
   lat?: number
   lng?: number
@@ -114,10 +114,6 @@ export async function saveDraft(input: SaveDraftInput) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  // Derive outcome from sightings
-  const hasSightings = input.sightings && input.sightings.length > 0
-  const derivedOutcome = hasSightings ? 'SIGHTED' : (input.outcome || null)
-
   let observationId = input.observationId
 
   if (observationId) {
@@ -126,7 +122,7 @@ export async function saveDraft(input: SaveDraftInput) {
       .from('observations')
       .update({
         walk_completion: input.walkCompletion,
-        outcome: derivedOutcome,
+        outcome: input.outcome,
         notes: input.notes,
         lat: input.lat,
         lng: input.lng,
@@ -144,7 +140,7 @@ export async function saveDraft(input: SaveDraftInput) {
         slot_id: input.walkId,
         user_id: user.id,
         walk_completion: input.walkCompletion,
-        outcome: derivedOutcome,
+        outcome: input.outcome,
         notes: input.notes,
         lat: input.lat,
         lng: input.lng,
@@ -168,7 +164,7 @@ export async function saveDraft(input: SaveDraftInput) {
     // Identify which sightings to keep (those with existing IDs)
     const keptIds = input.sightings
       .filter(s => s.id)
-      .map(s => s.id!)
+      .map(s => s.id)
 
     // Find sightings to remove (in DB but not in form)
     const { data: existingSightings } = await supabase
@@ -176,7 +172,7 @@ export async function saveDraft(input: SaveDraftInput) {
       .select('id')
       .eq('observation_id', observationId)
 
-    const existingIds = (existingSightings || []).map(s => s.id)
+    const existingIds = (existingSightings ?? []).map(s => s.id)
     const toRemoveIds = existingIds.filter(id => !keptIds.includes(id))
 
     // Clean up storage files for removed sightings before cascade delete
@@ -211,7 +207,7 @@ export async function saveDraft(input: SaveDraftInput) {
         const { data: newSighting } = await supabase
           .from('sightings')
           .insert({
-            observation_id: observationId!,
+            observation_id: observationId,
             species: s.species,
             count: s.count,
             observed_at: s.observed_at || null,
@@ -231,7 +227,7 @@ export async function saveDraft(input: SaveDraftInput) {
       .select('id')
       .eq('observation_id', observationId)
 
-    const existingIds = (existingSightings || []).map(s => s.id)
+    const existingIds = (existingSightings ?? []).map(s => s.id)
     if (existingIds.length > 0) {
       await cleanupSightingMedia(supabase, existingIds)
       await supabase
@@ -267,7 +263,7 @@ export async function submitObservation(observationId: string, walkId: string) {
   if (!obs.outcome) return { error: 'Outcome is required.' }
 
   if (obs.outcome === 'SIGHTED') {
-    const sightings = obs.sightings as unknown as { lat: number; lng: number }[]
+    const sightings = obs.sightings
     if (!sightings || sightings.length === 0) {
       return { error: 'At least one sighting is required when outcome is Sighted.' }
     }

@@ -70,28 +70,14 @@ export async function cancelWalk(walkId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  const submittedObservationQuery = supabase
+  const { data: submittedObservations, error: submittedObservationError } = await supabase
     .from('observations')
     .select('id')
     .eq('slot_id', walkId)
     .eq('user_id', user.id)
     .eq('status', 'SUBMITTED')
-
-  const submittedObservationResult = typeof (submittedObservationQuery as unknown as { maybeSingle?: unknown }).maybeSingle === 'function'
-    ? await (submittedObservationQuery as unknown as {
-        maybeSingle: () => Promise<{ data: { id: string } | null; error?: { code?: string; message: string } | null }>
-      }).maybeSingle()
-    : await (submittedObservationQuery as unknown as {
-        single: () => Promise<{ data: { id: string } | null; error?: { code?: string; message: string } | null }>
-      }).single()
-
-  const submittedObservation = submittedObservationResult.data
-  const submittedObservationError = submittedObservationResult.error
-
-  if (submittedObservationError && submittedObservationError.code !== 'PGRST116') {
-    return { error: submittedObservationError.message }
-  }
-  if (submittedObservation) {
+  if (submittedObservationError) return { error: submittedObservationError.message }
+  if (submittedObservations && submittedObservations.length > 0) {
     return { error: "You can't cancel this walk after submitting your report." }
   }
 

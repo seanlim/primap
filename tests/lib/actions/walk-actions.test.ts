@@ -95,7 +95,7 @@ function mockJoinableSlot(overrides?: Partial<{
 
 function setupCancelMocks(overrides?: {
   submittedObservation?: { id: string } | null
-  submittedObservationError?: { code?: string; message: string } | null
+  submittedObservationError?: { message: string } | null
   cancelledMemberships?: Array<{ id: string }>
   updateError?: { message: string } | null
   slot?: { walk_date: string; start_time: string; location_name: string } | null
@@ -105,7 +105,7 @@ function setupCancelMocks(overrides?: {
   const submittedObservation = overrides && 'submittedObservation' in overrides ? overrides.submittedObservation : null
   const submittedObservationError = overrides && 'submittedObservationError' in overrides
     ? overrides.submittedObservationError
-    : { code: 'PGRST116', message: 'No rows found' }
+    : null
   const cancelledMemberships = overrides?.cancelledMemberships ?? [{ id: 'membership-1' }]
   const updateError = overrides?.updateError ?? null
   const slot = overrides && 'slot' in overrides
@@ -124,11 +124,9 @@ function setupCancelMocks(overrides?: {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                maybeSingle: vi.fn().mockResolvedValue({
-                  data: submittedObservation,
-                  error: submittedObservationError,
-                }),
+              eq: vi.fn().mockResolvedValue({
+                data: submittedObservation ? [submittedObservation] : [],
+                error: submittedObservationError,
               }),
             }),
           }),

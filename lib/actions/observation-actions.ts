@@ -23,6 +23,7 @@ interface SaveDraftInput {
   lng?: number
   clientDraftId?: string
   sightings?: SightingInput[]
+  userAgent?: string
 }
 
 async function cleanupSightingMedia(
@@ -60,6 +61,7 @@ export async function saveDraft(input: SaveDraftInput) {
         notes: input.notes,
         lat: input.lat,
         lng: input.lng,
+        last_user_agent: input.userAgent || null,
       })
       .eq('id', observationId)
       .eq('user_id', user.id)
@@ -80,6 +82,7 @@ export async function saveDraft(input: SaveDraftInput) {
         lng: input.lng,
         status: 'DRAFT',
         client_draft_id: input.clientDraftId,
+        last_user_agent: input.userAgent || null,
       })
       .select('id')
       .single()
@@ -173,7 +176,7 @@ export async function saveDraft(input: SaveDraftInput) {
 
   revalidatePath('/report')
   revalidatePath(`/report/${input.walkId}`)
-  return { success: true, observationId, sightingIds }
+  return { success: true, observationId, sightingIds, serverUpdatedAt: new Date().toISOString() }
 }
 
 export async function submitObservation(observationId: string, walkId: string) {
@@ -302,4 +305,69 @@ export async function deleteMedia(mediaId: string) {
   if (error) return { error: error.message }
 
   return { success: true }
+}
+
+export async function getMediaBySightingIds(sightingIds: string[]) {
+  if (sightingIds.length === 0) return []
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('media')
+    .select('*')
+    .in('sighting_id', sightingIds)
+  return data || []
+}
+
+export async function getObservationMeta(walkId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const { data } = await supabase
+    .from('observations')
+    .select('id, updated_at, last_user_agent')
+    .eq('slot_id', walkId)
+    .eq('user_id', user.id)
+    .single()
+
+  return data ? {
+    observationId: data.id,
+    updatedAt: data.updated_at,
+    lastUserAgent: data.last_user_agent,
+  } : null
+}
+
+export async function getObservationFull(walkId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const { data } = await supabase
+    .from('observations')
+    .select('*, sightings(*, media:media!media_sighting_id_fkey(*)), media:media!media_observation_id_fkey(*)')
+    .eq('slot_id', walkId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (!data) return null
+
+  return {
+    id: data.id,
+    walkCompletion: data.walk_completion,
+    outcome: data.outcome,
+    notes: data.notes,
+    lat: data.lat,
+    lng: data.lng,
+    serverUpdatedAt: data.updated_at,
+    sightings: (data.sightings as Array<Record<string, unknown>>).map((s: Record<string, unknown>) => ({
+      id: s.id as string,
+      species: s.species as string,
+      count: s.count as string,
+      observedAt: (s.observed_at as string)?.slice(0, 16) ?? null,
+      lat: s.lat as number,
+      lng: s.lng as number,
+      notes: s.notes as string | null,
+      media: s.media as Array<{ id: string; file_path: string; file_name: string; media_type: string }>,
+    })),
+    media: data.media as Array<{ id: string; file_path: string; file_name: string; media_type: string }>,
+  }
 }

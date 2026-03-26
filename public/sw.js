@@ -1,4 +1,4 @@
-const CACHE_NAME = 'primap-v1'
+const CACHE_NAME = 'primap-v2'
 const STATIC_ASSETS = [
   '/',
   '/home',
@@ -53,13 +53,20 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Static assets: cache-first
+  // Static assets: cache-first, but cache on first fetch
   if (
     url.pathname.startsWith('/_next/static/') ||
-    url.pathname.match(/\.(png|jpg|jpeg|svg|gif|webp|ico|woff2?)$/)
+    url.pathname.match(/\.(png|jpg|jpeg|svg|gif|webp|ico|woff2?|css|js)$/)
   ) {
     event.respondWith(
-      caches.match(request).then((cached) => cached || fetch(request))
+      caches.match(request).then((cached) => {
+        if (cached) return cached
+        return fetch(request).then((response) => {
+          const clone = response.clone()
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
+          return response
+        })
+      })
     )
     return
   }

@@ -110,11 +110,11 @@ describe('observation-actions', () => {
 
       const result = await saveDraft(baseDraftInput)
 
-      expect(result).toEqual({
+      expect(result).toEqual(expect.objectContaining({
         success: true,
         observationId: 'obs-1',
         sightingIds: [],
-      })
+      }))
       expect(mockSupabase.from).toHaveBeenCalledWith('observations')
       expect(methods.insert).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -160,11 +160,11 @@ describe('observation-actions', () => {
         observationId: 'obs-1',
       })
 
-      expect(result).toEqual({
+      expect(result).toEqual(expect.objectContaining({
         success: true,
         observationId: 'obs-1',
         sightingIds: [],
-      })
+      }))
       expect(methods.update).toHaveBeenCalledWith(
         expect.objectContaining({
           walk_completion: 'COMPLETED',
@@ -225,11 +225,11 @@ describe('observation-actions', () => {
         ],
       })
 
-      expect(result).toEqual({
+      expect(result).toEqual(expect.objectContaining({
         success: true,
         observationId: 'obs-1',
         sightingIds: ['existing-sight', 'new-sight-1'],
-      })
+      }))
     })
 
     it('removes sightings no longer in form', async () => {
@@ -253,11 +253,11 @@ describe('observation-actions', () => {
         sightings: [{ ...sightingInput }],
       })
 
-      expect(result).toEqual({
+      expect(result).toEqual(expect.objectContaining({
         success: true,
         observationId: 'obs-1',
         sightingIds: ['new-sight-1'],
-      })
+      }))
       expect(methods.delete).toHaveBeenCalled()
       expect(methods.in).toHaveBeenCalledWith('id', ['old-sight-1'])
     })
@@ -277,11 +277,11 @@ describe('observation-actions', () => {
         sightings: [],
       })
 
-      expect(result).toEqual({
+      expect(result).toEqual(expect.objectContaining({
         success: true,
         observationId: 'obs-1',
         sightingIds: [],
-      })
+      }))
       expect(methods.in).toHaveBeenCalledWith('id', ['sight-a', 'sight-b'])
     })
 
@@ -337,11 +337,11 @@ describe('observation-actions', () => {
         sightings: [sightingInput],
       })
 
-      expect(result).toEqual({
+      expect(result).toEqual(expect.objectContaining({
         success: true,
         observationId: 'obs-1',
         sightingIds: [],
-      })
+      }))
     })
   })
 

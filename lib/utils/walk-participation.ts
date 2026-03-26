@@ -3,12 +3,19 @@ export interface JoinBlockInfo {
   description: string
 }
 
+export const APP_TIME_ZONE = 'Asia/Singapore'
+export const APP_TIME_ZONE_OFFSET = '+08:00'
+
+function parseAppDateTime(date: string, time: string) {
+  return new Date(`${date}T${time}${APP_TIME_ZONE_OFFSET}`)
+}
+
 export function getWalkStartDateTime(walkDate: string, startTime: string) {
-  return new Date(`${walkDate}T${startTime}`)
+  return parseAppDateTime(walkDate, startTime)
 }
 
 export function getWalkEndDateTime(walkDate: string, endTime: string) {
-  return new Date(`${walkDate}T${endTime}`)
+  return parseAppDateTime(walkDate, endTime)
 }
 
 export function hasWalkStarted(walkDate: string, startTime: string, now = new Date()) {

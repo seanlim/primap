@@ -21,6 +21,11 @@ const { mockSend, mockSingle, mockChain, mockSupabase } = vi.hoisted(() => {
   }
   const mockSupabase = {
     from: vi.fn().mockReturnValue(mockChain),
+    storage: {
+      from: vi.fn().mockReturnValue({
+        remove: vi.fn().mockResolvedValue({ error: null }),
+      }),
+    },
     auth: {
       getUser: vi.fn(),
     },
@@ -36,6 +41,14 @@ vi.mock('resend', () => ({
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn().mockResolvedValue(mockSupabase),
+}))
+
+const { mockDeleteDraftObservationsForSlot } = vi.hoisted(() => ({
+  mockDeleteDraftObservationsForSlot: vi.fn().mockResolvedValue({ deletedCount: 0 }),
+}))
+
+vi.mock('@/lib/actions/observation-actions', () => ({
+  deleteDraftObservationsForSlot: (...args: unknown[]) => mockDeleteDraftObservationsForSlot(...args),
 }))
 
 import { cancelWalk } from '@/lib/actions/walk-actions'
@@ -55,12 +68,15 @@ function resetChain() {
   mockChain.neq.mockReturnThis()
   mockSingle.mockReset()
   mockSupabase.from.mockReturnValue(mockChain)
+  mockDeleteDraftObservationsForSlot.mockResolvedValue({ deletedCount: 0 })
 }
 
 describe('cancel-walk-email-flow (integration)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetChain()
+    mockSend.mockReset()
+    mockSend.mockResolvedValue({})
     process.env.RESEND_API_KEY = 'test-key'
   })
 
@@ -71,16 +87,50 @@ describe('cancel-walk-email-flow (integration)', () => {
       data: { user: { id: 'user-1' } },
     })
 
-    let fromCallCount = 0
+    let slotMembershipCalls = 0
     mockSupabase.from.mockImplementation((table: string) => {
-      fromCallCount++
-      if (table === 'slot_memberships' && fromCallCount === 1) {
-        // First call: update status to CANCELLED
+      if (table === 'observations') {
         return {
-          update: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockResolvedValue({ error: null }),
+                eq: vi.fn().mockReturnValue({
+                  maybeSingle: vi.fn().mockResolvedValue({
+                    data: null,
+                    error: { code: 'PGRST116', message: 'No rows found' },
+                  }),
+                }),
+              }),
+            }),
+          }),
+        }
+      }
+      if (table === 'slot_memberships') {
+        slotMembershipCalls++
+        if (slotMembershipCalls === 1) {
+          return {
+            update: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  eq: vi.fn().mockReturnValue({
+                    select: vi.fn().mockResolvedValue({ data: [{ id: 'membership-1' }], error: null }),
+                  }),
+                }),
+              }),
+            }),
+          }
+        }
+        // second call: get other active members
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                neq: vi.fn().mockResolvedValue({
+                  data: [
+                    { user_id: 'user-2', profiles: { email: 'bob@test.com' } },
+                  ],
+                  error: null,
+                }),
               }),
             }),
           }),
@@ -110,23 +160,6 @@ describe('cancel-walk-email-flow (integration)', () => {
           }),
         }
       }
-      // slot_memberships second call: get other active members
-      if (table === 'slot_memberships') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                neq: vi.fn().mockResolvedValue({
-                  data: [
-                    { user_id: 'user-2', profiles: { email: 'bob@test.com' } },
-                  ],
-                  error: null,
-                }),
-              }),
-            }),
-          }),
-        }
-      }
       return mockChain
     })
 
@@ -148,6 +181,22 @@ describe('cancel-walk-email-flow (integration)', () => {
 
     let slotMembershipCalls = 0
     mockSupabase.from.mockImplementation((table: string) => {
+      if (table === 'observations') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  maybeSingle: vi.fn().mockResolvedValue({
+                    data: null,
+                    error: { code: 'PGRST116', message: 'No rows found' },
+                  }),
+                }),
+              }),
+            }),
+          }),
+        }
+      }
       if (table === 'slot_memberships') {
         slotMembershipCalls++
         if (slotMembershipCalls === 1) {
@@ -155,7 +204,9 @@ describe('cancel-walk-email-flow (integration)', () => {
             update: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnValue({
                 eq: vi.fn().mockReturnValue({
-                  eq: vi.fn().mockResolvedValue({ error: null }),
+                  eq: vi.fn().mockReturnValue({
+                    select: vi.fn().mockResolvedValue({ data: [{ id: 'membership-1' }], error: null }),
+                  }),
                 }),
               }),
             }),
@@ -214,6 +265,22 @@ describe('cancel-walk-email-flow (integration)', () => {
 
     let slotMembershipCalls = 0
     mockSupabase.from.mockImplementation((table: string) => {
+      if (table === 'observations') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  maybeSingle: vi.fn().mockResolvedValue({
+                    data: null,
+                    error: { code: 'PGRST116', message: 'No rows found' },
+                  }),
+                }),
+              }),
+            }),
+          }),
+        }
+      }
       if (table === 'slot_memberships') {
         slotMembershipCalls++
         if (slotMembershipCalls === 1) {
@@ -221,7 +288,9 @@ describe('cancel-walk-email-flow (integration)', () => {
             update: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnValue({
                 eq: vi.fn().mockReturnValue({
-                  eq: vi.fn().mockResolvedValue({ error: null }),
+                  eq: vi.fn().mockReturnValue({
+                    select: vi.fn().mockResolvedValue({ data: [{ id: 'membership-1' }], error: null }),
+                  }),
                 }),
               }),
             }),

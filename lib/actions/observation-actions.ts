@@ -2,6 +2,8 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@/lib/types/database'
 
 interface SightingInput {
   id?: string
@@ -27,7 +29,7 @@ interface SaveDraftInput {
 }
 
 async function cleanupSightingMedia(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: SupabaseClient<Database>,
   sightingIds: string[]
 ) {
   if (sightingIds.length === 0) return
@@ -42,6 +44,70 @@ async function cleanupSightingMedia(
       .from('observation-media')
       .remove(mediaRecords.map(m => m.file_path))
   }
+}
+
+export async function deleteDraftObservationsForSlot(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  walkId: string
+) {
+  const { data: drafts, error: draftsError } = await supabase
+    .from('observations')
+    .select('id')
+    .eq('slot_id', walkId)
+    .eq('user_id', userId)
+    .eq('status', 'DRAFT')
+
+  if (draftsError) return { error: draftsError.message }
+
+  const observationIds = (drafts || []).map((draft) => draft.id)
+  if (observationIds.length === 0) return { deletedCount: 0 }
+
+  const [{ data: observationMedia, error: observationMediaError }, { data: sightings, error: sightingsError }] = await Promise.all([
+    supabase
+      .from('media')
+      .select('file_path')
+      .in('observation_id', observationIds),
+    supabase
+      .from('sightings')
+      .select('id')
+      .in('observation_id', observationIds),
+  ])
+
+  if (observationMediaError) return { error: observationMediaError.message }
+  if (sightingsError) return { error: sightingsError.message }
+
+  const sightingIds = (sightings || []).map((sighting) => sighting.id)
+  const { data: sightingMedia, error: sightingMediaError } = sightingIds.length > 0
+    ? await supabase
+        .from('media')
+        .select('file_path')
+        .in('sighting_id', sightingIds)
+    : { data: [], error: null }
+
+  if (sightingMediaError) return { error: sightingMediaError.message }
+
+  const filePaths = [
+    ...(observationMedia || []).map((media) => media.file_path),
+    ...(sightingMedia || []).map((media) => media.file_path),
+  ]
+
+  if (filePaths.length > 0) {
+    const { error: storageError } = await supabase.storage
+      .from('observation-media')
+      .remove(filePaths)
+
+    if (storageError) return { error: storageError.message }
+  }
+
+  const { error: deleteError } = await supabase
+    .from('observations')
+    .delete()
+    .in('id', observationIds)
+
+  if (deleteError) return { error: deleteError.message }
+
+  return { deletedCount: observationIds.length }
 }
 
 export async function saveDraft(input: SaveDraftInput) {

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { ArrowLeft, AlertTriangle, CheckCircle } from 'lucide-react'
 import { resolveIncident } from '@/lib/actions/admin-round-actions'
 import { formatDate } from '@/lib/utils/format-date'
+import { useToast } from '@/components/ui/toast'
 
 const TYPE_LABELS: Record<string, string> = {
   INJURED_ANIMAL: 'Injured Animal',
@@ -31,10 +32,11 @@ export function IncidentsClient({ incidents }: { incidents: IncidentData[] }) {
   const [resolvingId, setResolvingId] = useState<string | null>(null)
   const [resolveNotes, setResolveNotes] = useState('')
   const router = useRouter()
+  const { showToast } = useToast()
 
   const handleResolve = async (id: string) => {
     const result = await resolveIncident(id, resolveNotes)
-    if (result.error) alert(result.error)
+    if (result.error) showToast(result.error, 'error')
     else {
       setResolvingId(null)
       setResolveNotes('')
@@ -53,7 +55,7 @@ export function IncidentsClient({ incidents }: { incidents: IncidentData[] }) {
 
       <div className="space-y-2">
         {incidents.map(inc => (
-          <div key={inc.id} className={`bg-white rounded-xl p-4 shadow-sm ${inc.resolved ? 'opacity-60' : ''}`}>
+          <div key={inc.id} className={`bg-white rounded-2xl p-4 shadow-sm ${inc.resolved ? 'opacity-60' : ''}`}>
             <div className="flex items-start gap-3">
               {inc.resolved ? (
                 <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />

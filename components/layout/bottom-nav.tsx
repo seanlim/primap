@@ -27,13 +27,16 @@ export function BottomNav({ isAdmin }: { isAdmin: boolean }) {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center justify-center flex-1 h-full gap-0.5 transition-colors ${
+              className={`flex flex-col items-center justify-center flex-1 h-full gap-0.5 transition-colors relative ${
                 isActive
                   ? 'text-green-600'
                   : 'text-gray-400 hover:text-gray-600'
               }`}
             >
-              <item.icon className="w-5 h-5" />
+              {isActive && (
+                <span className="absolute top-1 w-1 h-1 rounded-full bg-green-600" />
+              )}
+              <item.icon className={`w-5 h-5 ${isActive ? 'mt-1' : ''}`} />
               <span className="text-[10px] font-medium">{item.label}</span>
             </Link>
           )

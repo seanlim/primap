@@ -1,13 +1,15 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { ArrowLeft, Plus, Trash2, Loader2 } from 'lucide-react'
+import { Plus, Trash2, Loader2 } from 'lucide-react'
 import { formatDate, toLocalDateString } from '@/lib/utils/format-date'
 import { saveDraft, submitObservation, getMediaBySightingIds, getObservationMeta, getObservationFull } from '@/lib/actions/observation-actions'
 import { LocationPicker } from '@/components/map/location-picker'
 import { MediaUploader, type MediaItem } from '@/components/report/media-uploader'
+import { StepIndicator } from '@/components/report/step-indicator'
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
+import { Breadcrumb } from '@/components/ui/breadcrumb'
 import { getDraft, putDraft, deleteDraft, clearSyncStateForWalk, getMediaByClientParent, updateMediaResolvedParentId, getOutboxItems } from '@/lib/offline/db'
 import { processOutbox } from '@/lib/offline/sync-engine'
 import { type SightingForm } from '@/lib/types/observation'
@@ -79,6 +81,8 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [savedMessage, setSavedMessage] = useState('')
+  const [showSubmitDialog, setShowSubmitDialog] = useState(false)
+  const [activeStep, setActiveStep] = useState('walk-completion')
   const [isOnline, setIsOnline] = useState(true)
   const [mediaSyncKey, setMediaSyncKey] = useState(0)
   const [conflictState, setConflictState] = useState<{
@@ -88,6 +92,47 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
   const syncingRef = useRef(false)
   const wasOfflineRef = useRef(false)
   const router = useRouter()
+
+  // Step indicator setup
+  const hasSightingsForSteps = sightings.some(s => s.species)
+  const steps = useMemo(() => {
+    const base = [
+      { id: 'walk-completion', label: 'Completion' },
+      { id: 'sightings', label: 'Sightings' },
+      { id: 'notes', label: 'Notes' },
+    ]
+    if (!hasSightingsForSteps) {
+      base.push({ id: 'location', label: 'Location' })
+      base.push({ id: 'photos', label: 'Photos' })
+    }
+    return base
+  }, [hasSightingsForSteps])
+
+  // IntersectionObserver to track active step
+  useEffect(() => {
+    const stepIds = steps.map(s => s.id)
+    const elements = stepIds.map(id => document.getElementById(`step-${id}`)).filter(Boolean) as HTMLElement[]
+    if (elements.length === 0) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter(e => e.isIntersecting)
+        if (visible.length > 0) {
+          visible.sort((a, b) => b.intersectionRatio - a.intersectionRatio)
+          const id = visible[0].target.id.replace('step-', '')
+          setActiveStep(id)
+        }
+      },
+      { threshold: 0.3, rootMargin: '-80px 0px -50% 0px' }
+    )
+
+    elements.forEach(el => observer.observe(el))
+    return () => observer.disconnect()
+  }, [steps])
+
+  const scrollToStep = (stepId: string) => {
+    document.getElementById(`step-${stepId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   // Ref that always holds current form state
   const formStateRef = useRef({ walkCompletion, notes, lat, lng, observationId, clientDraftId, sightings })
@@ -579,21 +624,19 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
   }, [])
 
   // --- SUBMIT ---
-  const handleSubmit = async () => {
-    const validSightings = buildSightingsPayload()
-    const hasSightings = validSightings.length > 0
+  const handleSubmit = () => {
+    setShowSubmitDialog(true)
+  }
 
-    if (!hasSightings) {
-      if (!confirm("You haven't added any sightings. Submit?\nYou won't be able to edit it after submission.")) return
-    } else {
-      if (!confirm("Submit this report? You won't be able to edit it after submission.")) return
-    }
-
+  const confirmSubmit = async () => {
+    setShowSubmitDialog(false)
     setSaving(true)
     setSubmitting(true)
     setError('')
 
-    const outcome = hasSightings ? 'SIGHTED' : 'NOT_SIGHTED'
+    const validSightings = buildSightingsPayload()
+    const hasSightingsNow = validSightings.length > 0
+    const outcome = hasSightingsNow ? 'SIGHTED' : 'NOT_SIGHTED'
 
     const saveResult = await saveDraft({
       walkId: slot.id,
@@ -639,10 +682,11 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
 
   return (
     <div className="space-y-6">
-      <Link href={`/report/${slot.id}`} className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700">
-        <ArrowLeft className="w-4 h-4" />
-        Back to Group View
-      </Link>
+      <Breadcrumb items={[
+        { label: 'Reports', href: '/report' },
+        { label: slot.locationName, href: `/report/${slot.id}` },
+        { label: 'Edit' },
+      ]} />
 
       <div>
         <h1 className="text-xl font-bold text-gray-900">Edit Report</h1>
@@ -650,6 +694,8 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
           {slot.locationName} &middot; {formatDate(slot.walkDate, 'compact')}
         </p>
       </div>
+
+      <StepIndicator steps={steps} activeStepId={activeStep} onStepClick={scrollToStep} />
 
       {/* Conflict resolution dialog */}
       {conflictState && (
@@ -675,7 +721,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
       )}
 
       {/* Step 1: Walk Completion */}
-      <div className="bg-white rounded-xl p-5 shadow-sm space-y-3">
+      <div id="step-walk-completion" className="bg-white rounded-2xl p-5 shadow-sm space-y-3 scroll-mt-20">
         <h2 className="text-sm font-semibold text-gray-900">1. Walk Completion</h2>
         <div className="grid grid-cols-3 gap-2">
           {WALK_COMPLETION_OPTIONS.map(opt => (
@@ -696,7 +742,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
       </div>
 
       {/* Step 2: Sightings */}
-      <div className="bg-white rounded-xl p-5 shadow-sm space-y-4">
+      <div id="step-sightings" className="bg-white rounded-2xl p-5 shadow-sm space-y-4 scroll-mt-20">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-gray-900">2. Sightings</h2>
           <button
@@ -830,7 +876,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
       </div>
 
       {/* Step 3: Additional Notes */}
-      <div className="bg-white rounded-xl p-5 shadow-sm space-y-3">
+      <div id="step-notes" className="bg-white rounded-2xl p-5 shadow-sm space-y-3 scroll-mt-20">
         <h2 className="text-sm font-semibold text-gray-900">3. Additional Notes</h2>
         <textarea
           value={notes}
@@ -843,7 +889,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
 
       {/* Step 4: Walk Location (only when no sightings for NOT_SIGHTED) */}
       {!hasSightings && (
-        <div className="bg-white rounded-xl p-5 shadow-sm space-y-3">
+        <div id="step-location" className="bg-white rounded-2xl p-5 shadow-sm space-y-3 scroll-mt-20">
           <h2 className="text-sm font-semibold text-gray-900">4. Walk Location</h2>
           <p className="text-xs text-gray-400">Required when submitting with no sightings</p>
           <LocationPicker
@@ -865,7 +911,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
 
       {/* Step 5: Observation-level media (only when no sightings for NOT_SIGHTED) */}
       {!hasSightings && (
-        <div className="bg-white rounded-xl p-5 shadow-sm space-y-3">
+        <div id="step-photos" className="bg-white rounded-2xl p-5 shadow-sm space-y-3 scroll-mt-20">
           <h2 className="text-sm font-semibold text-gray-900">5. Photos/Videos</h2>
           <MediaUploader
             parentType="observation"
@@ -917,6 +963,19 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
           {submitting ? 'Submitting...' : 'Submit Report'}
         </button>
       </div>
+
+      <ConfirmationDialog
+        open={showSubmitDialog}
+        title="Submit Report"
+        message={
+          sightings.some(s => s.species)
+            ? "Submit this report? You won't be able to edit it after submission."
+            : "You haven't added any sightings. Submit? You won't be able to edit it after submission."
+        }
+        confirmLabel="Submit"
+        onConfirm={confirmSubmit}
+        onCancel={() => setShowSubmitDialog(false)}
+      />
     </div>
   )
 }

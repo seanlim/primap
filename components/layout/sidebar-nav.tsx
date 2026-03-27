@@ -18,11 +18,11 @@ export function SidebarNav({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <aside className="fixed left-0 top-0 bottom-0 w-64 bg-white border-r border-gray-200 flex flex-col z-50">
-      <div className="p-6 border-b border-gray-100">
-        <Link href="/home" className="text-2xl font-bold text-green-700">
+      <div className="p-6 bg-gradient-to-br from-green-600 to-emerald-500">
+        <Link href="/home" className="text-2xl font-bold text-white">
           Primap
         </Link>
-        <p className="text-xs text-gray-400 mt-1">Primate Survey Platform</p>
+        <p className="text-xs text-white/70 mt-1">Primate Survey Platform</p>
       </div>
 
       <nav className="flex-1 p-4 space-y-1">

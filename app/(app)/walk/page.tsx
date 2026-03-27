@@ -1,8 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { formatDate } from '@/lib/utils/format-date'
+import { formatDate, getRelativeDay } from '@/lib/utils/format-date'
 import { WalkFilters } from './walk-filters-client'
+import { MapPin, Calendar, Clock, Users, ChevronRight, Footprints, Search } from 'lucide-react'
+import { EmptyState } from '@/components/ui/empty-state'
 import { hasWalkStarted } from '@/lib/utils/walk-participation'
 
 export const dynamic = 'force-dynamic'
@@ -93,7 +95,7 @@ export default async function WalkPage({
   const hasFilters = dateFilter || locationFilter || availabilityFilter
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <h1 className="text-2xl font-bold text-gray-900">Walks</h1>
 
       {/* Filters */}
@@ -103,35 +105,52 @@ export default async function WalkPage({
       {mySlots.length > 0 && (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">My Walks</h2>
-          <div className="space-y-2">
+          <div className="space-y-2 stagger-children">
             {mySlots.map((slot) => {
               const activeCount = (slot.slot_memberships as unknown as { status: string }[])
                 .filter(m => m.status === 'ACTIVE').length
+              const relDay = getRelativeDay(slot.walk_date)
               return (
                 <Link
                   key={slot.id}
                   href={`/walk/${slot.id}`}
-                  className="block bg-green-50 border border-green-200 rounded-xl p-4 hover:shadow-md transition-shadow"
+                  className="flex items-center gap-3 bg-green-50 border-l-4 border-green-500 rounded-2xl p-4 hover:scale-[1.01] hover:shadow-md transition-all group"
                 >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-semibold text-gray-900">{slot.location_name}</p>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {formatDate(slot.walk_date, 'default')}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
-                      </p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-start">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                          <p className="font-semibold text-gray-900 truncate">{slot.location_name}</p>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Calendar className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                          <p className="text-sm text-gray-600">
+                            {formatDate(slot.walk_date, 'default')}
+                          </p>
+                          {relDay && (
+                            <span className="text-xs font-medium text-green-700 bg-green-100 px-2 py-0.5 rounded-full">{relDay}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <Clock className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                          <p className="text-sm text-gray-500">
+                            {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-green-600 text-white px-2.5 py-1 rounded-full font-medium shrink-0">
+                        Joined
+                      </span>
                     </div>
-                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
-                      Joined
-                    </span>
+                    <div className="flex items-center gap-1.5 mt-2">
+                      <Users className="w-3.5 h-3.5 text-gray-400" />
+                      <span className="text-xs text-gray-500">
+                        {activeCount}/{slot.max_volunteers} volunteers
+                      </span>
+                    </div>
                   </div>
-                  <div className="mt-2">
-                    <span className="text-xs text-gray-500">
-                      {activeCount}/{slot.max_volunteers} volunteers
-                    </span>
-                  </div>
+                  <ChevronRight className="w-4 h-4 text-green-300 group-hover:text-green-600 transition-colors shrink-0" />
                 </Link>
               )
             })}
@@ -145,59 +164,81 @@ export default async function WalkPage({
           Available Walks {totalAvailable > 0 && `(${totalAvailable})`}
         </h2>
         {paginatedSlots.length === 0 && mySlots.length === 0 && !hasFilters ? (
-          <div className="bg-white rounded-xl p-8 text-center shadow-sm">
-            <p className="text-gray-500">No walks available at the moment.</p>
-            <p className="text-sm text-gray-400 mt-1">Check back when a new survey round opens.</p>
-          </div>
+          <EmptyState
+            icon={Footprints}
+            title="No walks available"
+            description="Check back when a new survey round opens"
+            color="green"
+          />
         ) : paginatedSlots.length === 0 ? (
-          <div className="bg-white rounded-xl p-6 text-center shadow-sm">
-            <p className="text-gray-500 text-sm">
-              {hasFilters ? 'No walks match your filters.' : 'No more available walks in this round.'}
-            </p>
-          </div>
+          <EmptyState
+            icon={Search}
+            title={hasFilters ? 'No walks match your filters' : 'No more available walks'}
+            description={hasFilters ? 'Try adjusting your filters' : undefined}
+            color="blue"
+          />
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2 stagger-children">
             {paginatedSlots.map((slot) => {
               const activeCount = (slot.slot_memberships as unknown as { status: string }[])
                 .filter(m => m.status === 'ACTIVE').length
               const isFull = activeCount >= slot.max_volunteers
+              const relDay = getRelativeDay(slot.walk_date)
               return (
                 <Link
                   key={slot.id}
                   href={`/walk/${slot.id}`}
-                  className={`block bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow ${
-                    isFull ? 'opacity-60' : ''
+                  className={`flex items-center gap-3 bg-white border-l-4 rounded-2xl p-4 shadow-sm transition-all group ${
+                    isFull
+                      ? 'border-gray-300 opacity-60'
+                      : 'border-blue-500 hover:scale-[1.01] hover:shadow-md'
                   }`}
                 >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-semibold text-gray-900">{slot.location_name}</p>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {formatDate(slot.walk_date, 'default')}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
-                      </p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-start">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <p className="font-semibold text-gray-900 truncate">{slot.location_name}</p>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Calendar className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <p className="text-sm text-gray-600">
+                            {formatDate(slot.walk_date, 'default')}
+                          </p>
+                          {relDay && (
+                            <span className="text-xs font-medium text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">{relDay}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <Clock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <p className="text-sm text-gray-500">
+                            {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
+                          </p>
+                        </div>
+                      </div>
+                      {isFull ? (
+                        <span className="text-xs bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full font-medium shrink-0">Full</span>
+                      ) : (
+                        <span className="text-xs bg-blue-600 text-white px-2.5 py-1 rounded-full font-medium shrink-0">Open</span>
+                      )}
                     </div>
-                    {isFull ? (
-                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full font-medium">Full</span>
-                    ) : (
-                      <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full font-medium">Open</span>
-                    )}
-                  </div>
-                  <div className="mt-2">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+                    <div className="flex items-center gap-2 mt-2">
+                      <div className="flex-1 bg-gray-100 rounded-full h-2.5">
                         <div
-                          className="bg-green-500 h-1.5 rounded-full transition-all"
+                          className="bg-gradient-to-r from-green-400 to-green-600 h-2.5 rounded-full transition-all"
                           style={{ width: `${(activeCount / slot.max_volunteers) * 100}%` }}
                         />
                       </div>
-                      <span className="text-xs text-gray-500">
-                        {activeCount}/{slot.max_volunteers}
-                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Users className="w-3.5 h-3.5 text-gray-400" />
+                        <span className="text-xs text-gray-500">
+                          {activeCount}/{slot.max_volunteers}
+                        </span>
+                      </div>
                     </div>
                   </div>
+                  <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors shrink-0" />
                 </Link>
               )
             })}

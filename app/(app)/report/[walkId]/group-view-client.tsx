@@ -3,12 +3,15 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, ChevronDown, ChevronUp, MapPin, Eye, AlertTriangle, Loader2, ImageOff } from 'lucide-react'
+import { ChevronDown, ChevronUp, MapPin, Eye, AlertTriangle, Loader2, ImageOff } from 'lucide-react'
 import { submitObservation } from '@/lib/actions/observation-actions'
 import { reportIncident } from '@/lib/actions/incident-actions'
 import { getSignedMediaUrl } from '@/lib/utils/storage'
 import { cacheGet, cacheSet } from '@/lib/offline/db'
 import { formatDate } from '@/lib/utils/format-date'
+import { useToast } from '@/components/ui/toast'
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
+import { Breadcrumb } from '@/components/ui/breadcrumb'
 
 interface SightingData {
   id: string
@@ -80,8 +83,10 @@ export function GroupViewClient({
 }: Props) {
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set())
   const [showIncidentModal, setShowIncidentModal] = useState(false)
+  const [showSubmitDialog, setShowSubmitDialog] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const router = useRouter()
+  const { showToast } = useToast()
 
   const myObservation = observations.find(o => o.userId === currentUserId)
   const othersObservations = observations.filter(o => o.userId !== currentUserId)
@@ -95,13 +100,18 @@ export function GroupViewClient({
     })
   }
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!myObservation) return
-    if (!confirm('Submit this report? You won\'t be able to edit it after submission.')) return
+    setShowSubmitDialog(true)
+  }
+
+  const confirmSubmit = async () => {
+    if (!myObservation) return
+    setShowSubmitDialog(false)
     setSubmitting(true)
     const result = await submitObservation(myObservation.id, slot.id)
     if (result.error) {
-      alert(result.error)
+      showToast(result.error, 'error')
     } else {
       router.refresh()
     }
@@ -110,13 +120,13 @@ export function GroupViewClient({
 
   return (
     <div className="space-y-6">
-      <Link href={backHref} className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700">
-        <ArrowLeft className="w-4 h-4" />
-        {backLabel}
-      </Link>
+      <Breadcrumb items={[
+        { label: backLabel === 'Back to Reports' ? 'Reports' : 'Admin Reports', href: backHref },
+        { label: slot.locationName },
+      ]} />
 
       {/* Walk Header */}
-      <div className="bg-white rounded-xl p-5 shadow-sm">
+      <div className="bg-white rounded-2xl p-5 shadow-sm">
         <p className="text-xs text-green-600 font-medium">{slot.roundName}</p>
         <h1 className="text-xl font-bold text-gray-900 mt-1">{slot.locationName}</h1>
         <p className="text-sm text-gray-500 mt-1">
@@ -126,7 +136,7 @@ export function GroupViewClient({
 
       {/* Your Report */}
       {myObservation && (
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
           <div className="p-4 border-b border-gray-100">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -174,7 +184,7 @@ export function GroupViewClient({
             Group Reports ({othersObservations.length})
           </h2>
           {othersObservations.map(obs => (
-            <div key={obs.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div key={obs.id} className="bg-white rounded-2xl shadow-sm overflow-hidden">
               <button
                 onClick={() => toggleCard(obs.id)}
                 className="w-full p-4 flex items-center justify-between text-left"
@@ -275,6 +285,15 @@ export function GroupViewClient({
           }}
         />
       )}
+
+      <ConfirmationDialog
+        open={showSubmitDialog}
+        title="Submit Report"
+        message="Submit this report? You won't be able to edit it after submission."
+        confirmLabel="Submit"
+        onConfirm={confirmSubmit}
+        onCancel={() => setShowSubmitDialog(false)}
+      />
     </div>
   )
 }

@@ -90,8 +90,8 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
   const router = useRouter()
 
   // Ref that always holds current form state
-  const formStateRef = useRef({ walkCompletion, notes, lat, lng, observationId, sightings })
-  formStateRef.current = { walkCompletion, notes, lat, lng, observationId, sightings }
+  const formStateRef = useRef({ walkCompletion, notes, lat, lng, observationId, clientDraftId, sightings })
+  formStateRef.current = { walkCompletion, notes, lat, lng, observationId, clientDraftId, sightings }
 
   // --- LOCAL-FIRST INITIALIZATION ---
   useEffect(() => {
@@ -119,6 +119,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
         // No local draft, server has data — seed IndexedDB from server
         await putDraft(slot.id, {
           observationId: existingObservation.id,
+          clientDraftId: existingObservation.id,
           walkCompletion: existingObservation.walkCompletion,
           outcome: existingObservation.outcome,
           notes: existingObservation.notes ?? undefined,
@@ -186,6 +187,15 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
       }
     }
 
+    // Remap observation-level media (NOT_SIGHTED case)
+    const newObservationId = saveResult.observationId || draft.data.observationId
+    if (newObservationId && draft.data.clientDraftId && draft.data.clientDraftId !== newObservationId) {
+      const obsMedia = await getMediaByClientParent(draft.data.clientDraftId)
+      for (const mq of obsMedia) {
+        await updateMediaResolvedParentId(mq.id, newObservationId)
+      }
+    }
+
     // Upload queued media
     await processOutbox()
 
@@ -201,6 +211,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
     await putDraft(slot.id, {
       ...draft.data,
       observationId: newObsId,
+      clientDraftId: newObsId || draft.data.clientDraftId,
       sightings: updatedSightings,
     }, saveResult.serverUpdatedAt ?? null)
 
@@ -244,6 +255,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
 
       await putDraft(slot.id, {
         observationId: fs.observationId,
+        clientDraftId: fs.clientDraftId,
         walkCompletion: fs.walkCompletion as 'COMPLETED' | 'PARTIAL' | 'ABORTED',
         outcome: hasSightings ? 'SIGHTED' : 'NOT_SIGHTED',
         notes: fs.notes || undefined,
@@ -331,6 +343,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
       }))
       await putDraft(slot.id, {
         observationId: serverData.id,
+        clientDraftId: serverData.id,
         walkCompletion: serverData.walkCompletion as 'COMPLETED' | 'PARTIAL' | 'ABORTED',
         outcome: serverData.outcome as 'SIGHTED' | 'NOT_SIGHTED',
         notes: serverData.notes ?? undefined,
@@ -388,6 +401,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
         getDraft(slot.id).then(existing => {
           putDraft(slot.id, {
             observationId: fs.observationId,
+            clientDraftId: fs.clientDraftId,
             walkCompletion: fs.walkCompletion as 'COMPLETED' | 'PARTIAL' | 'ABORTED',
             outcome: has ? 'SIGHTED' : 'NOT_SIGHTED',
             notes: fs.notes || undefined,
@@ -471,6 +485,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
     const hasSightings = validSightings.length > 0
     const formData = {
       observationId,
+      clientDraftId,
       walkCompletion: walkCompletion as 'COMPLETED' | 'PARTIAL' | 'ABORTED',
       outcome: (hasSightings ? 'SIGHTED' : 'NOT_SIGHTED') as 'SIGHTED' | 'NOT_SIGHTED',
       notes: notes || undefined,

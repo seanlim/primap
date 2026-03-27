@@ -66,11 +66,12 @@ export default async function EditReportPage({
         notes: existingObs.notes,
         lat: existingObs.lat,
         lng: existingObs.lng,
+        serverUpdatedAt: existingObs.updated_at,
         sightings: existingObs.sightings.map(s => ({
           id: s.id,
           species: s.species,
           count: s.count,
-          observedAt: s.observed_at,
+          observedAt: s.observed_at?.slice(0, 16) ?? null,
           lat: s.lat,
           lng: s.lng,
           notes: s.notes,

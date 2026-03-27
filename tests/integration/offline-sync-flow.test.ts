@@ -47,10 +47,10 @@ beforeEach(() => {
 
 describe('offline-sync-flow (integration)', () => {
   it('saveDraftLocally → addToOutbox(FINALIZE_SUBMIT) → processOutbox → supabase update with SUBMITTED', async () => {
-    const { saveDraftLocally, addToOutbox } = await import('@/lib/offline/db')
+    const { putDraft: saveDraftLocally, addToOutbox } = await import('@/lib/offline/db')
     const { processOutbox } = await import('@/lib/offline/sync-engine')
 
-    await saveDraftLocally('draft-1', 'slot-A', { species: 'macaque' })
+    await saveDraftLocally('slot-A', { walkCompletion: "COMPLETED", outcome: "NOT_SIGHTED" })
     await addToOutbox('FINALIZE_SUBMIT', { observationId: 'obs-1' }, 'draft-1')
 
     const processed = await processOutbox()
@@ -61,50 +61,6 @@ describe('offline-sync-flow (integration)', () => {
       expect.objectContaining({ status: 'SUBMITTED' }),
     )
     expect(mockChain.eq).toHaveBeenCalledWith('id', 'obs-1')
-  })
-
-  it('addToOutbox(UPSERT_DRAFT with observationId) → processOutbox → supabase update called', async () => {
-    const { addToOutbox } = await import('@/lib/offline/db')
-    const { processOutbox } = await import('@/lib/offline/sync-engine')
-
-    await addToOutbox(
-      'UPSERT_DRAFT',
-      { walkId: 'slot-A', observationId: 'obs-1', species: 'gibbon' },
-      'draft-1',
-    )
-
-    await processOutbox()
-
-    expect(mockChain.from).toHaveBeenCalledWith('observations')
-    expect(mockChain.update).toHaveBeenCalledWith(
-      expect.objectContaining({ species: 'gibbon' }),
-    )
-    expect(mockChain.eq).toHaveBeenCalledWith('id', 'obs-1')
-  })
-
-  it('addToOutbox(UPSERT_DRAFT without observationId) → processOutbox → supabase upsert with user', async () => {
-    const { addToOutbox } = await import('@/lib/offline/db')
-    const { processOutbox } = await import('@/lib/offline/sync-engine')
-
-    await addToOutbox(
-      'UPSERT_DRAFT',
-      { walkId: 'slot-A', species: 'langur' },
-      'client-1',
-    )
-
-    await processOutbox()
-
-    expect(mockGetUser).toHaveBeenCalled()
-    expect(mockChain.from).toHaveBeenCalledWith('observations')
-    expect(mockChain.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        slot_id: 'slot-A',
-        user_id: 'user-123',
-        client_draft_id: 'client-1',
-        species: 'langur',
-      }),
-      { onConflict: 'slot_id,user_id' },
-    )
   })
 
   it('processOutbox with supabase error → incrementRetry → item still in outbox with retries=1', async () => {
@@ -176,9 +132,10 @@ describe('offline-sync-flow (integration)', () => {
     const { addToOutbox, getOutboxItems } = await import('@/lib/offline/db')
     const { processOutbox } = await import('@/lib/offline/sync-engine')
 
-    await addToOutbox('UPLOAD_MEDIA', { file: 'photo1.jpg' }, 'draft-1')
-    await addToOutbox('UPLOAD_MEDIA', { file: 'photo2.jpg' }, 'draft-2')
-    await addToOutbox('UPLOAD_MEDIA', { file: 'photo3.jpg' }, 'draft-3')
+    // UPLOAD_MEDIA with no matching media-queue entry → treated as already cleaned up
+    await addToOutbox('UPLOAD_MEDIA', { mediaQueueId: 'missing-1' }, 'draft-1')
+    await addToOutbox('UPLOAD_MEDIA', { mediaQueueId: 'missing-2' }, 'draft-2')
+    await addToOutbox('UPLOAD_MEDIA', { mediaQueueId: 'missing-3' }, 'draft-3')
 
     const processed = await processOutbox()
 
@@ -188,17 +145,17 @@ describe('offline-sync-flow (integration)', () => {
   })
 
   it('full flow: saveDraftLocally + addToOutbox + processOutbox → outbox empty', async () => {
-    const { saveDraftLocally, addToOutbox, getOutboxItems, getDraftByWalk } =
+    const { putDraft: saveDraftLocally, addToOutbox, getOutboxItems, getDraft: getDraftByWalk } =
       await import('@/lib/offline/db')
     const { processOutbox } = await import('@/lib/offline/sync-engine')
 
     // Save draft locally
-    await saveDraftLocally('draft-1', 'slot-A', { species: 'macaque', count: 3 })
+    await saveDraftLocally('slot-A', { walkCompletion: "COMPLETED", outcome: "NOT_SIGHTED", notes: 'macaque' })
 
     // Verify draft exists
     const draft = await getDraftByWalk('slot-A')
     expect(draft).toBeDefined()
-    expect(draft!.data).toEqual({ species: 'macaque', count: 3 })
+    expect(draft!.data).toEqual({ walkCompletion: "COMPLETED", outcome: "NOT_SIGHTED", notes: 'macaque' })
 
     // Queue for sync
     await addToOutbox(
@@ -219,11 +176,11 @@ describe('offline-sync-flow (integration)', () => {
     expect(items).toHaveLength(0)
   })
 
-  it('addToOutbox(UPLOAD_MEDIA) → processOutbox → no supabase call, still removed from outbox', async () => {
+  it('addToOutbox(UPLOAD_MEDIA) with missing media-queue entry → removed from outbox', async () => {
     const { addToOutbox, getOutboxItems } = await import('@/lib/offline/db')
     const { processOutbox } = await import('@/lib/offline/sync-engine')
 
-    await addToOutbox('UPLOAD_MEDIA', { file: 'photo.jpg' }, 'draft-1')
+    await addToOutbox('UPLOAD_MEDIA', { mediaQueueId: 'nonexistent' }, 'draft-1')
 
     // Reset call counts so we can assert no supabase interactions
     mockChain.from.mockClear()

@@ -9,56 +9,95 @@ beforeEach(() => {
 })
 
 describe('Drafts', () => {
-  it('saveDraftLocally + getDraftByWalk round trip', async () => {
-    const { saveDraftLocally, getDraftByWalk } = await import('@/lib/offline/db')
+  it('putDraft + getDraft round trip', async () => {
+    const { putDraft, getDraft } = await import('@/lib/offline/db')
 
-    await saveDraftLocally('draft-1', 'slot-A', { species: 'macaque' })
-    const result = await getDraftByWalk('slot-A')
+    await putDraft('slot-A', {
+      walkCompletion: "PARTIAL",
+      outcome: 'SIGHTED' 
+    })
+    const result = await getDraft('slot-A')
 
     expect(result).toBeDefined()
-    expect(result!.id).toBe('draft-1')
     expect(result!.walkId).toBe('slot-A')
-    expect(result!.data).toEqual({ species: 'macaque' })
-    expect(result!.updatedAt).toBeTypeOf('number')
+    expect(result!.data).toEqual({
+      walkCompletion: "PARTIAL",
+      outcome: 'SIGHTED' 
+    })
+    expect(result!.lastModified).toBeTypeOf('number')
+    expect(result!.serverUpdatedAt).toBeNull()
   })
 
-  it('saveDraftLocally overwrites existing with same id', async () => {
-    const { saveDraftLocally, getDraftByWalk } = await import('@/lib/offline/db')
+  it('putDraft overwrites existing with same id', async () => {
+    const { putDraft, getDraft } = await import('@/lib/offline/db')
 
-    await saveDraftLocally('draft-1', 'slot-A', { species: 'macaque' })
-    await saveDraftLocally('draft-1', 'slot-A', { species: 'gibbon' })
+    await putDraft('slot-A', {
+      walkCompletion: "PARTIAL",
+      outcome: 'SIGHTED' 
+    })
+    await putDraft('slot-A',  {
+      walkCompletion: "COMPLETED",
+      outcome: 'SIGHTED' 
+    })
 
-    const result = await getDraftByWalk('slot-A')
-    expect(result!.data).toEqual({ species: 'gibbon' })
+    const result = await getDraft('slot-A')
+    expect(result!.data).toEqual({
+      walkCompletion: "COMPLETED",
+      outcome: 'SIGHTED' 
+    })
   })
 
-  it('getDraftByWalk returns undefined for missing slot', async () => {
-    const { getDraftByWalk } = await import('@/lib/offline/db')
+  it('getDraft returns null for missing slot', async () => {
+    const { getDraft } = await import('@/lib/offline/db')
 
-    const result = await getDraftByWalk('nonexistent-slot')
-    expect(result).toBeUndefined()
+    const result = await getDraft('nonexistent-slot')
+    expect(result).toBeNull()
+  })
+
+  it('putDraft with serverUpdatedAt', async () => {
+    const { putDraft, getDraft } = await import('@/lib/offline/db')
+
+    await putDraft('slot-A', {
+      walkCompletion: "PARTIAL",
+      outcome: 'SIGHTED'
+    }, '2026-03-26T12:00:00Z')
+    const result = await getDraft('slot-A')
+
+    expect(result!.serverUpdatedAt).toBe('2026-03-26T12:00:00Z')
   })
 
   it('deleteDraft removes draft', async () => {
-    const { saveDraftLocally, getDraftByWalk, deleteDraft } = await import('@/lib/offline/db')
+    const { putDraft, getDraft, deleteDraft } = await import('@/lib/offline/db')
 
-    await saveDraftLocally('draft-1', 'slot-A', { species: 'macaque' })
-    await deleteDraft('draft-1')
+    await putDraft('slot-A', {
+      walkCompletion: "PARTIAL",
+      outcome: 'SIGHTED'
+    })
+    await deleteDraft('slot-A')
 
-    const result = await getDraftByWalk('slot-A')
-    expect(result).toBeUndefined()
+    const result = await getDraft('slot-A')
+    expect(result).toBeNull()
   })
 
   it('getAllDrafts returns all saved drafts', async () => {
-    const { saveDraftLocally, getAllDrafts } = await import('@/lib/offline/db')
+    const { putDraft, getAllDrafts } = await import('@/lib/offline/db')
 
-    await saveDraftLocally('draft-1', 'slot-A', { species: 'macaque' })
-    await saveDraftLocally('draft-2', 'slot-B', { species: 'gibbon' })
-    await saveDraftLocally('draft-3', 'slot-C', { species: 'langur' })
+    await putDraft('slot-A', {
+      walkCompletion: "PARTIAL",
+      outcome: 'SIGHTED',
+    })
+    await putDraft('slot-B', {
+      walkCompletion: "PARTIAL",
+      outcome: 'SIGHTED',
+    })
+    await putDraft('slot-C', {
+      walkCompletion: "PARTIAL",
+      outcome: 'SIGHTED',
+    })
 
     const drafts = await getAllDrafts()
     expect(drafts).toHaveLength(3)
-    expect(drafts.map((d) => d.id).sort()).toEqual(['draft-1', 'draft-2', 'draft-3'])
+    expect(drafts.map((d) => d.walkId).sort()).toEqual(['slot-A', 'slot-B', 'slot-C'])
   })
 
   it('getAllDrafts returns empty array when none', async () => {
@@ -73,12 +112,12 @@ describe('Outbox', () => {
   it('addToOutbox + getOutboxItems round trip', async () => {
     const { addToOutbox, getOutboxItems } = await import('@/lib/offline/db')
 
-    await addToOutbox('UPSERT_DRAFT', { walkId: 'slot-A' }, 'client-1')
+    await addToOutbox('UPLOAD_MEDIA', { mediaQueueId: 'mq-1' }, 'client-1')
     const items = await getOutboxItems()
 
     expect(items).toHaveLength(1)
-    expect(items[0].action).toBe('UPSERT_DRAFT')
-    expect(items[0].payload).toEqual({ walkId: 'slot-A' })
+    expect(items[0].action).toBe('UPLOAD_MEDIA')
+    expect(items[0].payload).toEqual({ mediaQueueId: 'mq-1' })
     expect(items[0].clientDraftId).toBe('client-1')
   })
 
@@ -98,7 +137,7 @@ describe('Outbox', () => {
   it('removeFromOutbox removes item', async () => {
     const { addToOutbox, getOutboxItems, removeFromOutbox } = await import('@/lib/offline/db')
 
-    await addToOutbox('UPSERT_DRAFT', { walkId: 'slot-A' }, 'client-1')
+    await addToOutbox('UPLOAD_MEDIA', { mediaQueueId: 'mq-1' }, 'client-1')
     const items = await getOutboxItems()
     expect(items).toHaveLength(1)
 
@@ -180,5 +219,95 @@ describe('Cache', () => {
 
     const result = await cacheGet('key')
     expect(result).toBe('second')
+  })
+})
+
+describe('Media Queue', () => {
+  const makeQueuedMedia = (overrides = {}) => ({
+    id: 'mq-1',
+    clientParentId: 'sighting-temp-1',
+    parentType: 'sighting' as const,
+    resolvedParentId: null,
+    blob: new Blob(['fake image data'], { type: 'image/jpeg' }),
+    fileName: 'photo.jpg',
+    fileSize: 1024,
+    mediaType: 'PHOTO' as const,
+    exifLat: 1.3521,
+    exifLng: 103.8198,
+    exifDatetime: null,
+    createdAt: Date.now(),
+    ...overrides,
+  })
+
+  it('saveMediaToQueue + getMediaByClientParent round trip', async () => {
+    const { saveMediaToQueue, getMediaByClientParent } = await import('@/lib/offline/db')
+
+    const item = makeQueuedMedia()
+    await saveMediaToQueue(item)
+
+    const results = await getMediaByClientParent('sighting-temp-1')
+    expect(results).toHaveLength(1)
+    expect(results[0].id).toBe('mq-1')
+    expect(results[0].fileName).toBe('photo.jpg')
+    expect(results[0].resolvedParentId).toBeNull()
+  })
+
+  it('getMediaByClientParent returns empty for missing parent', async () => {
+    const { getMediaByClientParent } = await import('@/lib/offline/db')
+
+    const results = await getMediaByClientParent('nonexistent')
+    expect(results).toHaveLength(0)
+  })
+
+  it('removeMediaFromQueue removes the item', async () => {
+    const { saveMediaToQueue, getMediaByClientParent, removeMediaFromQueue } = await import('@/lib/offline/db')
+
+    await saveMediaToQueue(makeQueuedMedia())
+    await removeMediaFromQueue('mq-1')
+
+    const results = await getMediaByClientParent('sighting-temp-1')
+    expect(results).toHaveLength(0)
+  })
+
+  it('updateMediaResolvedParentId sets the server ID', async () => {
+    const { saveMediaToQueue, getQueuedMediaById, updateMediaResolvedParentId } = await import('@/lib/offline/db')
+
+    await saveMediaToQueue(makeQueuedMedia())
+    await updateMediaResolvedParentId('mq-1', 'server-sighting-abc')
+
+    const updated = await getQueuedMediaById('mq-1')
+    expect(updated).toBeDefined()
+    expect(updated!.resolvedParentId).toBe('server-sighting-abc')
+  })
+
+  it('getAllQueuedMedia returns all items', async () => {
+    const { saveMediaToQueue, getAllQueuedMedia } = await import('@/lib/offline/db')
+
+    await saveMediaToQueue(makeQueuedMedia({ id: 'mq-1', clientParentId: 'p1' }))
+    await saveMediaToQueue(makeQueuedMedia({ id: 'mq-2', clientParentId: 'p2' }))
+    await saveMediaToQueue(makeQueuedMedia({ id: 'mq-3', clientParentId: 'p1' }))
+
+    const all = await getAllQueuedMedia()
+    expect(all).toHaveLength(3)
+    expect(all.map(m => m.id).sort()).toEqual(['mq-1', 'mq-2', 'mq-3'])
+  })
+
+  it('getAllQueuedMedia returns empty when none', async () => {
+    const { getAllQueuedMedia } = await import('@/lib/offline/db')
+
+    const all = await getAllQueuedMedia()
+    expect(all).toHaveLength(0)
+  })
+
+  it('getMediaByClientParent returns multiple items for same parent', async () => {
+    const { saveMediaToQueue, getMediaByClientParent } = await import('@/lib/offline/db')
+
+    await saveMediaToQueue(makeQueuedMedia({ id: 'mq-1', clientParentId: 'parent-A' }))
+    await saveMediaToQueue(makeQueuedMedia({ id: 'mq-2', clientParentId: 'parent-A' }))
+    await saveMediaToQueue(makeQueuedMedia({ id: 'mq-3', clientParentId: 'parent-B' }))
+
+    const results = await getMediaByClientParent('parent-A')
+    expect(results).toHaveLength(2)
+    expect(results.map(m => m.id).sort()).toEqual(['mq-1', 'mq-2'])
   })
 })

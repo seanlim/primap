@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronDown, ChevronUp, MapPin, Eye, AlertTriangle, Loader2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, MapPin, Eye, AlertTriangle, Loader2, ImageOff } from 'lucide-react'
 import { submitObservation } from '@/lib/actions/observation-actions'
 import { reportIncident } from '@/lib/actions/incident-actions'
 import { getSignedMediaUrl } from '@/lib/utils/storage'
+import { cacheGet, cacheSet } from '@/lib/offline/db'
 import { formatDate } from '@/lib/utils/format-date'
 import { useToast } from '@/components/ui/toast'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
@@ -299,19 +300,57 @@ export function GroupViewClient({
 
 function MediaGallery({ media }: { media: { id: string; file_path: string; file_name: string; media_type: string }[] }) {
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({})
+  const blobUrlsRef = useRef<string[]>([])
 
   useEffect(() => {
     let cancelled = false
+    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000
+
     async function resolveUrls() {
       const urls: Record<string, string> = {}
       for (const item of media) {
-        urls[item.id] = await getSignedMediaUrl(item.file_path)
-        if (cancelled) return
+        // Check IndexedDB blob cache first (works offline)
+        const cacheKey = `media-blob:${item.file_path}`
+        try {
+          const cachedBlob = await cacheGet(cacheKey) as Blob | null
+          if (cancelled) return
+          if (cachedBlob && cachedBlob instanceof Blob) {
+            const blobUrl = URL.createObjectURL(cachedBlob)
+            blobUrlsRef.current.push(blobUrl)
+            urls[item.id] = blobUrl
+            continue
+          }
+        } catch { /* cache miss */ }
+
+        // Skip network when offline
+        if (!navigator.onLine) {
+          urls[item.id] = 'error'
+          continue
+        }
+
+        // Network: get signed URL, cache blob in background
+        try {
+          const signedUrl = await getSignedMediaUrl(item.file_path)
+          if (cancelled) return
+          urls[item.id] = signedUrl
+          fetch(signedUrl, { mode: 'cors' }).then(async res => {
+            if (res.ok) {
+              const blob = await res.blob()
+              await cacheSet(cacheKey, blob, SEVEN_DAYS)
+            }
+          }).catch(() => {})
+        } catch {
+          urls[item.id] = 'error'
+        }
       }
-      setSignedUrls(urls)
+      if (!cancelled) setSignedUrls(urls)
     }
     if (media.length > 0) resolveUrls()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      blobUrlsRef.current.forEach(URL.revokeObjectURL)
+      blobUrlsRef.current = []
+    }
   }, [media])
 
   if (media.length === 0) return null
@@ -320,7 +359,7 @@ function MediaGallery({ media }: { media: { id: string; file_path: string; file_
     <div className="grid grid-cols-3 gap-2 mt-2">
       {media.map(item => (
         <div key={item.id} className="aspect-square rounded-lg overflow-hidden bg-gray-100">
-          {signedUrls[item.id] ? (
+          {signedUrls[item.id] && signedUrls[item.id] !== 'error' ? (
             item.media_type === 'VIDEO' ? (
               <video
                 src={signedUrls[item.id]}
@@ -334,6 +373,11 @@ function MediaGallery({ media }: { media: { id: string; file_path: string; file_
                 className="w-full h-full object-cover"
               />
             )
+          ) : signedUrls[item.id] === 'error' ? (
+            <div className="w-full h-full flex flex-col items-center justify-center gap-1">
+              <ImageOff className="w-5 h-5 text-gray-300" />
+              <span className="text-[10px] text-gray-400">Unavailable</span>
+            </div>
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
@@ -401,7 +445,7 @@ function ObservationDetails({ observation }: { observation: ObservationData }) {
               </div>
               {sighting.observedAt && (
                 <p className="text-xs text-gray-400 mt-1">
-                  {new Date(sighting.observedAt).toLocaleString('en-SG')}
+                  {new Date(sighting.observedAt).toLocaleString('en-SG', { timeZone: 'UTC' })}
                 </p>
               )}
               {sighting.notes && (

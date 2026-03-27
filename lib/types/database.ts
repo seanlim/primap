@@ -155,6 +155,7 @@ export type Database = {
           client_draft_id: string | null
           created_at: string
           id: string
+          last_user_agent: string | null
           lat: number | null
           lng: number | null
           notes: string | null
@@ -170,6 +171,7 @@ export type Database = {
           client_draft_id?: string | null
           created_at?: string
           id?: string
+          last_user_agent?: string | null
           lat?: number | null
           lng?: number | null
           notes?: string | null
@@ -186,6 +188,7 @@ export type Database = {
           client_draft_id?: string | null
           created_at?: string
           id?: string
+          last_user_agent?: string | null
           lat?: number | null
           lng?: number | null
           notes?: string | null

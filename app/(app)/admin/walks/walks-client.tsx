@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { ArrowLeft, Plus, Trash2, Pencil, X, Layers } from 'lucide-react'
 import { createWalk, updateWalk, deleteWalk, bulkCreateWalks } from '@/lib/actions/admin-round-actions'
 import { formatDate, toLocalDateString } from '@/lib/utils/format-date'
+import { useToast } from '@/components/ui/toast'
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 
 interface WalkData {
   id: string
@@ -85,8 +87,10 @@ export function WalksClient({ walks, rounds }: {
   const [generatedWalks, setGeneratedWalks] = useState<GeneratedWalk[]>([])
   const [bulkStep, setBulkStep] = useState<'rules' | 'preview'>('rules')
   const [bulkLoading, setBulkLoading] = useState(false)
+  const [deletingWalkId, setDeletingWalkId] = useState<string | null>(null)
 
   const router = useRouter()
+  const { showToast } = useToast()
 
   // When editing a walk whose round is closed (not in the active rounds list),
   // include it so the dropdown still shows the current round.
@@ -106,7 +110,7 @@ export function WalksClient({ walks, rounds }: {
       endTime,
       maxVolunteers: maxVol,
     })
-    if ('error' in result) alert(result.error)
+    if ('error' in result) showToast(result.error || 'An error occurred', 'error')
     else {
       setShowForm(false)
       setLocationName(''); setWalkDate('')
@@ -149,7 +153,7 @@ export function WalksClient({ walks, rounds }: {
       endTime,
       maxVolunteers: maxVol,
     })
-    if ('error' in result) alert(result.error)
+    if ('error' in result) showToast(result.error || 'An error occurred', 'error')
     else {
       cancelEdit()
       router.refresh()
@@ -157,11 +161,12 @@ export function WalksClient({ walks, rounds }: {
     setLoading(false)
   }
 
-  const handleDelete = async (walkId: string) => {
-    if (!confirm('Delete this walk?')) return
-    const result = await deleteWalk(walkId)
-    if ('error' in result) alert(result.error)
+  const confirmDeleteWalk = async () => {
+    if (!deletingWalkId) return
+    const result = await deleteWalk(deletingWalkId)
+    if ('error' in result) showToast(result.error || 'An error occurred', 'error')
     else router.refresh()
+    setDeletingWalkId(null)
   }
 
   const toggleDay = (day: number) => {
@@ -178,13 +183,13 @@ export function WalksClient({ walks, rounds }: {
   }
 
   const handleGeneratePreview = () => {
-    if (!bulkRule.dateFrom || !bulkRule.dateTo) { alert('Please select a date range'); return }
-    if (bulkRule.daysOfWeek.length === 0) { alert('Please select at least one day of the week'); return }
+    if (!bulkRule.dateFrom || !bulkRule.dateTo) { showToast('Please select a date range', 'error'); return }
+    if (bulkRule.daysOfWeek.length === 0) { showToast('Please select at least one day of the week', 'error'); return }
     const validLocations = bulkRule.locations.filter(l => l.trim())
-    if (validLocations.length === 0) { alert('Please enter at least one location'); return }
+    if (validLocations.length === 0) { showToast('Please enter at least one location', 'error'); return }
     const ruleWithCleanLocations = { ...bulkRule, locations: validLocations }
     const generated = generateWalksFromRules(ruleWithCleanLocations)
-    if (generated.length === 0) { alert('No walks generated. Check your date range and selected days.'); return }
+    if (generated.length === 0) { showToast('No walks generated. Check your date range and selected days.', 'error'); return }
     setGeneratedWalks(generated)
     setBulkStep('preview')
   }
@@ -192,7 +197,7 @@ export function WalksClient({ walks, rounds }: {
   const handleBulkConfirm = async () => {
     setBulkLoading(true)
     const result = await bulkCreateWalks({ roundId: bulkRoundId, slots: generatedWalks })
-    if ('error' in result) alert(result.error)
+    if ('error' in result) showToast(result.error || 'An error occurred', 'error')
     else {
       setShowBulkForm(false)
       setBulkStep('rules')
@@ -204,7 +209,7 @@ export function WalksClient({ walks, rounds }: {
   }
 
   const walkForm = (onSubmit: (e: React.SubmitEvent) => void, submitLabel: string, onCancel: () => void) => (
-    <form onSubmit={onSubmit} className="bg-white rounded-xl p-5 shadow-sm space-y-4">
+    <form onSubmit={onSubmit} className="bg-white rounded-2xl p-5 shadow-sm space-y-4">
       <div>
         <label className="text-xs font-medium text-gray-500 mb-1">Round</label>
         <select value={roundId} onChange={e => setRoundId(e.target.value)}
@@ -280,7 +285,7 @@ export function WalksClient({ walks, rounds }: {
       {showForm && walkForm(handleCreate, 'Create Walk', () => setShowForm(false))}
 
       {showBulkForm && (
-        <div className="bg-white rounded-xl p-5 shadow-sm space-y-4">
+        <div className="bg-white rounded-2xl p-5 shadow-sm space-y-4">
           <h2 className="font-semibold text-gray-900">Bulk Create Walks</h2>
           <p className="text-sm text-gray-500">Define scheduling rules and the system will generate walks automatically.</p>
 
@@ -432,7 +437,7 @@ export function WalksClient({ walks, rounds }: {
             {editingWalkId === walk.id ? (
               walkForm(handleUpdate, 'Save Changes', cancelEdit)
             ) : (
-              <div className="bg-white rounded-xl p-4 shadow-sm flex items-center justify-between">
+              <div className="bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between">
                 <div>
                   <p className="font-medium text-gray-900">{walk.locationName}</p>
                   <p className="text-sm text-gray-500">
@@ -447,7 +452,7 @@ export function WalksClient({ walks, rounds }: {
                   <button onClick={() => startEdit(walk)} className="text-blue-400 hover:text-blue-600 p-2">
                     <Pencil className="w-4 h-4" />
                   </button>
-                  <button onClick={() => handleDelete(walk.id)} className="text-red-400 hover:text-red-600 p-2">
+                  <button onClick={() => setDeletingWalkId(walk.id)} className="text-red-400 hover:text-red-600 p-2">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -461,6 +466,16 @@ export function WalksClient({ walks, rounds }: {
           </div>
         )}
       </div>
+
+      <ConfirmationDialog
+        open={!!deletingWalkId}
+        title="Delete Walk"
+        message="Delete this walk? This cannot be undone."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={confirmDeleteWalk}
+        onCancel={() => setDeletingWalkId(null)}
+      />
     </div>
   )
 }

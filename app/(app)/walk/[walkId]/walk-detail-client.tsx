@@ -3,11 +3,12 @@
 import { useState, useOptimistic, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { joinWalk, cancelWalk } from '@/lib/actions/walk-actions'
-import { ArrowLeft, MapPin, Calendar, Clock, Users } from 'lucide-react'
-import Link from 'next/link'
+import { MapPin, Calendar, Clock, Users } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
+import { Breadcrumb } from '@/components/ui/breadcrumb'
 import { useToast } from '@/components/ui/toast'
 import { formatDate } from '@/lib/utils/format-date'
+import type { JoinBlockInfo } from '@/lib/utils/walk-participation'
 
 interface WalkDetailProps {
   walk: {
@@ -19,6 +20,7 @@ interface WalkDetailProps {
     maxVolunteers: number
     notes: string | null
     roundName: string
+    joinBlockedInfo: JoinBlockInfo | null
   }
   members: {
     userId: string
@@ -29,12 +31,15 @@ interface WalkDetailProps {
   isJoined: boolean
   isFull: boolean
   currentUserId: string
+  lateCancelWarning: string | null
+  hasSubmittedReport: boolean
 }
 
-export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserId }: WalkDetailProps) {
+export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserId, lateCancelWarning, hasSubmittedReport }: WalkDetailProps) {
   const [error, setError] = useState('')
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [pendingAction, setPendingAction] = useState<'join' | 'cancel' | null>(null)
   const router = useRouter()
   const { showToast } = useToast()
 
@@ -50,13 +55,20 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
     }
   )
 
+  const isJoining = isPending && pendingAction === 'join'
+  const isCancelling = isPending && pendingAction === 'cancel'
+  const displayIsJoined = isCancelling ? true : isJoining ? false : optimistic.isJoined
+  const joinDisabled = isPending || optimistic.isFull || !!walk.joinBlockedInfo
+
   const handleJoin = () => {
     setError('')
+    setPendingAction('join')
     startTransition(async () => {
       setOptimistic('join')
       const result = await joinWalk(walk.id)
       if (result.error) {
         setError(result.error)
+        setPendingAction(null)
       } else {
         router.refresh()
       }
@@ -70,11 +82,13 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
   const confirmCancel = () => {
     setShowCancelDialog(false)
     setError('')
+    setPendingAction('cancel')
     startTransition(async () => {
       setOptimistic('cancel')
       const result = await cancelWalk(walk.id)
       if (result.error) {
         setError(result.error)
+        setPendingAction(null)
       } else {
         if (result.warning) {
           showToast(result.warning, 'info')
@@ -86,12 +100,12 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
 
   return (
     <div className="space-y-6">
-      <Link href="/walk" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700">
-        <ArrowLeft className="w-4 h-4" />
-        Back to Walks
-      </Link>
+      <Breadcrumb items={[
+        { label: 'Walks', href: '/walk' },
+        { label: walk.locationName },
+      ]} />
 
-      <div className="bg-white rounded-xl p-6 shadow-sm space-y-4">
+      <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
         <div>
           <p className="text-xs text-green-600 font-medium">{walk.roundName}</p>
           <h1 className="text-xl font-bold text-gray-900 mt-1">{walk.locationName}</h1>
@@ -122,27 +136,38 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
           <p className="text-sm text-red-500 bg-red-50 p-3 rounded-lg">{error}</p>
         )}
 
-        {optimistic.isJoined ? (
+        {displayIsJoined ? (
           <div className="space-y-2">
             <div className="bg-green-50 border border-green-200 p-3 rounded-lg text-center">
               <p className="text-sm font-medium text-green-700">You&apos;re signed up for this walk</p>
             </div>
-            <button
-              onClick={handleCancel}
-              disabled={isPending}
-              className="w-full py-3 px-4 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 font-medium transition-colors disabled:opacity-50 text-sm"
-            >
-              {isPending ? 'Cancelling...' : 'Cancel Participation'}
-            </button>
+            {hasSubmittedReport ? (
+              <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg text-center">
+                You can&apos;t cancel this walk after submitting your report.
+              </p>
+            ) : (
+              <button
+                onClick={handleCancel}
+                disabled={isPending}
+                className="w-full py-3 px-4 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 font-medium transition-colors disabled:opacity-50 text-sm"
+              >
+                {isCancelling ? 'Cancelling...' : 'Cancel Participation'}
+              </button>
+            )}
           </div>
         ) : (
-          <button
-            onClick={handleJoin}
-            disabled={isPending || optimistic.isFull}
-            className="w-full bg-green-600 text-white py-3 px-4 rounded-xl hover:bg-green-700 disabled:opacity-50 font-medium transition-colors"
-          >
-            {isPending ? 'Joining...' : optimistic.isFull ? 'Walk Full' : 'Join Walk'}
-          </button>
+          <div className="space-y-2">
+            <button
+              onClick={handleJoin}
+              disabled={joinDisabled}
+              className="w-full bg-green-600 text-white py-3 px-4 rounded-xl hover:bg-green-700 disabled:opacity-50 font-medium transition-colors"
+            >
+              {isJoining ? 'Joining...' : walk.joinBlockedInfo?.label || 'Join Walk'}
+            </button>
+            {walk.joinBlockedInfo && (
+              <p className="text-xs text-gray-500 text-center">{walk.joinBlockedInfo.description}</p>
+            )}
+          </div>
         )}
       </div>
 
@@ -152,11 +177,15 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
           Group Members ({members.length})
         </h2>
         {members.length === 0 ? (
-          <div className="bg-white rounded-xl p-6 text-center shadow-sm">
-            <p className="text-gray-500 text-sm">No volunteers yet. Be the first to join!</p>
+          <div className="bg-white rounded-2xl p-6 text-center shadow-sm">
+            <div className="w-14 h-14 bg-green-50 ring-4 ring-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Users className="w-7 h-7 text-green-500" />
+            </div>
+            <p className="font-medium text-gray-700">No volunteers yet</p>
+            <p className="text-sm text-gray-400 mt-1">Be the first to join!</p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl shadow-sm divide-y divide-gray-100">
+          <div className="bg-white rounded-2xl shadow-sm divide-y divide-gray-100">
             {members.map((member) => (
               <div key={member.userId} className="flex items-center gap-3 p-4">
                 <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
@@ -184,7 +213,9 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
       <ConfirmationDialog
         open={showCancelDialog}
         title="Cancel Participation"
-        message="Are you sure you want to cancel your participation? Other group members will be notified."
+        message={lateCancelWarning
+          ? `Are you sure you want to cancel your participation? Other group members will be notified. ${lateCancelWarning}`
+          : 'Are you sure you want to cancel your participation? Other group members will be notified.'}
         confirmLabel="Yes, Cancel"
         cancelLabel="Keep"
         destructive

@@ -221,6 +221,8 @@ export function MediaUploader({
 
             if (result.success && result.media) {
               setMedia(prev => [...prev, result.media as MediaItem])
+            } else {
+              throw new Error(result.error || 'Upload failed')
             }
           } catch {
             // Online upload failed — fall back to offline queue

@@ -73,6 +73,7 @@ describe('walk-actions', () => {
       expect(result).toEqual({ error: 'Not authenticated' })
     })
 
+    // TC-UNIT-WALK-01 (UC-03): Successful sign up for a walk slot
     it('calls RPC and returns success', async () => {
       setupUser()
       mockSupabase.rpc.mockResolvedValue({
@@ -94,6 +95,7 @@ describe('walk-actions', () => {
       expect(revalidatePath).toHaveBeenCalledWith('/report/slot-1')
     })
 
+    // TC-UNIT-WALK-02 (UC-03 A1): Slot full prevents sign up
     it('returns "Slot is full" error from RPC', async () => {
       setupUser()
       mockSupabase.rpc.mockResolvedValue({
@@ -106,6 +108,7 @@ describe('walk-actions', () => {
       expect(result).toEqual({ error: 'This walk slot is full.' })
     })
 
+    // TC-UNIT-WALK-03 (UC-03 A2): Duplicate sign up is blocked
     it('returns "already joined" error from RPC', async () => {
       setupUser()
       mockSupabase.rpc.mockResolvedValue({
@@ -156,6 +159,7 @@ describe('walk-actions', () => {
       expect(result).toEqual({ error: 'Not authenticated' })
     })
 
+    // TC-UNIT-WALK-04 (UC-04): Cancel participation successfully and notify peers
     it('cancels slot and sends email notification', async () => {
       setupUser()
       // single() calls for slot info and profile info
@@ -253,6 +257,7 @@ describe('walk-actions', () => {
       expect(sendWalkCancellationEmail).not.toHaveBeenCalled()
     })
 
+    // TC-UNIT-WALK-05 (UC-04 robustness): Cancellation still succeeds when email fails
     it('returns success with warning when email notification throws', async () => {
       setupUser()
       methods.single

@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Trash2, Pencil, X, Layers } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Pencil, X, Layers, Search, ArrowRight, BarChart3 } from 'lucide-react'
 import { createWalk, updateWalk, deleteWalk, bulkCreateWalks } from '@/lib/actions/admin-round-actions'
 import { formatDate, toLocalDateString } from '@/lib/utils/format-date'
 import { useToast } from '@/components/ui/toast'
@@ -13,6 +13,8 @@ interface WalkData {
   id: string
   roundId: string
   roundName: string
+  roundStatus: string
+  roundStartDate: string
   locationName: string
   walkDate: string
   startTime: string
@@ -69,6 +71,11 @@ export function WalksClient({ walks, rounds }: {
 }) {
   const [showForm, setShowForm] = useState(false)
   const [showBulkForm, setShowBulkForm] = useState(false)
+  const [filterDate, setFilterDate] = useState('')
+  const [filterRoundName, setFilterRoundName] = useState('')
+  const [filterLocation, setFilterLocation] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
+  const [filterRoundStatus, setFilterRoundStatus] = useState('')
   const [editingWalkId, setEditingWalkId] = useState<string | null>(null)
   const [roundId, setRoundId] = useState(rounds[0]?.id || '')
   const [locationName, setLocationName] = useState('')
@@ -91,6 +98,63 @@ export function WalksClient({ walks, rounds }: {
 
   const router = useRouter()
   const { showToast } = useToast()
+
+  const filteredWalks = useMemo(() => {
+    const normalizedRoundName = filterRoundName.trim().toLowerCase()
+    const normalizedLocation = filterLocation.trim().toLowerCase()
+
+    return walks.filter((walk) => {
+      const matchesDate = !filterDate || walk.walkDate === filterDate
+      const matchesRoundName =
+        !normalizedRoundName || walk.roundName.toLowerCase().includes(normalizedRoundName)
+      const matchesLocation =
+        !normalizedLocation || walk.locationName.toLowerCase().includes(normalizedLocation)
+
+      const walkStatus =
+        walk.memberCount >= walk.maxVolunteers ? 'full' : 'open'
+      const matchesStatus = !filterStatus || walkStatus === filterStatus
+      const matchesRoundStatus = !filterRoundStatus || walk.roundStatus === filterRoundStatus
+
+      return matchesDate && matchesRoundName && matchesLocation && matchesStatus && matchesRoundStatus
+    })
+  }, [filterDate, filterLocation, filterRoundName, filterStatus, filterRoundStatus, walks])
+
+  const groupedWalks = useMemo(() => {
+    const byRound = new Map<string, { roundId: string; roundName: string; roundStartDate: string; walks: WalkData[] }>()
+
+    for (const walk of filteredWalks) {
+      const existing = byRound.get(walk.roundId)
+      if (existing) {
+        existing.walks.push(walk)
+        continue
+      }
+
+      byRound.set(walk.roundId, {
+        roundId: walk.roundId,
+        roundName: walk.roundName,
+        roundStartDate: walk.roundStartDate,
+        walks: [walk],
+      })
+    }
+
+    return Array.from(byRound.values())
+      .map((group) => ({
+        ...group,
+        walks: [...group.walks].sort((left, right) => {
+          const leftTime = new Date(`${left.walkDate}T${left.startTime}`).getTime()
+          const rightTime = new Date(`${right.walkDate}T${right.startTime}`).getTime()
+          return leftTime - rightTime
+        }),
+      }))
+      .sort((left, right) => {
+        const leftTime = left.roundStartDate ? new Date(`${left.roundStartDate}T00:00:00`).getTime() : Number.MAX_SAFE_INTEGER
+        const rightTime = right.roundStartDate ? new Date(`${right.roundStartDate}T00:00:00`).getTime() : Number.MAX_SAFE_INTEGER
+        if (leftTime !== rightTime) return leftTime - rightTime
+        return left.roundName.localeCompare(right.roundName)
+      })
+  }, [filteredWalks])
+
+  const hasFilters = Boolean(filterDate || filterRoundName || filterLocation || filterStatus || filterRoundStatus)
 
   // When editing a walk whose round is closed (not in the active rounds list),
   // include it so the dropdown still shows the current round.
@@ -282,6 +346,101 @@ export function WalksClient({ walks, rounds }: {
         </div>
       </div>
 
+      <Link
+        href="/admin/walks/analytics"
+        className="flex items-center justify-between rounded-2xl border-l-4 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+        style={{ borderLeftColor: '#d97706' }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50">
+            <BarChart3 className="h-5 w-5 text-amber-600" />
+          </div>
+          <p className="text-sm font-semibold text-gray-900">Walk Analytics</p>
+        </div>
+        <ArrowRight className="h-4 w-4 text-gray-300" />
+      </Link>
+
+      <div className="rounded-xl bg-white p-4 shadow-sm space-y-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Date</label>
+          <input
+            type="date"
+            value={filterDate}
+            onChange={(e) => setFilterDate(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
+        </div>
+        <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Round Name</label>
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={filterRoundName}
+                onChange={(e) => setFilterRoundName(e.target.value)}
+                placeholder="Search round names..."
+                className="w-full px-3 py-2 pl-9 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Round Status</label>
+            <select
+              value={filterRoundStatus}
+              onChange={(e) => setFilterRoundStatus(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="">All</option>
+              <option value="OPEN">Open</option>
+              <option value="CLOSED">Closed</option>
+              <option value="DRAFT">Draft</option>
+            </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Walk Location</label>
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={filterLocation}
+                onChange={(e) => setFilterLocation(e.target.value)}
+                placeholder="Search locations..."
+                className="w-full px-3 py-2 pl-9 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Walk Status</label>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="">All</option>
+              <option value="open">Open</option>
+              <option value="full">Full</option>
+            </select>
+          </div>
+        </div>
+        {hasFilters && (
+          <button
+            onClick={() => {
+              setFilterDate('')
+              setFilterRoundName('')
+              setFilterLocation('')
+              setFilterStatus('')
+              setFilterRoundStatus('')
+            }}
+            className="text-xs text-gray-500 hover:text-gray-700 underline"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
+
       {showForm && walkForm(handleCreate, 'Create Walk', () => setShowForm(false))}
 
       {showBulkForm && (
@@ -431,40 +590,64 @@ export function WalksClient({ walks, rounds }: {
         </div>
       )}
 
-      <div className="space-y-2">
-        {walks.map(walk => (
-          <div key={walk.id}>
-            {editingWalkId === walk.id ? (
-              walkForm(handleUpdate, 'Save Changes', cancelEdit)
-            ) : (
-              <div className="bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between">
+      <div className="space-y-5">
+        {groupedWalks.map((group) => (
+          <section key={group.roundId} className="overflow-hidden rounded-2xl bg-white shadow-sm">
+            <div className="border-b border-gray-100 bg-gray-50/80 px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="font-medium text-gray-900">{walk.locationName}</p>
-                  <p className="text-sm text-gray-500">
-                    {formatDate(walk.walkDate, 'compact')}
-                    {" "}&middot; {walk.startTime.slice(0, 5)} - {walk.endTime.slice(0, 5)}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {walk.roundName} &middot; {walk.memberCount}/{walk.maxVolunteers} volunteers
+                  <h2 className="text-sm font-semibold text-gray-900">{group.roundName}</h2>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {group.walks.length} walk{group.walks.length === 1 ? '' : 's'} in this round
                   </p>
                 </div>
-                <div className="flex gap-1">
-                  <button onClick={() => startEdit(walk)} className="text-blue-400 hover:text-blue-600 p-2">
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => setDeletingWalkId(walk.id)} className="text-red-400 hover:text-red-600 p-2">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                <div className="rounded-full bg-white px-3 py-1 text-xs font-medium text-gray-500 ring-1 ring-gray-200">
+                  Sorted by date
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+
+            <div className="divide-y divide-gray-100">
+              {group.walks.map((walk) => (
+                <div key={walk.id} className="px-4 py-4">
+                  {editingWalkId === walk.id ? (
+                    walkForm(handleUpdate, 'Save Changes', cancelEdit)
+                  ) : (
+                    <div className="flex items-center justify-between gap-4 rounded-xl border border-transparent transition-colors hover:border-gray-100 hover:bg-gray-50/60">
+                      <div className="min-w-0 px-1 py-1">
+                        <p className="font-medium text-gray-900">{walk.locationName}</p>
+                        <p className="text-sm text-gray-500">
+                          {formatDate(walk.walkDate, 'compact')}
+                          {' '}&middot; {walk.startTime.slice(0, 5)} - {walk.endTime.slice(0, 5)}
+                        </p>
+                        <p className="mt-0.5 text-xs text-gray-400">
+                          {walk.memberCount}/{walk.maxVolunteers} volunteers
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 gap-1">
+                        <button onClick={() => startEdit(walk)} className="rounded-lg p-2 text-blue-400 hover:bg-blue-50 hover:text-blue-600">
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => setDeletingWalkId(walk.id)} className="rounded-lg p-2 text-red-400 hover:bg-red-50 hover:text-red-600">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
         ))}
-        {walks.length === 0 && (
+        {walks.length === 0 ? (
           <div className="bg-white rounded-xl p-8 text-center shadow-sm">
             <p className="text-gray-500">No walks yet.</p>
           </div>
-        )}
+        ) : groupedWalks.length === 0 ? (
+          <div className="bg-white rounded-xl p-8 text-center shadow-sm">
+            <p className="text-gray-500">No walks match those filters.</p>
+          </div>
+        ) : null}
       </div>
 
       <ConfirmationDialog

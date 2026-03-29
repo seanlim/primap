@@ -9,7 +9,7 @@ export default async function AdminWalksPage() {
 
   const { data: walks } = await supabase
     .from('walk_slots')
-    .select('*, survey_rounds(name, status), slot_memberships(count)')
+    .select('*, survey_rounds(name, status, start_date), slot_memberships(count)')
     .order('walk_date', { ascending: false })
 
   const { data: rounds } = await supabase
@@ -26,6 +26,8 @@ export default async function AdminWalksPage() {
         id: s.id,
         roundId: s.round_id,
         roundName: s.survey_rounds?.name || '',
+        roundStatus: s.survey_rounds?.status || '',
+        roundStartDate: s.survey_rounds?.start_date || '',
         locationName: s.location_name,
         walkDate: s.walk_date,
         startTime: s.start_time,

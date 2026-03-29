@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { UsersClient } from './users-client'
 import type { UserStatus } from '@/lib/auth/access-policy'
+import { getAdminUsersAnalytics } from '@/lib/admin-volunteer-analytics'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,7 +11,7 @@ const ALL_STATUSES: UserStatus[] = ['PENDING', 'ACTIVE', 'REJECTED', 'DISABLED']
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; status?: string }>
+  searchParams: Promise<{ page?: string; status?: string; sort?: string }>
 }) {
   const params = await searchParams
   const page = Math.max(1, Number(params.page) || 1)
@@ -42,21 +43,26 @@ export default async function AdminUsersPage({
     ALL_STATUSES.map((s, i) => [s, statusResults[i].count || 0])
   ) as Record<UserStatus, number>
 
+  const userRows = (users || []).map(u => ({
+    id: u.id,
+    email: u.email,
+    fullName: u.full_name,
+    role: u.role,
+    status: u.status,
+    createdAt: u.created_at,
+  }))
+
+  const analytics = await getAdminUsersAnalytics(supabase, userRows.map((user) => user.id))
+
   return (
     <UsersClient
-      users={(users || []).map(u => ({
-        id: u.id,
-        email: u.email,
-        fullName: u.full_name,
-        role: u.role,
-        status: u.status,
-        createdAt: u.created_at,
-      }))}
+      users={userRows}
       currentPage={page}
       totalCount={totalCount || 0}
       pageSize={PAGE_SIZE}
       statusCounts={statusCounts}
       activeFilter={statusFilter}
+      analytics={analytics}
     />
   )
 }

@@ -6,6 +6,7 @@
  * - Invalid/missing status param does NOT filter
  * - Page range is computed correctly
  * - Per-status count queries always run
+ * - Per-user activity stats are passed to the users client
  */
 
 // Track every .eq() call across all query chains
@@ -61,6 +62,29 @@ function setupMock() {
     { count: 20, error: null },
     { count: 20, error: null },
   ]
+  const membershipResult = {
+    data: [
+      { slot_id: 'slot-1', user_id: 'user-1', status: 'ACTIVE' },
+      { slot_id: 'slot-2', user_id: 'user-1', status: 'ACTIVE' },
+      { slot_id: 'slot-3', user_id: 'user-2', status: 'CANCELLED' },
+    ],
+    error: null,
+  }
+  const profilesResult = {
+    data: [
+      { id: 'user-1', full_name: 'A Volunteer', email: 'a@example.com' },
+      { id: 'user-2', full_name: 'B Volunteer', email: 'b@example.com' },
+    ],
+    error: null,
+  }
+  const observationResult = {
+    data: [
+      { user_id: 'user-1', status: 'SUBMITTED' },
+      { user_id: 'user-1', status: 'SUBMITTED' },
+      { user_id: 'user-2', status: 'DRAFT' },
+    ],
+    error: null,
+  }
 
   const chains: ReturnType<typeof makeChain>[] = []
 
@@ -69,7 +93,11 @@ function setupMock() {
     let result: unknown
     if (idx === 0) result = usersResult
     else if (idx === 1) result = totalCountResult
-    else result = statusCountResults[idx - 2] ?? { count: 0, error: null }
+    else if (idx >= 2 && idx <= 5) result = statusCountResults[idx - 2] ?? { count: 0, error: null }
+    else if (idx === 6) result = profilesResult
+    else if (idx === 7) result = membershipResult
+    else if (idx === 8) result = observationResult
+    else result = { data: [], error: null }
 
     const chain = makeChain(idx, result)
     chains[idx] = chain
@@ -145,5 +173,28 @@ describe('AdminUsersPage', () => {
       expect(calls).toHaveLength(1)
       expect(calls[0].args[1]).toBe(statuses[i])
     }
+  })
+
+  it('passes per-user participation, submission, and cancellation stats to the users client', async () => {
+    setupMock()
+
+    const element = await AdminUsersPage({ searchParams: Promise.resolve({}) })
+
+    const props = element.props as {
+      analytics: {
+        userStats: Record<string, { participations: number; submissions: number; cancellations: number }>
+      }
+    }
+
+    expect(props.analytics.userStats['user-1']).toMatchObject({
+      participations: 2,
+      submissions: 2,
+      cancellations: 0,
+    })
+    expect(props.analytics.userStats['user-2']).toMatchObject({
+      participations: 0,
+      submissions: 0,
+      cancellations: 1,
+    })
   })
 })

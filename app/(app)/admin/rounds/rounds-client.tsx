@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Pencil, X } from 'lucide-react'
+import { ArrowLeft, Plus, Pencil, Search, X, ArrowRight, BarChart3 } from 'lucide-react'
 import { createRound, updateRound, updateRoundStatus, deleteRound } from '@/lib/actions/admin-round-actions'
 import { formatDate } from '@/lib/utils/format-date'
 import { useToast } from '@/components/ui/toast'
@@ -21,6 +21,9 @@ interface RoundData {
 
 export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
   const [showForm, setShowForm] = useState(false)
+  const [searchName, setSearchName] = useState('')
+  const [filterDate, setFilterDate] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [startDate, setStartDate] = useState('')
@@ -34,6 +37,23 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
   const [deletingRoundId, setDeletingRoundId] = useState<string | null>(null)
   const router = useRouter()
   const { showToast } = useToast()
+
+  const filteredRounds = useMemo(() => {
+    const normalizedName = searchName.trim().toLowerCase()
+
+    return rounds
+      .filter((round) => {
+        const matchesName = !normalizedName || round.name.toLowerCase().includes(normalizedName)
+        const matchesStatus = !filterStatus || round.status === filterStatus
+        const matchesDate =
+          !filterDate || (round.startDate <= filterDate && round.endDate >= filterDate)
+
+        return matchesName && matchesStatus && matchesDate
+      })
+      .sort((left, right) => left.startDate.localeCompare(right.startDate))
+  }, [filterDate, filterStatus, rounds, searchName])
+
+  const hasFilters = Boolean(searchName || filterDate || filterStatus)
 
   const handleCreate = async (e: React.SubmitEvent) => {
     e.preventDefault()
@@ -97,7 +117,7 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
           <Link href="/admin" className="text-gray-400 hover:text-gray-600">
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Survey Rounds</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Rounds</h1>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
@@ -106,6 +126,72 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
           <Plus className="w-4 h-4" />
           New Round
         </button>
+      </div>
+
+      <Link
+        href="/admin/rounds/analytics"
+        className="flex items-center justify-between rounded-2xl border-l-4 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+        style={{ borderLeftColor: '#d97706' }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50">
+            <BarChart3 className="h-5 w-5 text-amber-600" />
+          </div>
+          <p className="text-sm font-semibold text-gray-900">Round Analytics</p>
+        </div>
+        <ArrowRight className="h-4 w-4 text-gray-300" />
+      </Link>
+
+      <div className="rounded-xl bg-white p-4 shadow-sm space-y-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Date</label>
+          <input
+            type="date"
+            value={filterDate}
+            onChange={(e) => setFilterDate(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
+        </div>
+        <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Round Name</label>
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchName}
+                onChange={(e) => setSearchName(e.target.value)}
+                placeholder="Search round names..."
+                className="w-full px-3 py-2 pl-9 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Round Status</label>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="">All</option>
+              <option value="OPEN">Open</option>
+              <option value="CLOSED">Closed</option>
+              <option value="DRAFT">Draft</option>
+            </select>
+          </div>
+        </div>
+        {hasFilters && (
+          <button
+            onClick={() => {
+              setSearchName('')
+              setFilterDate('')
+              setFilterStatus('')
+            }}
+            className="text-xs text-gray-500 hover:text-gray-700 underline"
+          >
+            Clear filters
+          </button>
+        )}
       </div>
 
       {showForm && (
@@ -151,7 +237,7 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
       )}
 
       <div className="space-y-2">
-        {rounds.map(round => (
+        {filteredRounds.map(round => (
           <div key={round.id} className="bg-white rounded-2xl p-4 shadow-sm">
             {editingRoundId === round.id ? (
               <form onSubmit={handleUpdate} className="space-y-3">
@@ -229,11 +315,15 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
             )}
           </div>
         ))}
-        {rounds.length === 0 && (
+        {rounds.length === 0 ? (
           <div className="bg-white rounded-xl p-8 text-center shadow-sm">
             <p className="text-gray-500">No survey rounds yet.</p>
           </div>
-        )}
+        ) : filteredRounds.length === 0 ? (
+          <div className="bg-white rounded-xl p-8 text-center shadow-sm">
+            <p className="text-gray-500">No rounds match those filters.</p>
+          </div>
+        ) : null}
       </div>
 
       <ConfirmationDialog

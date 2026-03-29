@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronDown, ChevronUp, MapPin, Eye, AlertTriangle, Loader2, ImageOff } from 'lucide-react'
+import { ChevronDown, ChevronUp, MapPin, Eye, AlertTriangle, Loader2, ImageOff, ArrowLeft } from 'lucide-react'
 import { submitObservation } from '@/lib/actions/observation-actions'
 import { reportIncident } from '@/lib/actions/incident-actions'
 import { getSignedMediaUrl } from '@/lib/utils/storage'
@@ -87,6 +87,7 @@ export function GroupViewClient({
   const [submitting, setSubmitting] = useState(false)
   const router = useRouter()
   const { showToast } = useToast()
+  const isAdminView = backHref.startsWith('/admin')
 
   const myObservation = observations.find(o => o.userId === currentUserId)
   const othersObservations = observations.filter(o => o.userId !== currentUserId)
@@ -120,10 +121,19 @@ export function GroupViewClient({
 
   return (
     <div className="space-y-6">
-      <Breadcrumb items={[
-        { label: backLabel === 'Back to Reports' ? 'Reports' : 'Admin Reports', href: backHref },
-        { label: slot.locationName },
-      ]} />
+      {isAdminView ? (
+        <div className="flex items-center gap-4">
+          <Link href={backHref} className="text-gray-400 hover:text-gray-600">
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
+        </div>
+      ) : (
+        <Breadcrumb items={[
+          { label: backLabel === 'Back to Reports' ? 'Reports' : 'Admin Reports', href: backHref },
+          { label: slot.locationName },
+        ]} />
+      )}
 
       {/* Walk Header */}
       <div className="bg-white rounded-2xl p-5 shadow-sm">

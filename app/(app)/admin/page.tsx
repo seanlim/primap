@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { Users, Calendar, MapPin, AlertTriangle, Settings, ClipboardList } from 'lucide-react'
+import { Users, Calendar, MapPin, AlertTriangle, Settings, ClipboardList, Database } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,6 +29,7 @@ export default async function AdminDashboard() {
     { label: 'Walks', value: totalWalks || 0, sub: 'total', href: '/admin/walks', icon: MapPin, color: 'bg-purple-50 text-purple-600' },
     { label: 'Reports', value: totalObservations || 0, sub: 'submitted', href: '/admin/reports', icon: ClipboardList, color: 'bg-indigo-50 text-indigo-600' },
     { label: 'Incidents', value: openIncidents || 0, sub: 'open', href: '/admin/incidents', icon: AlertTriangle, color: 'bg-red-50 text-red-600' },
+    { label: 'Data', value: '', sub: 'Export & Import', href: '/admin/data', icon: Database, color: 'bg-orange-50 text-orange-600' },
     { label: 'Settings', value: '', sub: 'Configure', href: '/admin/settings', icon: Settings, color: 'bg-gray-50 text-gray-600' },
   ]
 

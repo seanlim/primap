@@ -28,7 +28,7 @@ describe('SidebarNav', () => {
     })
 
     render(<SidebarNav isAdmin={true} />)
-    expect(screen.getByText('Admin Panel')).toBeInTheDocument()
+    expect(screen.getByText('Admin Dashboard')).toBeInTheDocument()
   })
 
   it('hides Admin section when isAdmin is false', () => {
@@ -41,7 +41,7 @@ describe('SidebarNav', () => {
     })
 
     render(<SidebarNav isAdmin={false} />)
-    expect(screen.queryByText('Admin Panel')).not.toBeInTheDocument()
+    expect(screen.queryByText('Admin Dashboard')).not.toBeInTheDocument()
     expect(screen.queryByText('Admin')).not.toBeInTheDocument()
   })
 

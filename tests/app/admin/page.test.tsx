@@ -1,12 +1,17 @@
 import { render, screen } from '@testing-library/react'
 
-const { mockSupabase } = vi.hoisted(() => {
+const { mockSupabase, mockLanding } = vi.hoisted(() => {
   const mockSupabase = { from: vi.fn() }
-  return { mockSupabase }
+  const mockLanding = vi.fn()
+  return { mockSupabase, mockLanding }
 })
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => mockSupabase),
+}))
+
+vi.mock('@/lib/admin-volunteer-analytics', () => ({
+  getAdminVolunteerAnalyticsLanding: (...args: unknown[]) => mockLanding(...args),
 }))
 
 import AdminDashboard from '../../../app/(app)/admin/page'
@@ -27,7 +32,7 @@ describe('AdminDashboard', () => {
     vi.clearAllMocks()
   })
 
-  it('shows the analytics card for admins', async () => {
+  it('renders dashboard donut analytics without the old standalone analytics card', async () => {
     const results = [
       { count: 12, error: null },
       { count: 2, error: null },
@@ -39,10 +44,33 @@ describe('AdminDashboard', () => {
 
     let index = 0
     mockSupabase.from.mockImplementation(() => makeAwaitableChain(results[index++]))
+    mockLanding.mockResolvedValue({
+      overall: {
+        reportCompletionRate: 0.5,
+        completionRateSubmittedReports: 6,
+        completionRateExpectedReports: 12,
+        capacityFillRate: 0.75,
+        walkSignUps: 9,
+        totalVolunteerCapacity: 12,
+        totalWalks: 8,
+        completedWalks: 5,
+        upcomingWalks: 3,
+        participatingVolunteers: 7,
+        walkCancellations: 2,
+      },
+    })
 
     render(await AdminDashboard())
 
-    const link = screen.getByRole('link', { name: /Analytics - Volunteers/i })
-    expect(link).toHaveAttribute('href', '/admin/analytics')
-  })
+    expect(screen.getByText('Admin Dashboard')).toBeInTheDocument()
+    expect(screen.getByText('Completion Rate')).toBeInTheDocument()
+    expect(screen.getByText('Sign-up Rate')).toBeInTheDocument()
+    expect(screen.getByText('completed reports')).toBeInTheDocument()
+    expect(screen.getByText('total reports required')).toBeInTheDocument()
+    expect(screen.getByText('sign-ups')).toBeInTheDocument()
+    expect(screen.getByText('total available capacity')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Users/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Rounds/i })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^Volunteer Analytics$/i })).not.toBeInTheDocument()
+  }, 20000)
 })

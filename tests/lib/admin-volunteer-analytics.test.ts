@@ -21,8 +21,8 @@ describe('buildVolunteerAnalyticsSnapshot', () => {
       round,
       now: new Date('2026-03-20T12:00:00+08:00'),
       slots: [
-        { id: 'ended-slot', walk_date: '2026-03-10', end_time: '10:00:00', max_volunteers: 3 },
-        { id: 'future-slot', walk_date: '2026-03-25', end_time: '10:00:00', max_volunteers: 3 },
+        { id: 'ended-slot', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 3 },
+        { id: 'future-slot', walk_date: '2026-03-25', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 3 },
       ],
       memberships: [
         { slot_id: 'ended-slot', user_id: 'user-1', status: 'ACTIVE' },
@@ -42,8 +42,8 @@ describe('buildVolunteerAnalyticsSnapshot', () => {
       round,
       now: new Date('2026-03-20T12:00:00+08:00'),
       slots: [
-        { id: 'slot-1', walk_date: '2026-03-10', end_time: '10:00:00', max_volunteers: 2 },
-        { id: 'slot-2', walk_date: '2026-03-11', end_time: '10:00:00', max_volunteers: 4 },
+        { id: 'slot-1', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 2 },
+        { id: 'slot-2', walk_date: '2026-03-11', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 4 },
       ],
       memberships: [
         { slot_id: 'slot-1', user_id: 'user-1', status: 'ACTIVE' },
@@ -62,8 +62,8 @@ describe('buildVolunteerAnalyticsSnapshot', () => {
       round,
       now: new Date('2026-03-20T12:00:00+08:00'),
       slots: [
-        { id: 'slot-1', walk_date: '2026-03-10', end_time: '10:00:00', max_volunteers: 3 },
-        { id: 'slot-2', walk_date: '2026-03-11', end_time: '10:00:00', max_volunteers: 3 },
+        { id: 'slot-1', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 3 },
+        { id: 'slot-2', walk_date: '2026-03-11', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 3 },
       ],
       memberships: [
         { slot_id: 'slot-1', user_id: 'user-1', status: 'ACTIVE' },
@@ -82,8 +82,8 @@ describe('buildVolunteerAnalyticsSnapshot', () => {
       round,
       now: new Date('2026-03-20T12:00:00+08:00'),
       slots: [
-        { id: 'slot-1', walk_date: '2026-03-10', end_time: '10:00:00', max_volunteers: 3 },
-        { id: 'slot-2', walk_date: '2026-03-11', end_time: '10:00:00', max_volunteers: 3 },
+        { id: 'slot-1', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 3 },
+        { id: 'slot-2', walk_date: '2026-03-11', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 3 },
       ],
       memberships: [
         { slot_id: 'slot-1', user_id: 'user-1', status: 'ACTIVE' },
@@ -98,5 +98,38 @@ describe('buildVolunteerAnalyticsSnapshot', () => {
     })
 
     expect(snapshot.roundHealth?.missingReportWalks).toBe(1)
+  })
+
+  it('keeps round-level totals available for the current round summary', () => {
+    const snapshot = buildVolunteerAnalyticsSnapshot({
+      round,
+      now: new Date('2026-03-20T12:00:00+08:00'),
+      slots: [
+        { id: 'slot-ended', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 4 },
+        { id: 'slot-upcoming', walk_date: '2026-03-25', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 2 },
+      ],
+      memberships: [
+        { slot_id: 'slot-ended', user_id: 'user-1', status: 'ACTIVE' },
+        { slot_id: 'slot-ended', user_id: 'user-2', status: 'ACTIVE' },
+        { slot_id: 'slot-ended', user_id: 'user-3', status: 'CANCELLED' },
+        { slot_id: 'slot-upcoming', user_id: 'user-4', status: 'ACTIVE' },
+      ],
+      observations: [
+        { slot_id: 'slot-ended', status: 'SUBMITTED' },
+      ],
+      allTime,
+    })
+
+    expect(snapshot.currentRound).toMatchObject({
+      walkSignUps: 3,
+      walkCancellations: 1,
+      submittedReports: 1,
+    })
+    expect(snapshot.roundHealth).toMatchObject({
+      totalWalks: 2,
+      completedWalks: 1,
+      upcomingWalks: 1,
+      missingReportWalks: 1,
+    })
   })
 })

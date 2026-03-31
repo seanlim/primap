@@ -1,4 +1,7 @@
-import { buildVolunteerAnalyticsSnapshot } from '@/lib/admin-volunteer-analytics'
+import {
+  buildVolunteerAnalyticsSnapshot,
+  getAdminWalksAnalyticsPageSnapshotByRound,
+} from '@/lib/admin-volunteer-analytics'
 
 describe('buildVolunteerAnalyticsSnapshot', () => {
   const round = {
@@ -130,6 +133,59 @@ describe('buildVolunteerAnalyticsSnapshot', () => {
       completedWalks: 1,
       upcomingWalks: 1,
       missingReportWalks: 1,
+    })
+  })
+})
+
+describe('getAdminWalksAnalyticsPageSnapshotByRound', () => {
+  function createQuery(result: { data?: unknown; count?: number | null }) {
+    const query = {
+      eq: () => query,
+      order: () => query,
+      limit: () => query,
+      in: () => query,
+      then: (resolve: (value: unknown) => unknown) =>
+        Promise.resolve(resolve({ data: result.data ?? null, error: null, count: result.count ?? null })),
+    }
+
+    return query
+  }
+
+  it('returns an empty snapshot instead of crashing when rounds are missing', async () => {
+    const supabase = {
+      from: (table: string) => ({
+        select: (..._args: unknown[]) => {
+          if (table === 'survey_rounds') return createQuery({ data: [] })
+          if (table === 'walk_slots') {
+            return createQuery({
+              data: [
+                {
+                  id: 'slot-1',
+                  round_id: 'missing-round',
+                  walk_date: '2026-03-10',
+                  start_time: '07:00:00',
+                  end_time: '10:00:00',
+                  location_name: 'Hill',
+                  max_volunteers: 3,
+                },
+              ],
+            })
+          }
+          if (table === 'slot_memberships') return createQuery({ data: [] })
+          if (table === 'observations') return createQuery({ data: [] })
+          if (table === 'profiles') return createQuery({ count: 0 })
+          throw new Error(`Unexpected table ${table}`)
+        },
+      }),
+    }
+
+    await expect(getAdminWalksAnalyticsPageSnapshotByRound(supabase as never)).resolves.toEqual({
+      availableRounds: [],
+      targetRound: null,
+      availableWalks: [],
+      targetWalk: null,
+      targetWalkRoundName: null,
+      overview: null,
     })
   })
 })

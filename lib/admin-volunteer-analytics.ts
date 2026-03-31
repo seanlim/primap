@@ -285,9 +285,9 @@ export async function getAdminWalksAnalyticsPageSnapshotByRound(
 ): Promise<AdminWalksAnalyticsPageSnapshot> {
   const base = await getAnalyticsBaseData(supabase)
 
-  if (base.slots.length === 0) {
+  if (base.rounds.length === 0 || base.slots.length === 0) {
     return {
-      availableRounds: [],
+      availableRounds: base.rounds,
       targetRound: null,
       availableWalks: [],
       targetWalk: null,

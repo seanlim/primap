@@ -36,6 +36,7 @@ interface UsersProps {
   pageSize: number
   statusCounts: Record<UserStatus, number>
   activeFilter: UserStatus | null
+  activeRoleFilter?: 'VOLUNTEER' | 'ADMIN' | null
   analytics?: AdminUsersAnalyticsSnapshot
 }
 
@@ -48,11 +49,11 @@ const ACTION_LABELS: Record<ActionType, { title: string; message: (name: string)
   demote: { title: 'Demote to volunteer?', message: (name) => `Remove admin role from ${name}?`, confirm: 'Demote', destructive: true },
 }
 
-function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, activeFilter, analytics }: UsersProps) {
+function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, activeFilter, activeRoleFilter, analytics }: UsersProps) {
   const filter: 'all' | UserStatus = activeFilter ?? 'all'
   const [query, setQuery] = useState('')
   const [sortBy, setSortBy] = useState<'default' | 'participations' | 'submissions' | 'cancellations'>('default')
-  const [roleFilter, setRoleFilter] = useState<'ALL' | 'VOLUNTEER' | 'ADMIN'>('ALL')
+  const [roleFilter, setRoleFilter] = useState<'ALL' | 'VOLUNTEER' | 'ADMIN'>(activeRoleFilter ?? 'ALL')
   const [loading, setLoading] = useState<string | null>(null)
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
   const router = useRouter()
@@ -68,9 +69,7 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, 
       u.email.toLowerCase().includes(normalized)
     )
 
-    const roleFiltered = searched.filter((user) => roleFilter === 'ALL' || user.role === roleFilter)
-
-    return [...roleFiltered].sort((left, right) => {
+    return [...searched].sort((left, right) => {
       if (sortBy === 'default') {
         return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
       }
@@ -80,7 +79,21 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, 
       if (diff !== 0) return diff
       return (left.fullName || left.email).localeCompare(right.fullName || right.email)
     })
-  }, [analytics?.userStats, query, roleFilter, sortBy, users])
+  }, [analytics?.userStats, query, sortBy, users])
+
+  const buildUsersHref = (next: { page?: number; status?: 'all' | UserStatus; role?: 'ALL' | 'VOLUNTEER' | 'ADMIN' }) => {
+    const params = new URLSearchParams()
+    const nextStatus = next.status ?? filter
+    const nextRole = next.role ?? roleFilter
+    const nextPage = next.page ?? currentPage
+
+    if (nextPage > 1) params.set('page', String(nextPage))
+    if (nextStatus !== 'all') params.set('status', nextStatus)
+    if (nextRole !== 'ALL') params.set('role', nextRole)
+
+    const queryString = params.toString()
+    return queryString ? `/admin/users?${queryString}` : '/admin/users'
+  }
 
   const requestAction = (userId: string, userLabel: string, action: ActionType) =>
     setPendingAction({ userId, userLabel, action })
@@ -162,7 +175,11 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, 
               <label className="block text-xs font-medium text-gray-500 mb-1">Role</label>
               <select
                 value={roleFilter}
-                onChange={(event) => setRoleFilter(event.target.value as typeof roleFilter)}
+                onChange={(event) => {
+                  const nextRole = event.target.value as typeof roleFilter
+                  setRoleFilter(nextRole)
+                  router.push(buildUsersHref({ role: nextRole, page: 1 }))
+                }}
                 className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               >
                 <option value="ALL">All roles</option>
@@ -177,7 +194,7 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, 
           {(['all', 'PENDING', 'ACTIVE', 'REJECTED', 'DISABLED'] as const).map((value) => (
             <Link
               key={value}
-              href={value === 'all' ? '/admin/users' : `/admin/users?status=${value}`}
+              href={buildUsersHref({ status: value, page: 1 })}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
                 filter === value
                   ? 'bg-green-600 text-white'
@@ -321,7 +338,7 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, 
         {totalPages > 1 && (
           <div className="flex items-center justify-between">
             <Link
-              href={`/admin/users?page=${currentPage - 1}${activeFilter ? `&status=${activeFilter}` : ''}`}
+              href={buildUsersHref({ page: currentPage - 1 })}
               className={`flex items-center gap-1 text-sm font-medium px-3 py-2 rounded-lg transition-colors ${
                 currentPage <= 1
                   ? 'text-gray-300 pointer-events-none'
@@ -337,7 +354,7 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, 
               Page {currentPage} of {totalPages}
             </span>
             <Link
-              href={`/admin/users?page=${currentPage + 1}${activeFilter ? `&status=${activeFilter}` : ''}`}
+              href={buildUsersHref({ page: currentPage + 1 })}
               className={`flex items-center gap-1 text-sm font-medium px-3 py-2 rounded-lg transition-colors ${
                 currentPage >= totalPages
                   ? 'text-gray-300 pointer-events-none'

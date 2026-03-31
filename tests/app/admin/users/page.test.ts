@@ -3,6 +3,7 @@
  *
  * Verifies that:
  * - A valid ?status= param adds .eq('status', ...) to the users + totalCount queries
+ * - A valid ?role= param adds .eq('role', ...) to the users + totalCount queries
  * - Invalid/missing status param does NOT filter
  * - Page range is computed correctly
  * - Per-status count queries always run
@@ -145,6 +146,30 @@ describe('AdminUsersPage', () => {
 
     const usersStatusEqs = eqCalls.filter((c) => c.chain === 0 && c.args[0] === 'status')
     expect(usersStatusEqs).toHaveLength(0)
+  })
+
+  it('applies .eq(\"role\", filter) on users and totalCount queries when role param is valid', async () => {
+    setupMock()
+    await AdminUsersPage({ searchParams: Promise.resolve({ role: 'ADMIN' }) })
+
+    const usersRoleEqs = eqCalls.filter((c) => c.chain === 0 && c.args[0] === 'role')
+    const countRoleEqs = eqCalls.filter((c) => c.chain === 1 && c.args[0] === 'role')
+
+    expect(usersRoleEqs).toHaveLength(1)
+    expect(usersRoleEqs[0].args[1]).toBe('ADMIN')
+    expect(countRoleEqs).toHaveLength(1)
+    expect(countRoleEqs[0].args[1]).toBe('ADMIN')
+  })
+
+  it('does not apply role .eq for invalid role param', async () => {
+    setupMock()
+    await AdminUsersPage({ searchParams: Promise.resolve({ role: 'BOGUS' }) })
+
+    const usersRoleEqs = eqCalls.filter((c) => c.chain === 0 && c.args[0] === 'role')
+    const countRoleEqs = eqCalls.filter((c) => c.chain === 1 && c.args[0] === 'role')
+
+    expect(usersRoleEqs).toHaveLength(0)
+    expect(countRoleEqs).toHaveLength(0)
   })
 
   it('computes correct page range for page=2', async () => {

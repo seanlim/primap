@@ -193,5 +193,22 @@ function validateLegacyRow(
     }
   }
 
+  // When SIGHTED, at least one coordinate pair must be present
+  if (outcome === 'SIGHTED') {
+    const hasSightingCoords = isValidCoord(row.sighting_lat) && isValidCoord(row.sighting_lng)
+    const hasObservationCoords = isValidCoord(row.observation_lat) && isValidCoord(row.observation_lng)
+    if (!hasSightingCoords && !hasObservationCoords) {
+      errors.push({
+        row: rowNumber,
+        column: 'sighting_lat',
+        message: 'Coordinates are required when outcome is SIGHTED. Provide sighting_lat/sighting_lng or observation_lat/observation_lng.',
+      })
+    }
+  }
+
   return errors
+}
+
+function isValidCoord(val: unknown): boolean {
+  return val !== null && val !== undefined && val !== '' && !isNaN(Number(val))
 }

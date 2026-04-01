@@ -14,6 +14,60 @@ interface TableSummary {
   errors: string[]
 }
 
+async function upsertAppSettings(
+  adminClient: ReturnType<typeof createAdminClient>,
+  rows: Record<string, unknown>[]
+): Promise<TableSummary> {
+  const result: TableSummary = { inserted: 0, skipped: 0, errors: [] }
+  if (rows.length === 0) return result
+
+  const importedRow = rows[0]
+  // Extract only data columns, not the id
+  const { id: _importedId, ...dataColumns } = importedRow
+  const cleanedData: Record<string, unknown> = {}
+  for (const [key, val] of Object.entries(dataColumns)) {
+    cleanedData[key] = val === '' ? null : val
+  }
+
+  // Check if a settings row already exists
+  const { data: existing } = await adminClient
+    .from('app_settings')
+    .select('id')
+    .limit(1)
+    .maybeSingle()
+
+  if (existing) {
+    // Update existing singleton row
+    const { error } = await adminClient
+      .from('app_settings')
+      .update(cleanedData)
+      .eq('id', existing.id)
+
+    if (error) {
+      result.errors.push(error.message)
+    } else {
+      result.inserted = 1
+    }
+  } else {
+    // No existing row — insert the imported one (with its original id)
+    const cleanedRow: Record<string, unknown> = {}
+    for (const [key, val] of Object.entries(importedRow)) {
+      cleanedRow[key] = val === '' ? null : val
+    }
+    const { error } = await adminClient
+      .from('app_settings')
+      .insert(cleanedRow)
+
+    if (error) {
+      result.errors.push(error.message)
+    } else {
+      result.inserted = 1
+    }
+  }
+
+  return result
+}
+
 export async function POST(request: NextRequest) {
   // Auth: verify admin
   const supabase = await createClient()
@@ -58,11 +112,20 @@ export async function POST(request: NextRequest) {
     const adminClient = createAdminClient()
     const summary: Record<string, TableSummary> = {}
 
-    // Insert data in FK-dependency order
+    // Insert data in FK-dependency order, deferring media until blobs are uploaded
     for (const table of TABLE_ORDER) {
+      // Skip media — handled after blob upload below
+      if (table === 'media') continue
+
       const rows = tableData[table]
       if (!rows || rows.length === 0) {
         summary[table] = { inserted: 0, skipped: 0, errors: [] }
+        continue
+      }
+
+      // Special-case app_settings: update existing singleton instead of upserting by id
+      if (table === 'app_settings') {
+        summary[table] = await upsertAppSettings(adminClient, rows)
         continue
       }
 
@@ -101,8 +164,9 @@ export async function POST(request: NextRequest) {
       summary[table] = tableSummary
     }
 
-    // Upload media files from zip
+    // Upload media blobs from zip BEFORE inserting media DB rows
     const mediaSummary = { uploaded: 0, skipped: 0, errors: [] as string[] }
+    const uploadedPaths = new Set<string>()
     const mediaFolder = zip.folder(MEDIA_DIR)
 
     if (mediaFolder) {
@@ -119,16 +183,67 @@ export async function POST(request: NextRequest) {
 
         if (error) {
           mediaSummary.errors.push(`${path}: ${error}`)
-        } else if (skipped) {
-          mediaSummary.skipped++
         } else {
-          mediaSummary.uploaded++
+          uploadedPaths.add(path)
+          if (skipped) {
+            mediaSummary.skipped++
+          } else {
+            mediaSummary.uploaded++
+          }
         }
       }
     }
 
+    // Now insert media DB rows, only for files that were successfully uploaded or already existed
+    const mediaRows = tableData['media']
+    const mediaTableSummary: TableSummary = { inserted: 0, skipped: 0, errors: [] }
+
+    if (mediaRows && mediaRows.length > 0) {
+      // Filter to only rows whose file_path has a corresponding blob
+      const eligibleRows = uploadedPaths.size > 0
+        ? mediaRows.filter(row => {
+            const filePath = String(row.file_path ?? '')
+            return uploadedPaths.has(filePath)
+          })
+        : mediaRows // If no media folder in zip, still attempt upsert (re-import on same env)
+
+      const skippedMediaRows = mediaRows.length - eligibleRows.length
+      mediaTableSummary.skipped += skippedMediaRows
+
+      for (let i = 0; i < eligibleRows.length; i += BATCH_SIZE) {
+        const batch = eligibleRows.slice(i, i + BATCH_SIZE)
+        const cleanedBatch = batch.map(row => {
+          const cleaned: Record<string, unknown> = {}
+          for (const [key, val] of Object.entries(row)) {
+            cleaned[key] = val === '' ? null : val
+          }
+          return cleaned
+        })
+
+        const { data, error } = await adminClient
+          .from('media')
+          .upsert(cleanedBatch, { onConflict: 'id', ignoreDuplicates: true })
+          .select('id')
+
+        if (error) {
+          mediaTableSummary.errors.push(
+            `Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${error.message}`
+          )
+        } else {
+          const insertedCount = data?.length ?? 0
+          mediaTableSummary.inserted += insertedCount
+          mediaTableSummary.skipped += batch.length - insertedCount
+        }
+      }
+    }
+
+    summary['media'] = mediaTableSummary
+
+    const hasMediaErrors = mediaSummary.errors.length > 0
+
     return NextResponse.json({
-      success: true,
+      success: !hasMediaErrors,
+      ...(hasMediaErrors && { partial: true }),
       summary: {
         ...summary,
         media_files: mediaSummary,

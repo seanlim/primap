@@ -284,7 +284,7 @@ describe('validateLegacyWorkbook', () => {
       expect(errors.some(e => e.column === 'observation_lng' && e.message.includes('number'))).toBe(true)
     })
 
-    it('accepts empty coordinate fields (optional)', async () => {
+    it('accepts empty coordinate fields (optional) for NOT_SIGHTED', async () => {
       const buffer = await createLegacyWorkbook(ALL_HEADERS, [
         makeValidRow({ observation_lat: '', observation_lng: '' }),
       ])
@@ -292,6 +292,182 @@ describe('validateLegacyWorkbook', () => {
 
       const { errors } = await validateLegacyWorkbook(buffer, client)
       expect(errors.filter(e => e.column?.includes('lat') || e.column?.includes('lng'))).toHaveLength(0)
+    })
+
+    it('accepts negative coordinates', async () => {
+      const buffer = await createLegacyWorkbook(ALL_HEADERS, [
+        makeValidRow({ observation_lat: -33.87, observation_lng: -151.21 }),
+      ])
+      const client = createMockAdminClient()
+
+      const { errors } = await validateLegacyWorkbook(buffer, client)
+      expect(errors.filter(e => e.column?.includes('lat') || e.column?.includes('lng'))).toHaveLength(0)
+    })
+
+    it('accepts zero as a valid coordinate', async () => {
+      const buffer = await createLegacyWorkbook(ALL_HEADERS, [
+        makeValidRow({ outcome: 'SIGHTED', species: 'RBL', observation_lat: 0, observation_lng: 0 }),
+      ])
+      const client = createMockAdminClient()
+
+      const { errors } = await validateLegacyWorkbook(buffer, client)
+      expect(errors.filter(e => e.column === 'sighting_lat')).toHaveLength(0)
+    })
+  })
+
+  describe('SIGHTED coordinate requirement', () => {
+    it('fails when SIGHTED with no coordinates at all', async () => {
+      const buffer = await createLegacyWorkbook(ALL_HEADERS, [
+        makeValidRow({
+          outcome: 'SIGHTED',
+          species: 'RBL',
+          observation_lat: '',
+          observation_lng: '',
+          sighting_lat: '',
+          sighting_lng: '',
+        }),
+      ])
+      const client = createMockAdminClient()
+
+      const { errors } = await validateLegacyWorkbook(buffer, client)
+      expect(errors.some(e => e.column === 'sighting_lat' && e.message.includes('Coordinates are required'))).toBe(true)
+    })
+
+    it('fails when SIGHTED with null coordinates', async () => {
+      const buffer = await createLegacyWorkbook(ALL_HEADERS, [
+        makeValidRow({
+          outcome: 'SIGHTED',
+          species: 'RBL',
+          observation_lat: null,
+          observation_lng: null,
+          sighting_lat: null,
+          sighting_lng: null,
+        }),
+      ])
+      const client = createMockAdminClient()
+
+      const { errors } = await validateLegacyWorkbook(buffer, client)
+      expect(errors.some(e => e.column === 'sighting_lat' && e.message.includes('Coordinates are required'))).toBe(true)
+    })
+
+    it('passes when SIGHTED with only observation coordinates', async () => {
+      const buffer = await createLegacyWorkbook(ALL_HEADERS, [
+        makeValidRow({
+          outcome: 'SIGHTED',
+          species: 'RBL',
+          observation_lat: 1.3,
+          observation_lng: 103.8,
+          sighting_lat: '',
+          sighting_lng: '',
+        }),
+      ])
+      const client = createMockAdminClient()
+
+      const { errors } = await validateLegacyWorkbook(buffer, client)
+      expect(errors.filter(e => e.column === 'sighting_lat')).toHaveLength(0)
+    })
+
+    it('passes when SIGHTED with only sighting coordinates', async () => {
+      const buffer = await createLegacyWorkbook(ALL_HEADERS, [
+        makeValidRow({
+          outcome: 'SIGHTED',
+          species: 'RBL',
+          observation_lat: '',
+          observation_lng: '',
+          sighting_lat: 1.35,
+          sighting_lng: 103.82,
+        }),
+      ])
+      const client = createMockAdminClient()
+
+      const { errors } = await validateLegacyWorkbook(buffer, client)
+      expect(errors.filter(e => e.column === 'sighting_lat')).toHaveLength(0)
+    })
+
+    it('passes when SIGHTED with both coordinate pairs', async () => {
+      const buffer = await createLegacyWorkbook(ALL_HEADERS, [
+        makeValidRow({
+          outcome: 'SIGHTED',
+          species: 'RBL',
+          observation_lat: 1.3,
+          observation_lng: 103.8,
+          sighting_lat: 1.35,
+          sighting_lng: 103.82,
+        }),
+      ])
+      const client = createMockAdminClient()
+
+      const { errors } = await validateLegacyWorkbook(buffer, client)
+      expect(errors.filter(e => e.column === 'sighting_lat')).toHaveLength(0)
+    })
+
+    it('does not require coordinates when NOT_SIGHTED', async () => {
+      const buffer = await createLegacyWorkbook(ALL_HEADERS, [
+        makeValidRow({
+          outcome: 'NOT_SIGHTED',
+          observation_lat: '',
+          observation_lng: '',
+          sighting_lat: '',
+          sighting_lng: '',
+        }),
+      ])
+      const client = createMockAdminClient()
+
+      const { errors } = await validateLegacyWorkbook(buffer, client)
+      expect(errors.filter(e => e.message.includes('Coordinates are required'))).toHaveLength(0)
+    })
+
+    it('fails when SIGHTED with only one of the sighting pair', async () => {
+      const buffer = await createLegacyWorkbook(ALL_HEADERS, [
+        makeValidRow({
+          outcome: 'SIGHTED',
+          species: 'RBL',
+          observation_lat: '',
+          observation_lng: '',
+          sighting_lat: 1.35,
+          sighting_lng: '',
+        }),
+      ])
+      const client = createMockAdminClient()
+
+      const { errors } = await validateLegacyWorkbook(buffer, client)
+      expect(errors.some(e => e.column === 'sighting_lat' && e.message.includes('Coordinates are required'))).toBe(true)
+    })
+
+    it('fails when SIGHTED with only one of the observation pair', async () => {
+      const buffer = await createLegacyWorkbook(ALL_HEADERS, [
+        makeValidRow({
+          outcome: 'SIGHTED',
+          species: 'RBL',
+          observation_lat: 1.3,
+          observation_lng: '',
+          sighting_lat: '',
+          sighting_lng: '',
+        }),
+      ])
+      const client = createMockAdminClient()
+
+      const { errors } = await validateLegacyWorkbook(buffer, client)
+      expect(errors.some(e => e.column === 'sighting_lat' && e.message.includes('Coordinates are required'))).toBe(true)
+    })
+
+    it('fails when SIGHTED with non-numeric coordinate values only', async () => {
+      const buffer = await createLegacyWorkbook(ALL_HEADERS, [
+        makeValidRow({
+          outcome: 'SIGHTED',
+          species: 'RBL',
+          observation_lat: 'abc',
+          observation_lng: 'xyz',
+          sighting_lat: '',
+          sighting_lng: '',
+        }),
+      ])
+      const client = createMockAdminClient()
+
+      const { errors } = await validateLegacyWorkbook(buffer, client)
+      // Should have both "must be a number" errors AND "Coordinates are required" error
+      expect(errors.some(e => e.column === 'observation_lat' && e.message.includes('number'))).toBe(true)
+      expect(errors.some(e => e.column === 'sighting_lat' && e.message.includes('Coordinates are required'))).toBe(true)
     })
   })
 

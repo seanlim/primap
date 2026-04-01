@@ -306,6 +306,7 @@ describe('POST /api/admin/import-legacy', () => {
           round_name: 'Round 1', location_name: 'Park A', walk_date: '2026-03-15',
           start_time: '08:00', end_time: '10:00', observer_email: 'alice@test.com',
           walk_completion: 'COMPLETED', outcome: 'SIGHTED', species: 'RBL', count: '2',
+          observation_lat: 1.3, observation_lng: 103.8,
         },
         {
           round_name: 'Round 1', location_name: 'Park A', walk_date: '2026-03-15',
@@ -336,5 +337,259 @@ describe('POST /api/admin/import-legacy', () => {
     expect(response.status).toBe(500)
     const body = await response.json()
     expect(body.error).toBe('Unexpected parse error')
+  })
+
+  // --- Sighting coordinate fallback ---
+
+  it('uses observation coordinates as sighting fallback when sighting coords are missing', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'admin1' } } })
+    mockAuthProfileSingle.mockResolvedValue({ data: { role: 'ADMIN' } })
+
+    const sightingInsert = vi.fn().mockResolvedValue({ error: null })
+
+    mockValidate.mockResolvedValue({
+      rows: [{
+        round_name: 'Round 1',
+        location_name: 'Park A',
+        walk_date: '2026-03-15',
+        start_time: '08:00',
+        end_time: '10:00',
+        observer_email: 'alice@test.com',
+        walk_completion: 'COMPLETED',
+        outcome: 'SIGHTED',
+        observation_lat: 1.3,
+        observation_lng: 103.8,
+        species: 'RBL',
+        count: '2',
+        sighting_lat: null,
+        sighting_lng: null,
+      }],
+      errors: [],
+    })
+
+    const mocks = setupAdminMocks()
+    // Override sightings mock to capture insert args
+    mockAdminFrom.mockImplementation((table: string) => {
+      if (table === 'sightings') {
+        return { insert: sightingInsert }
+      }
+      return setupAdminMocks(), mockAdminFrom.getMockImplementation()!(table)
+    })
+    // Re-setup properly
+    const originalImpl = setupAdminMocks()
+    mockAdminFrom.mockImplementation((table: string) => {
+      const result = (() => {
+        switch (table) {
+          case 'survey_rounds':
+            return { select: vi.fn().mockResolvedValue({ data: [{ id: 'r1', name: 'Round 1' }], error: null }) }
+          case 'profiles':
+            return { select: vi.fn().mockResolvedValue({ data: [{ id: 'u1', email: 'alice@test.com' }], error: null }) }
+          case 'walk_slots':
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  eq: vi.fn().mockReturnValue({
+                    eq: vi.fn().mockReturnValue({
+                      eq: vi.fn().mockReturnValue({
+                        eq: vi.fn().mockReturnValue({
+                          maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'ws1' }, error: null }),
+                        }),
+                      }),
+                    }),
+                  }),
+                }),
+              }),
+            }
+          case 'slot_memberships':
+            return {
+              select: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  eq: vi.fn().mockReturnValue({
+                    maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+                  }),
+                }),
+              }),
+              insert: vi.fn().mockResolvedValue({ error: null }),
+            }
+          case 'observations':
+            return {
+              insert: vi.fn().mockReturnValue({
+                select: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({ data: { id: 'obs1' }, error: null }),
+                }),
+              }),
+            }
+          case 'sightings':
+            return { insert: sightingInsert }
+          default:
+            return { select: vi.fn().mockResolvedValue({ data: [], error: null }) }
+        }
+      })()
+      return result
+    })
+
+    const response = await POST(makeRequest())
+    const body = await response.json()
+
+    expect(body.success).toBe(true)
+    expect(body.summary.sightings_created).toBe(1)
+    // The sighting should use observation coords as fallback
+    expect(sightingInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ lat: 1.3, lng: 103.8 })
+    )
+  })
+
+  it('skips sighting when SIGHTED but all coordinates are null (post-validation safety)', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'admin1' } } })
+    mockAuthProfileSingle.mockResolvedValue({ data: { role: 'ADMIN' } })
+
+    // Simulate a row that somehow passed validation with no coords
+    // (belt-and-suspenders safety check in route)
+    mockValidate.mockResolvedValue({
+      rows: [{
+        round_name: 'Round 1',
+        location_name: 'Park A',
+        walk_date: '2026-03-15',
+        start_time: '08:00',
+        end_time: '10:00',
+        observer_email: 'alice@test.com',
+        walk_completion: 'COMPLETED',
+        outcome: 'SIGHTED',
+        observation_lat: null,
+        observation_lng: null,
+        species: 'RBL',
+        count: '1',
+        sighting_lat: null,
+        sighting_lng: null,
+      }],
+      errors: [],
+    })
+
+    setupAdminMocks()
+
+    const response = await POST(makeRequest())
+    const body = await response.json()
+
+    expect(body.success).toBe(true)
+    // Sighting should be skipped due to null coords
+    expect(body.summary.sightings_created).toBe(0)
+  })
+
+  it('uses explicit sighting coordinates when both pairs are present', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'admin1' } } })
+    mockAuthProfileSingle.mockResolvedValue({ data: { role: 'ADMIN' } })
+
+    const sightingInsert = vi.fn().mockResolvedValue({ error: null })
+
+    mockValidate.mockResolvedValue({
+      rows: [{
+        round_name: 'Round 1',
+        location_name: 'Park A',
+        walk_date: '2026-03-15',
+        start_time: '08:00',
+        end_time: '10:00',
+        observer_email: 'alice@test.com',
+        walk_completion: 'COMPLETED',
+        outcome: 'SIGHTED',
+        observation_lat: 1.3,
+        observation_lng: 103.8,
+        species: 'LTM',
+        count: '1',
+        sighting_lat: 1.35,
+        sighting_lng: 103.82,
+      }],
+      errors: [],
+    })
+
+    mockAdminFrom.mockImplementation((table: string) => {
+      switch (table) {
+        case 'survey_rounds':
+          return { select: vi.fn().mockResolvedValue({ data: [{ id: 'r1', name: 'Round 1' }], error: null }) }
+        case 'profiles':
+          return { select: vi.fn().mockResolvedValue({ data: [{ id: 'u1', email: 'alice@test.com' }], error: null }) }
+        case 'walk_slots':
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  eq: vi.fn().mockReturnValue({
+                    eq: vi.fn().mockReturnValue({
+                      eq: vi.fn().mockReturnValue({
+                        maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'ws1' }, error: null }),
+                      }),
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          }
+        case 'slot_memberships':
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+                }),
+              }),
+            }),
+            insert: vi.fn().mockResolvedValue({ error: null }),
+          }
+        case 'observations':
+          return {
+            insert: vi.fn().mockReturnValue({
+              select: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: { id: 'obs1' }, error: null }),
+              }),
+            }),
+          }
+        case 'sightings':
+          return { insert: sightingInsert }
+        default:
+          return { select: vi.fn().mockResolvedValue({ data: [], error: null }) }
+      }
+    })
+
+    const response = await POST(makeRequest())
+    const body = await response.json()
+
+    expect(body.success).toBe(true)
+    expect(body.summary.sightings_created).toBe(1)
+    // Should use explicit sighting coords, not fallback to observation coords
+    expect(sightingInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ lat: 1.35, lng: 103.82 })
+    )
+  })
+
+  it('skips sighting when sighting_lat is empty string and observation coords are null', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'admin1' } } })
+    mockAuthProfileSingle.mockResolvedValue({ data: { role: 'ADMIN' } })
+
+    mockValidate.mockResolvedValue({
+      rows: [{
+        round_name: 'Round 1',
+        location_name: 'Park A',
+        walk_date: '2026-03-15',
+        start_time: '08:00',
+        end_time: '10:00',
+        observer_email: 'alice@test.com',
+        walk_completion: 'COMPLETED',
+        outcome: 'SIGHTED',
+        observation_lat: null,
+        observation_lng: null,
+        species: 'DUSKY',
+        count: '1',
+        sighting_lat: '',
+        sighting_lng: '',
+      }],
+      errors: [],
+    })
+
+    setupAdminMocks()
+
+    const response = await POST(makeRequest())
+    const body = await response.json()
+
+    // Should not create a sighting at (0, 0)
+    expect(body.summary.sightings_created).toBe(0)
   })
 })

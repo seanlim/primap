@@ -174,10 +174,13 @@ export async function POST(request: NextRequest) {
       // Create sighting if SIGHTED
       if (outcome === 'SIGHTED' && row.species) {
         const species = String(row.species).toUpperCase()
-        const sightLat = row.sighting_lat !== null && row.sighting_lat !== undefined
-          ? Number(row.sighting_lat) : (obsLat ?? 0)
-        const sightLng = row.sighting_lng !== null && row.sighting_lng !== undefined
-          ? Number(row.sighting_lng) : (obsLng ?? 0)
+        const sightLat = row.sighting_lat !== null && row.sighting_lat !== undefined && row.sighting_lat !== ''
+          ? Number(row.sighting_lat) : obsLat
+        const sightLng = row.sighting_lng !== null && row.sighting_lng !== undefined && row.sighting_lng !== ''
+          ? Number(row.sighting_lng) : obsLng
+
+        // Skip sighting if no coordinates available (should be caught by validation)
+        if (sightLat === null || sightLng === null) continue
 
         const { error: sightError } = await adminClient
           .from('sightings')

@@ -367,6 +367,7 @@ describe('observation-actions', () => {
       })
     })
 
+    // TC-UNIT-OBS-03 (UC-06 A2): Missing completion status is blocked
     it('returns error when walk_completion is missing', async () => {
       setupUser()
       methods.single.mockResolvedValueOnce({
@@ -383,6 +384,7 @@ describe('observation-actions', () => {
       expect(result).toEqual({ error: 'Walk completion is required.' })
     })
 
+    // TC-UNIT-OBS-04 (UC-06 A2): Missing outcome is blocked
     it('returns error when outcome is missing', async () => {
       setupUser()
       methods.single.mockResolvedValueOnce({
@@ -453,6 +455,7 @@ describe('observation-actions', () => {
       })
     })
 
+    // TC-UNIT-OBS-01 (UC-06): Sighted submission succeeds with required fields
     it('submits SIGHTED observation successfully', async () => {
       setupUser()
       methods.single.mockResolvedValueOnce({
@@ -498,6 +501,7 @@ describe('observation-actions', () => {
       })
     })
 
+    // TC-UNIT-OBS-02 (UC-06): Not-sighted submission succeeds with required fields
     it('submits NOT_SIGHTED observation successfully', async () => {
       setupUser()
       methods.single.mockResolvedValueOnce({

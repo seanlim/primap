@@ -84,6 +84,15 @@ const sightingInput = {
   notes: 'Near trail',
 }
 
+const otherSightingInput = {
+  species: 'OTHER' as const,
+  species_other: 'Silvered Langur',
+  count: '2',
+  lat: 1.37,
+  lng: 103.84,
+  notes: 'Unusual species',
+}
+
 describe('observation-actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -343,6 +352,151 @@ describe('observation-actions', () => {
         sightingIds: [],
       }))
     })
+
+    // ─── species_other tests ────────────────────────────────────────────
+
+    it('includes species_other when inserting a new OTHER sighting', async () => {
+      setupUser()
+      methods.single
+        .mockResolvedValueOnce({ data: { id: 'obs-1' }, error: null }) // observation insert
+        .mockResolvedValueOnce({ data: { id: 'sight-other-1' }, error: null }) // sighting insert
+
+      const result = await saveDraft({
+        ...baseDraftInput,
+        outcome: 'SIGHTED',
+        sightings: [otherSightingInput],
+      })
+
+      expect(result).toEqual(expect.objectContaining({
+        success: true,
+        sightingIds: ['sight-other-1'],
+      }))
+      expect(methods.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          species: 'OTHER',
+          species_other: 'Silvered Langur',
+        })
+      )
+    })
+
+    it('includes species_other when updating an existing OTHER sighting', async () => {
+      setupUser()
+
+      const result = await saveDraft({
+        ...baseDraftInput,
+        observationId: 'obs-1',
+        outcome: 'SIGHTED',
+        sightings: [{ ...otherSightingInput, id: 'existing-sight' }],
+      })
+
+      expect(result).toEqual(expect.objectContaining({ success: true }))
+      expect(methods.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          species: 'OTHER',
+          species_other: 'Silvered Langur',
+        })
+      )
+    })
+
+    it('sets species_other to null for non-OTHER species insert', async () => {
+      setupUser()
+      methods.single
+        .mockResolvedValueOnce({ data: { id: 'obs-1' }, error: null })
+        .mockResolvedValueOnce({ data: { id: 'sight-1' }, error: null })
+
+      await saveDraft({
+        ...baseDraftInput,
+        outcome: 'SIGHTED',
+        sightings: [sightingInput],
+      })
+
+      expect(methods.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          species: 'RBL',
+          species_other: null,
+        })
+      )
+    })
+
+    it('sets species_other to null for non-OTHER species update', async () => {
+      setupUser()
+
+      await saveDraft({
+        ...baseDraftInput,
+        observationId: 'obs-1',
+        outcome: 'SIGHTED',
+        sightings: [{ ...sightingInput, id: 'existing-sight' }],
+      })
+
+      expect(methods.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          species: 'RBL',
+          species_other: null,
+        })
+      )
+    })
+
+    it('handles mixed sightings: one RBL and one OTHER', async () => {
+      setupUser()
+      methods.single
+        .mockResolvedValueOnce({ data: { id: 'obs-1' }, error: null }) // observation insert
+        .mockResolvedValueOnce({ data: { id: 'sight-rbl' }, error: null }) // RBL sighting insert
+        .mockResolvedValueOnce({ data: { id: 'sight-other' }, error: null }) // OTHER sighting insert
+
+      const result = await saveDraft({
+        ...baseDraftInput,
+        outcome: 'SIGHTED',
+        sightings: [
+          sightingInput,
+          otherSightingInput,
+        ],
+      })
+
+      expect(result).toEqual(expect.objectContaining({
+        success: true,
+        sightingIds: ['sight-rbl', 'sight-other'],
+      }))
+    })
+
+    it('saves species_other as null when species_other is empty string', async () => {
+      setupUser()
+      methods.single
+        .mockResolvedValueOnce({ data: { id: 'obs-1' }, error: null })
+        .mockResolvedValueOnce({ data: { id: 'sight-1' }, error: null })
+
+      await saveDraft({
+        ...baseDraftInput,
+        outcome: 'SIGHTED',
+        sightings: [{ ...otherSightingInput, species_other: '' }],
+      })
+
+      expect(methods.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          species: 'OTHER',
+          species_other: null,
+        })
+      )
+    })
+
+    it('saves species_other as null when species_other is undefined', async () => {
+      setupUser()
+      methods.single
+        .mockResolvedValueOnce({ data: { id: 'obs-1' }, error: null })
+        .mockResolvedValueOnce({ data: { id: 'sight-1' }, error: null })
+
+      await saveDraft({
+        ...baseDraftInput,
+        outcome: 'SIGHTED',
+        sightings: [{ ...otherSightingInput, species_other: undefined }],
+      })
+
+      expect(methods.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          species: 'OTHER',
+          species_other: null,
+        })
+      )
+    })
   })
 
   // ─── submitObservation ───────────────────────────────────────────────
@@ -473,7 +627,7 @@ describe('observation-actions', () => {
 
       expect(result).toEqual({ success: true })
       expect(methods.update).toHaveBeenCalledWith(
-        expect.objectContaining({ status: 'SUBMITTED' })
+        expect.objectContaining({ status: 'SUBMITTED', lat: null, lng: null })
       )
       expect(revalidatePath).toHaveBeenCalledWith('/report')
       expect(revalidatePath).toHaveBeenCalledWith('/report/slot-1')
@@ -520,6 +674,462 @@ describe('observation-actions', () => {
       expect(result).toEqual({ success: true })
     })
 
+    // ─── OTHER species validation ───────────────────────────────────────
+
+    it('returns error when SIGHTED with OTHER species and null species_other', async () => {
+      setupUser()
+      methods.single.mockResolvedValueOnce({
+        data: {
+          walk_completion: 'COMPLETED',
+          outcome: 'SIGHTED',
+          sightings: [{ lat: 1.36, lng: 103.83, species: 'OTHER', species_other: null }],
+        },
+        error: null,
+      })
+
+      const result = await submitObservation('obs-1', 'slot-1')
+
+      expect(result).toEqual({
+        error: 'Species name is required when "Other" is selected.',
+      })
+    })
+
+    it('returns error when SIGHTED with OTHER species and empty species_other', async () => {
+      setupUser()
+      methods.single.mockResolvedValueOnce({
+        data: {
+          walk_completion: 'COMPLETED',
+          outcome: 'SIGHTED',
+          sightings: [{ lat: 1.36, lng: 103.83, species: 'OTHER', species_other: '' }],
+        },
+        error: null,
+      })
+
+      const result = await submitObservation('obs-1', 'slot-1')
+
+      expect(result).toEqual({
+        error: 'Species name is required when "Other" is selected.',
+      })
+    })
+
+    it('returns error when SIGHTED with OTHER species and whitespace-only species_other', async () => {
+      setupUser()
+      methods.single.mockResolvedValueOnce({
+        data: {
+          walk_completion: 'COMPLETED',
+          outcome: 'SIGHTED',
+          sightings: [{ lat: 1.36, lng: 103.83, species: 'OTHER', species_other: '   ' }],
+        },
+        error: null,
+      })
+
+      const result = await submitObservation('obs-1', 'slot-1')
+
+      expect(result).toEqual({
+        error: 'Species name is required when "Other" is selected.',
+      })
+    })
+
+    it('succeeds when SIGHTED with OTHER species and valid species_other', async () => {
+      setupUser()
+      methods.single.mockResolvedValueOnce({
+        data: {
+          walk_completion: 'COMPLETED',
+          outcome: 'SIGHTED',
+          sightings: [{ lat: 1.36, lng: 103.83, species: 'OTHER', species_other: 'Silvered Langur' }],
+        },
+        error: null,
+      })
+
+      const result = await submitObservation('obs-1', 'slot-1')
+
+      expect(result).toEqual({ success: true })
+    })
+
+    it('validates OTHER species_other even when mixed with non-OTHER sightings', async () => {
+      setupUser()
+      methods.single.mockResolvedValueOnce({
+        data: {
+          walk_completion: 'COMPLETED',
+          outcome: 'SIGHTED',
+          sightings: [
+            { lat: 1.36, lng: 103.83, species: 'RBL', species_other: null },
+            { lat: 1.37, lng: 103.84, species: 'OTHER', species_other: null },
+          ],
+        },
+        error: null,
+      })
+
+      const result = await submitObservation('obs-1', 'slot-1')
+
+      expect(result).toEqual({
+        error: 'Species name is required when "Other" is selected.',
+      })
+    })
+
+    it('succeeds with multiple sightings including valid OTHER', async () => {
+      setupUser()
+      methods.single.mockResolvedValueOnce({
+        data: {
+          walk_completion: 'COMPLETED',
+          outcome: 'SIGHTED',
+          sightings: [
+            { lat: 1.36, lng: 103.83, species: 'RBL', species_other: null },
+            { lat: 1.37, lng: 103.84, species: 'OTHER', species_other: 'Silvered Langur' },
+            { lat: 1.38, lng: 103.85, species: 'LTM', species_other: null },
+          ],
+        },
+        error: null,
+      })
+
+      const result = await submitObservation('obs-1', 'slot-1')
+
+      expect(result).toEqual({ success: true })
+    })
+
+    it('does not validate species_other for non-OTHER species (RBL with null species_other passes)', async () => {
+      setupUser()
+      methods.single.mockResolvedValueOnce({
+        data: {
+          walk_completion: 'COMPLETED',
+          outcome: 'SIGHTED',
+          sightings: [{ lat: 1.36, lng: 103.83, species: 'RBL', species_other: null }],
+        },
+        error: null,
+      })
+
+      const result = await submitObservation('obs-1', 'slot-1')
+
+      expect(result).toEqual({ success: true })
+    })
+
+    it('checks GPS before species_other (missing GPS error takes priority)', async () => {
+      setupUser()
+      methods.single.mockResolvedValueOnce({
+        data: {
+          walk_completion: 'COMPLETED',
+          outcome: 'SIGHTED',
+          sightings: [{ lat: null, lng: 103.83, species: 'OTHER', species_other: null }],
+        },
+        error: null,
+      })
+
+      const result = await submitObservation('obs-1', 'slot-1')
+
+      // GPS validation runs first in the loop
+      expect(result).toEqual({
+        error: 'GPS location is required for each sighting.',
+      })
+    })
+
+    // ─── Nuke observation-level data for SIGHTED ─────────────────────────
+
+    it('nulls lat/lng in update for SIGHTED submissions', async () => {
+      setupUser()
+      methods.single.mockResolvedValueOnce({
+        data: {
+          walk_completion: 'COMPLETED',
+          outcome: 'SIGHTED',
+          lat: 1.35,
+          lng: 103.82,
+          sightings: [{ lat: 1.36, lng: 103.83, species: 'RBL', species_other: null }],
+        },
+        error: null,
+      })
+
+      await submitObservation('obs-1', 'slot-1')
+
+      expect(methods.update).toHaveBeenCalledWith(
+        expect.objectContaining({ lat: null, lng: null })
+      )
+    })
+
+    it('does NOT null lat/lng for NOT_SIGHTED submissions', async () => {
+      setupUser()
+      methods.single.mockResolvedValueOnce({
+        data: {
+          walk_completion: 'COMPLETED',
+          outcome: 'NOT_SIGHTED',
+          lat: 1.35,
+          lng: 103.82,
+          sightings: [],
+        },
+        error: null,
+      })
+
+      await submitObservation('obs-1', 'slot-1')
+
+      expect(methods.update).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'SUBMITTED' })
+      )
+      expect(methods.update).not.toHaveBeenCalledWith(
+        expect.objectContaining({ lat: null })
+      )
+    })
+
+    it('deletes observation-level media from storage and DB for SIGHTED', async () => {
+      setupUser()
+
+      let fromCallCount = 0
+      mockSupabase.from.mockImplementation((table: string) => {
+        fromCallCount++
+        // Call 1: observations select (fetch observation with sightings)
+        if (fromCallCount === 1) {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  eq: vi.fn().mockReturnValue({
+                    single: vi.fn().mockResolvedValue({
+                      data: {
+                        walk_completion: 'COMPLETED',
+                        outcome: 'SIGHTED',
+                        lat: 1.35,
+                        lng: 103.82,
+                        sightings: [{ lat: 1.36, lng: 103.83, species: 'RBL', species_other: null }],
+                      },
+                      error: null,
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          }
+        }
+        // Call 2: media select (observation-level media query)
+        if (fromCallCount === 2 && table === 'media') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({
+                data: [
+                  { id: 'media-1', file_path: 'user-1/obs-1/photo1.jpg' },
+                  { id: 'media-2', file_path: 'user-1/obs-1/photo2.jpg' },
+                ],
+                error: null,
+              }),
+            }),
+          }
+        }
+        // Call 3: media delete (delete obs-level media records)
+        if (fromCallCount === 3 && table === 'media') {
+          return {
+            delete: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({ error: null }),
+            }),
+          }
+        }
+        // Call 4: observations update (status + nulling lat/lng)
+        return methods
+      })
+
+      const result = await submitObservation('obs-1', 'slot-1')
+
+      expect(result).toEqual({ success: true })
+      expect(mockSupabase.storage.from).toHaveBeenCalledWith('observation-media')
+      expect(mockStorage.remove).toHaveBeenCalledWith([
+        'user-1/obs-1/photo1.jpg',
+        'user-1/obs-1/photo2.jpg',
+      ])
+
+      // Reset
+      mockSupabase.from.mockReturnValue(methods)
+    })
+
+    it('does NOT delete media when SIGHTED but no observation-level media exists', async () => {
+      setupUser()
+
+      let fromCallCount = 0
+      mockSupabase.from.mockImplementation((table: string) => {
+        fromCallCount++
+        if (fromCallCount === 1) {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  eq: vi.fn().mockReturnValue({
+                    single: vi.fn().mockResolvedValue({
+                      data: {
+                        walk_completion: 'COMPLETED',
+                        outcome: 'SIGHTED',
+                        lat: null,
+                        lng: null,
+                        sightings: [{ lat: 1.36, lng: 103.83, species: 'LTM', species_other: null }],
+                      },
+                      error: null,
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          }
+        }
+        // Call 2: media select returns empty
+        if (fromCallCount === 2 && table === 'media') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }
+        }
+        return methods
+      })
+
+      const result = await submitObservation('obs-1', 'slot-1')
+
+      expect(result).toEqual({ success: true })
+      // storage.remove should NOT be called since no media to delete
+      expect(mockStorage.remove).not.toHaveBeenCalled()
+
+      mockSupabase.from.mockReturnValue(methods)
+    })
+
+    it('does NOT query or delete observation-level media for NOT_SIGHTED', async () => {
+      setupUser()
+
+      const fromSpy = vi.fn()
+      let fromCallCount = 0
+      mockSupabase.from.mockImplementation((table: string) => {
+        fromCallCount++
+        fromSpy(table)
+        if (fromCallCount === 1) {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  eq: vi.fn().mockReturnValue({
+                    single: vi.fn().mockResolvedValue({
+                      data: {
+                        walk_completion: 'COMPLETED',
+                        outcome: 'NOT_SIGHTED',
+                        lat: 1.35,
+                        lng: 103.82,
+                        sightings: [],
+                      },
+                      error: null,
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          }
+        }
+        return methods
+      })
+
+      const result = await submitObservation('obs-1', 'slot-1')
+
+      expect(result).toEqual({ success: true })
+      // For NOT_SIGHTED, the only from() calls should be observations (select + update), NOT media
+      const mediaCalls = fromSpy.mock.calls.filter((c: string[]) => c[0] === 'media')
+      expect(mediaCalls).toHaveLength(0)
+      expect(mockStorage.remove).not.toHaveBeenCalled()
+
+      mockSupabase.from.mockReturnValue(methods)
+    })
+
+    it('handles null data from media select for SIGHTED gracefully', async () => {
+      setupUser()
+
+      let fromCallCount = 0
+      mockSupabase.from.mockImplementation((table: string) => {
+        fromCallCount++
+        if (fromCallCount === 1) {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  eq: vi.fn().mockReturnValue({
+                    single: vi.fn().mockResolvedValue({
+                      data: {
+                        walk_completion: 'COMPLETED',
+                        outcome: 'SIGHTED',
+                        lat: 1.35,
+                        lng: 103.82,
+                        sightings: [{ lat: 1.36, lng: 103.83, species: 'DUSKY', species_other: null }],
+                      },
+                      error: null,
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          }
+        }
+        // media select returns null data
+        if (fromCallCount === 2 && table === 'media') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+            }),
+          }
+        }
+        return methods
+      })
+
+      const result = await submitObservation('obs-1', 'slot-1')
+
+      expect(result).toEqual({ success: true })
+      expect(mockStorage.remove).not.toHaveBeenCalled()
+
+      mockSupabase.from.mockReturnValue(methods)
+    })
+
+    it('nukes obs-level data with single media file for SIGHTED', async () => {
+      setupUser()
+
+      let fromCallCount = 0
+      mockSupabase.from.mockImplementation((table: string) => {
+        fromCallCount++
+        if (fromCallCount === 1) {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  eq: vi.fn().mockReturnValue({
+                    single: vi.fn().mockResolvedValue({
+                      data: {
+                        walk_completion: 'PARTIAL',
+                        outcome: 'SIGHTED',
+                        lat: 1.35,
+                        lng: 103.82,
+                        sightings: [{ lat: 1.36, lng: 103.83, species: 'RBL', species_other: null }],
+                      },
+                      error: null,
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          }
+        }
+        if (fromCallCount === 2 && table === 'media') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({
+                data: [{ id: 'media-solo', file_path: 'user-1/obs-1/only.jpg' }],
+                error: null,
+              }),
+            }),
+          }
+        }
+        if (fromCallCount === 3 && table === 'media') {
+          return {
+            delete: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({ error: null }),
+            }),
+          }
+        }
+        return methods
+      })
+
+      const result = await submitObservation('obs-1', 'slot-1')
+
+      expect(result).toEqual({ success: true })
+      expect(mockStorage.remove).toHaveBeenCalledWith(['user-1/obs-1/only.jpg'])
+
+      mockSupabase.from.mockReturnValue(methods)
+    })
+
     it('returns error on DB update failure', async () => {
       setupUser()
       methods.single.mockResolvedValueOnce({
@@ -530,11 +1140,12 @@ describe('observation-actions', () => {
         },
         error: null,
       })
-      // select chain: eq x3, then update chain: eq x2
+      // select chain: eq x3, then nuke media select: eq x1, then update chain: eq x2
       methods.eq
         .mockReturnValueOnce(methods) // select eq('id', obsId)
         .mockReturnValueOnce(methods) // select eq('user_id', userId)
         .mockReturnValueOnce(methods) // select eq('status', 'DRAFT')
+        .mockReturnValueOnce({ data: null, error: null }) // nuke: media select eq('observation_id', obsId)
         .mockReturnValueOnce(methods) // update eq('id', obsId)
         .mockReturnValueOnce({ error: { message: 'Submit failed' } }) // update eq('user_id', userId)
 

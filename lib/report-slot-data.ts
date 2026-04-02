@@ -4,6 +4,7 @@ import type { Database } from '@/lib/types/database'
 interface SightingData {
   id: string
   species: string
+  speciesOther: string | null
   count: string
   observedAt: string | null
   lat: number
@@ -128,6 +129,7 @@ export async function getSlotReportViewData(
       sightings: obs.sightings.map(s => ({
         id: s.id,
         species: s.species,
+        speciesOther: s.species_other,
         count: s.count,
         observedAt: s.observed_at,
         lat: s.lat,

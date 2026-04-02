@@ -16,6 +16,7 @@ import { Breadcrumb } from '@/components/ui/breadcrumb'
 interface SightingData {
   id: string
   species: string
+  speciesOther: string | null
   count: string
   observedAt: string | null
   lat: number
@@ -61,6 +62,7 @@ const SPECIES_LABELS: Record<string, string> = {
   RBL: "Raffles' Banded Langur",
   LTM: 'Long-tailed Macaque',
   DUSKY: 'Dusky Langur',
+  OTHER: 'Other',
 }
 
 const INCIDENT_TYPES = [
@@ -435,7 +437,7 @@ function ObservationDetails({ observation }: { observation: ObservationData }) {
             <div key={sighting.id} className="bg-gray-50 rounded-lg p-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-gray-900">
-                  #{i + 1} {SPECIES_LABELS[sighting.species] || sighting.species}
+                  #{i + 1} {sighting.species === 'OTHER' ? `Other: ${sighting.speciesOther || 'Unknown'}` : (SPECIES_LABELS[sighting.species] || sighting.species)}
                 </p>
                 <span className="text-xs text-gray-500">Count: {sighting.count}</span>
               </div>

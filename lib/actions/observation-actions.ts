@@ -7,7 +7,8 @@ import type { Database } from '@/lib/types/database'
 
 interface SightingInput {
   id?: string
-  species: 'RBL' | 'LTM' | 'DUSKY'
+  species: 'RBL' | 'LTM' | 'DUSKY' | 'OTHER'
+  species_other?: string
   count: string
   observed_at?: string
   lat: number
@@ -197,6 +198,7 @@ export async function saveDraft(input: SaveDraftInput) {
           .from('sightings')
           .update({
             species: s.species,
+            species_other: s.species_other || null,
             count: s.count,
             observed_at: s.observed_at || null,
             lat: s.lat,
@@ -212,6 +214,7 @@ export async function saveDraft(input: SaveDraftInput) {
           .insert({
             observation_id: observationId,
             species: s.species,
+            species_other: s.species_other || null,
             count: s.count,
             observed_at: s.observed_at || null,
             lat: s.lat,
@@ -274,6 +277,25 @@ export async function submitObservation(observationId: string, walkId: string) {
       if (!s.lat || !s.lng) {
         return { error: 'GPS location is required for each sighting.' }
       }
+      if (s.species === 'OTHER' && !s.species_other?.trim()) {
+        return { error: 'Species name is required when "Other" is selected.' }
+      }
+    }
+
+    // Nuke observation-level data for SIGHTED reports
+    const { data: obsMedia } = await supabase
+      .from('media')
+      .select('id, file_path')
+      .eq('observation_id', observationId)
+
+    if (obsMedia && obsMedia.length > 0) {
+      await supabase.storage
+        .from('observation-media')
+        .remove(obsMedia.map(m => m.file_path))
+      await supabase
+        .from('media')
+        .delete()
+        .in('id', obsMedia.map(m => m.id))
     }
   }
 
@@ -286,6 +308,7 @@ export async function submitObservation(observationId: string, walkId: string) {
     .update({
       status: 'SUBMITTED',
       submitted_at: new Date().toISOString(),
+      ...(obs.outcome === 'SIGHTED' ? { lat: null, lng: null } : {}),
     })
     .eq('id', observationId)
     .eq('user_id', user.id)
@@ -427,6 +450,7 @@ export async function getObservationFull(walkId: string) {
     sightings: (data.sightings as Array<Record<string, unknown>>).map((s: Record<string, unknown>) => ({
       id: s.id as string,
       species: s.species as string,
+      speciesOther: (s.species_other as string | null) ?? null,
       count: s.count as string,
       observedAt: (s.observed_at as string)?.slice(0, 16) ?? null,
       lat: s.lat as number,

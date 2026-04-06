@@ -60,7 +60,7 @@ export function SidebarNav({ isAdmin }: { isAdmin: boolean }) {
               }`}
             >
               <Shield className="w-5 h-5" />
-              Admin Panel
+              Admin Dashboard
             </Link>
           </>
         )}

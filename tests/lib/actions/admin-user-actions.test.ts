@@ -101,6 +101,7 @@ describe('admin-user-actions', () => {
   })
 
   describe('approveUser', () => {
+    // TC-UNIT-ADMIN-01 (UC-13) + TC-UNIT-ACC-REQ-01 (UC-01): approving pending volunteer activates account and triggers notification
     it('approves user, sends email, and revalidates', async () => {
       setupAdmin()
       methods.single.mockResolvedValueOnce({

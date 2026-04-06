@@ -61,6 +61,7 @@ describe('middleware-routing (integration)', () => {
     expect(response.headers.get('location')).toContain('/home')
   })
 
+  // TC-INT-AUTH-01 (UC-01): Pending accounts are blocked from normal app routes
   it('authenticated PENDING → /home → real resolveStatusRedirect returns /pending → redirect /pending', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockSingle.mockResolvedValue({

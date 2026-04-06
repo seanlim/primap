@@ -1,0 +1,224 @@
+import type { ComponentType } from 'react'
+import Link from 'next/link'
+import { ArrowLeft, CheckCircle, Gauge, UserMinus } from 'lucide-react'
+import { createClient } from '@/lib/supabase/server'
+import { getAdminWalksAnalyticsPageSnapshotByRound } from '@/lib/admin-volunteer-analytics'
+import { WalkAnalyticsFilters } from './walk-analytics-filters'
+
+export const dynamic = 'force-dynamic'
+
+function formatPercent(value: number) {
+  return `${Math.round(value * 100)}%`
+}
+
+function DonutMetricCard({
+  title,
+  value,
+  numerator,
+  denominator,
+  numeratorLabel,
+  denominatorLabel,
+  progress,
+  icon: Icon,
+  ringColor,
+  trackColor,
+  iconBgColor,
+  iconColor,
+  accentColor,
+}: {
+  title: string
+  value: string
+  numerator: number
+  denominator: number
+  numeratorLabel: string
+  denominatorLabel: string
+  progress: number
+  icon: ComponentType<{ className?: string }>
+  ringColor: string
+  trackColor: string
+  iconBgColor: string
+  iconColor: string
+  accentColor: string
+}) {
+  const boundedProgress = Math.max(0, Math.min(progress, 1))
+  const radius = 36
+  const circumference = 2 * Math.PI * radius
+  const dashOffset = circumference * (1 - boundedProgress)
+
+  return (
+    <div className="min-w-0 rounded-2xl border-l-4 bg-white p-4 shadow-sm" style={{ borderLeftColor: accentColor }}>
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg" style={{ backgroundColor: iconBgColor }}>
+          <Icon className="h-5 w-5" style={{ color: iconColor }} />
+        </div>
+        <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
+      </div>
+
+      <div className="mt-4 flex items-start gap-3">
+        <div className="relative h-36 w-36 shrink-0">
+          <svg viewBox="0 0 92 92" className="h-full w-full -rotate-90" aria-hidden="true">
+            <circle cx="46" cy="46" r={radius} fill="none" stroke={trackColor} strokeWidth="10" />
+            <circle
+              cx="46"
+              cy="46"
+              r={radius}
+              fill="none"
+              stroke={ringColor}
+              strokeWidth="10"
+              strokeLinecap="round"
+              strokeDasharray={circumference}
+              strokeDashoffset={dashOffset}
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center text-2xl font-bold text-gray-900">{value}</div>
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="grid w-full gap-2">
+            <div className="rounded-lg bg-gray-50 p-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">{numeratorLabel}</div>
+              <div className="mt-1 text-xl font-bold text-gray-900">{numerator}</div>
+            </div>
+            <div className="rounded-lg bg-gray-50 p-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">{denominatorLabel}</div>
+              <div className="mt-1 text-xl font-bold text-gray-900">{denominator}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SummaryCard({
+  title,
+  value,
+  icon: Icon,
+  accentColor,
+  iconBgColor,
+  iconColor,
+}: {
+  title: string
+  value: number
+  icon: ComponentType<{ className?: string }>
+  accentColor: string
+  iconBgColor: string
+  iconColor: string
+}) {
+  return (
+    <div className="rounded-2xl border-l-4 bg-white p-4 shadow-sm" style={{ borderLeftColor: accentColor }}>
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg" style={{ backgroundColor: iconBgColor }}>
+          <Icon className="h-5 w-5" style={{ color: iconColor }} />
+        </div>
+        <p className="text-sm font-semibold text-gray-900">{title}</p>
+      </div>
+      <p className="mt-4 text-2xl font-bold text-gray-900">{value}</p>
+    </div>
+  )
+}
+
+export default async function AdminWalksAnalyticsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ round?: string; walk?: string }>
+}) {
+  const params = (await searchParams) ?? {}
+  const supabase = await createClient()
+  const analytics = await getAdminWalksAnalyticsPageSnapshotByRound(supabase, {
+    roundId: params.round ?? null,
+    walkId: params.walk ?? null,
+  })
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <Link href="/admin/walks" className="text-gray-400 hover:text-gray-600">
+          <ArrowLeft className="w-5 h-5" />
+        </Link>
+        <h1 className="text-2xl font-bold text-gray-900">Walk Analytics</h1>
+      </div>
+
+      {analytics.availableRounds.length === 0 ? (
+        <div className="rounded-xl bg-white p-8 text-center shadow-sm">
+          <p className="text-gray-500">No walks yet.</p>
+        </div>
+      ) : (
+        <>
+          <WalkAnalyticsFilters
+            rounds={analytics.availableRounds.map((round) => ({
+              id: round.id,
+              name: round.name,
+            }))}
+            walks={analytics.availableWalks.map((walk) => ({
+              id: walk.id,
+              label: walk.label,
+            }))}
+            selectedRoundId={analytics.targetRound?.id ?? ''}
+            selectedWalkId={analytics.targetWalk?.id ?? ''}
+          />
+
+          {analytics.targetWalk && analytics.overview ? (
+            <>
+              <div className="rounded-xl bg-white p-4 shadow-sm">
+                <h2 className="text-base font-semibold text-gray-900">{analytics.targetWalk.location_name}</h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  {analytics.targetWalkRoundName ? `${analytics.targetWalkRoundName} · ` : ''}
+                  {new Date(analytics.targetWalk.walk_date).toLocaleDateString('en-SG')} · {analytics.targetWalk.start_time.slice(0, 5)}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <DonutMetricCard
+                  title="Completion Rate"
+                  value={formatPercent(analytics.overview.reportCompletionRate)}
+                  numerator={analytics.overview.completionRateSubmittedReports}
+                  denominator={analytics.overview.completionRateExpectedReports}
+                  numeratorLabel="completed reports"
+                  denominatorLabel="total reports required"
+                  progress={analytics.overview.reportCompletionRate}
+                  icon={CheckCircle}
+                  ringColor="#166534"
+                  trackColor="#bbf7d0"
+                  iconBgColor="#f0fdf4"
+                  iconColor="#15803d"
+                  accentColor="#16a34a"
+                />
+                <DonutMetricCard
+                  title="Sign-up Rate"
+                  value={formatPercent(analytics.overview.capacityFillRate)}
+                  numerator={analytics.overview.walkSignUps}
+                  denominator={analytics.overview.totalVolunteerCapacity}
+                  numeratorLabel="sign-ups"
+                  denominatorLabel="total available capacity"
+                  progress={analytics.overview.capacityFillRate}
+                  icon={Gauge}
+                  ringColor="#ea580c"
+                  trackColor="#fed7aa"
+                  iconBgColor="#fff7ed"
+                  iconColor="#c2410c"
+                  accentColor="#ea580c"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                <SummaryCard
+                  title="Cancellations"
+                  value={analytics.overview.cancellations}
+                  icon={UserMinus}
+                  accentColor="#dc2626"
+                  iconBgColor="#fef2f2"
+                  iconColor="#dc2626"
+                />
+              </div>
+            </>
+          ) : (
+            <div className="rounded-xl bg-white p-8 text-center shadow-sm">
+              <p className="text-gray-500">No walks are available in this round.</p>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}

@@ -256,6 +256,7 @@ describe('cancel-walk-email-flow (integration)', () => {
     expect(mockSend).not.toHaveBeenCalled()
   })
 
+  // TC-INT-CANCEL-01 (UC-04): Cancellation should succeed even if email provider fails
   it('cancelWalk still succeeds when Resend.send throws (email error is swallowed)', async () => {
     mockSupabase.auth.getUser.mockResolvedValue({
       data: { user: { id: 'user-1' } },
@@ -358,6 +359,7 @@ describe('cancel-walk-email-flow (integration)', () => {
       .mockResolvedValueOnce({ data: updatedProfile, error: null })
   }
 
+  // TC-INT-ADMIN-01 (UC-13): Approval flow triggers account-approved email side effect
   it('approveUser -> sendAccountApprovedEmail -> Resend.send with correct subject', async () => {
     setupAdminChain({ email: 'user@test.com', full_name: 'Test User' })
 

@@ -95,7 +95,11 @@ export function DataClient() {
       if (!res.ok) throw new Error(body.error ?? 'Import failed')
 
       setImportResult(body.summary)
-      showToast('Backup restored successfully', 'success')
+      if (body.partial) {
+        showToast('Backup restored with some errors', 'info')
+      } else {
+        showToast('Backup restored successfully', 'success')
+      }
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Import failed', 'error')
     } finally {
@@ -114,6 +118,7 @@ export function DataClient() {
     setIsImportingLegacy(true)
     setLegacyResult(null)
     setLegacyErrors([])
+    let hasValidationErrors = false
     try {
       const formData = new FormData()
       formData.append('file', file)
@@ -127,6 +132,7 @@ export function DataClient() {
       if (!res.ok) {
         if (body.errors) {
           setLegacyErrors(body.errors)
+          hasValidationErrors = true
         }
         throw new Error(body.error ?? 'Import failed')
       }
@@ -134,7 +140,7 @@ export function DataClient() {
       setLegacyResult(body.summary)
       showToast('Legacy data imported successfully', 'success')
     } catch (err) {
-      if (legacyErrors.length === 0) {
+      if (!hasValidationErrors) {
         showToast(err instanceof Error ? err.message : 'Import failed', 'error')
       }
     } finally {

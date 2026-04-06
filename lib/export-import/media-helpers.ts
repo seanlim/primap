@@ -12,6 +12,7 @@ export async function fetchAllRows(
     const { data, error } = await client
       .from(table)
       .select('*')
+      .order('id')
       .range(from, from + PAGE_SIZE - 1)
 
     if (error) throw new Error(`Failed to fetch ${table}: ${error.message}`)

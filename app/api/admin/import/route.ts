@@ -240,10 +240,11 @@ export async function POST(request: NextRequest) {
     summary['media'] = mediaTableSummary
 
     const hasMediaErrors = mediaSummary.errors.length > 0
+    const hasTableErrors = Object.values(summary).some(s => s.errors.length > 0)
 
     return NextResponse.json({
-      success: !hasMediaErrors,
-      ...(hasMediaErrors && { partial: true }),
+      success: !hasMediaErrors && !hasTableErrors,
+      ...((hasMediaErrors || hasTableErrors) && { partial: true }),
       summary: {
         ...summary,
         media_files: mediaSummary,

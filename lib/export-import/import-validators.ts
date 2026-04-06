@@ -57,6 +57,8 @@ export async function validateLegacyWorkbook(
   const { data: profiles } = await adminClient
     .from('profiles')
     .select('email')
+    .order('id')
+    .limit(10000)
 
   const existingEmails = new Set(
     (profiles ?? []).map(p => (p.email as string).toLowerCase())
@@ -66,6 +68,8 @@ export async function validateLegacyWorkbook(
   const { data: rounds } = await adminClient
     .from('survey_rounds')
     .select('name')
+    .order('id')
+    .limit(10000)
 
   const existingRounds = new Set(
     (rounds ?? []).map(r => r.name as string)

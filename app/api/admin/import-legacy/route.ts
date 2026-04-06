@@ -46,6 +46,8 @@ export async function POST(request: NextRequest) {
     const { data: allRounds } = await adminClient
       .from('survey_rounds')
       .select('id, name')
+      .order('id')
+      .limit(10000)
 
     const roundsByName = new Map(
       (allRounds ?? []).map(r => [r.name as string, r.id as string])
@@ -54,6 +56,8 @@ export async function POST(request: NextRequest) {
     const { data: allProfiles } = await adminClient
       .from('profiles')
       .select('id, email')
+      .order('id')
+      .limit(10000)
 
     const profilesByEmail = new Map(
       (allProfiles ?? []).map(p => [(p.email as string).toLowerCase(), p.id as string])

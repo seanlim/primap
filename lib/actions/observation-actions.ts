@@ -289,13 +289,15 @@ export async function submitObservation(observationId: string, walkId: string) {
       .eq('observation_id', observationId)
 
     if (obsMedia && obsMedia.length > 0) {
-      await supabase.storage
+      const { error: storageError } = await supabase.storage
         .from('observation-media')
         .remove(obsMedia.map(m => m.file_path))
-      await supabase
+      if (storageError) return { error: 'Failed to clean up observation media files: ' + storageError.message }
+      const { error: mediaDeleteError } = await supabase
         .from('media')
         .delete()
         .in('id', obsMedia.map(m => m.id))
+      if (mediaDeleteError) return { error: 'Failed to clean up observation media records: ' + mediaDeleteError.message }
     }
   }
 

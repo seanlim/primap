@@ -262,6 +262,21 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
       // (covers case where tab-close save wrote to IndexedDB but server push didn't complete)
       const draft = await getDraft(slot.id)
       if (draft && navigator.onLine) {
+        // Check for conflicts before pushing (same logic as syncOnReconnect)
+        const serverMeta = await getObservationMeta(slot.id)
+        if (serverMeta && draft.serverUpdatedAt) {
+          const serverTime = new Date(serverMeta.updatedAt).getTime()
+          const localKnownServerTime = new Date(draft.serverUpdatedAt).getTime()
+          if (serverTime > localKnownServerTime) {
+            if (serverMeta.lastUserAgent && serverMeta.lastUserAgent !== navigator.userAgent) {
+              setConflictState({
+                serverUpdatedAt: serverMeta.updatedAt,
+                localLastModified: draft.lastModified,
+              })
+              return
+            }
+          }
+        }
         pushLocalToServer()
       }
     })
@@ -545,6 +560,8 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
     const handler = async (e: MouseEvent) => {
       const anchor = (e.target as HTMLElement).closest('a')
       if (!anchor) return
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return
+      if (anchor.target === '_blank') return
       const href = anchor.getAttribute('href')
       if (!href || href.startsWith('http') || href.startsWith('#')) return
       if (href === window.location.pathname) return
@@ -773,9 +790,8 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
       walkCompletion: walkCompletion,
       outcome,
       notes: notes || undefined,
-      // Clear obs-level location for SIGHTED reports (server also nukes on submit)
-      lat: hasSightingsNow ? undefined : (lat ?? undefined),
-      lng: hasSightingsNow ? undefined : (lng ?? undefined),
+      lat: lat ?? undefined,
+      lng: lng ?? undefined,
       sightings: validSightings,
       userAgent: navigator.userAgent,
     })

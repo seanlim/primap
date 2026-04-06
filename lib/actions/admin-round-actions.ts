@@ -244,6 +244,7 @@ export async function bulkCreateWalks(data: {
 export async function updateSettings(data: {
   requiredWalksPerRound: number
   lateCancelHours: number
+  maxMediaPerReport: number
 }) {
   const { supabase } = await requireAdmin()
 
@@ -260,6 +261,7 @@ export async function updateSettings(data: {
     .update({
       required_walks_per_round: data.requiredWalksPerRound,
       late_cancel_hours: data.lateCancelHours,
+      max_media_per_report: data.maxMediaPerReport,
     })
     .eq('id', existing.id)
 

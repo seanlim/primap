@@ -46,6 +46,7 @@ export function MediaUploader({
   clientParentId,
 }: MediaUploaderProps) {
   const [media, setMedia] = useState<MediaItem[]>(existingMedia)
+  const [error, setError] = useState<string | null>(null)
 
   // Sync when parent updates existingMedia (e.g., after offline sync fetches server media)
   useEffect(() => {
@@ -219,6 +220,13 @@ export function MediaUploader({
             const res = await fetch('/api/media', { method: 'POST', body: formData })
             const result = await res.json()
 
+            if (res.status === 422) {
+              // Server-side limit reached — show error, don't queue offline
+              setError(result.error || 'Media limit reached')
+              setTimeout(() => setError(null), 5000)
+              break // Stop processing remaining files
+            }
+
             if (result.success && result.media) {
               setMedia(prev => [...prev, result.media as MediaItem])
             } else {
@@ -380,6 +388,11 @@ export function MediaUploader({
             </div>
           ))}
         </div>
+      )}
+
+      {/* Error message */}
+      {error && (
+        <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
       )}
 
       {/* Upload button — always shown (works both online and offline) */}

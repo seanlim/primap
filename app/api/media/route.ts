@@ -17,6 +17,32 @@ export async function POST(request: NextRequest) {
   if (!file) return NextResponse.json({ error: 'No file provided' })
   if (!parentId) return NextResponse.json({ error: 'No parentId provided' })
 
+  // Fetch configurable media limit
+  const { data: settings } = await supabase
+    .from('app_settings')
+    .select('max_media_per_report')
+    .limit(1)
+    .single()
+  const maxMedia = settings?.max_media_per_report ?? 10
+
+  // Check current media count for this parent
+  const column = parentType === 'observation' ? 'observation_id' : 'sighting_id'
+  const { count, error: countError } = await supabase
+    .from('media')
+    .select('*', { count: 'exact', head: true })
+    .eq(column, parentId)
+
+  if (countError) {
+    return NextResponse.json({ error: 'Failed to check media count' }, { status: 500 })
+  }
+
+  if ((count ?? 0) >= maxMedia) {
+    return NextResponse.json(
+      { error: `Maximum of ${maxMedia} media files allowed per report` },
+      { status: 422 }
+    )
+  }
+
   const fileExt = file.name.split('.').pop()
   const filePath = `${user.id}/${parentId}/${crypto.randomUUID()}.${fileExt}`
 

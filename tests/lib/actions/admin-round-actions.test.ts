@@ -264,12 +264,14 @@ describe('admin-round-actions', () => {
       const result = await updateSettings({
         requiredWalksPerRound: 4,
         lateCancelHours: 24,
+        maxMediaPerReport: 10,
       })
 
       expect(result).toEqual({ success: true })
       expect(methods.update).toHaveBeenCalledWith({
         required_walks_per_round: 4,
         late_cancel_hours: 24,
+        max_media_per_report: 10,
       })
       expect(revalidatePath).toHaveBeenCalledWith('/admin/settings')
     })
@@ -281,6 +283,7 @@ describe('admin-round-actions', () => {
       const result = await updateSettings({
         requiredWalksPerRound: 4,
         lateCancelHours: 24,
+        maxMediaPerReport: 10,
       })
 
       expect(result).toEqual({ error: 'Settings not found' })
@@ -300,9 +303,28 @@ describe('admin-round-actions', () => {
       const result = await updateSettings({
         requiredWalksPerRound: 4,
         lateCancelHours: 24,
+        maxMediaPerReport: 10,
       })
 
       expect(result).toEqual({ error: 'Update failed' })
+    })
+
+    it('includes maxMediaPerReport in update call', async () => {
+      setupAdmin()
+      methods.single.mockResolvedValueOnce({
+        data: { id: 'settings-1' },
+        error: null,
+      })
+
+      await updateSettings({
+        requiredWalksPerRound: 4,
+        lateCancelHours: 48,
+        maxMediaPerReport: 15,
+      })
+
+      expect(methods.update).toHaveBeenCalledWith(
+        expect.objectContaining({ max_media_per_report: 15 })
+      )
     })
   })
 

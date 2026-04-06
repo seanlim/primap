@@ -15,7 +15,7 @@ export default async function EditReportPage({
   if (!user) redirect('/login')
 
   // Run all queries in parallel
-  const [walkResult, membershipResult, obsResult] = await Promise.all([
+  const [walkResult, membershipResult, obsResult, settingsResult] = await Promise.all([
     supabase
       .from('walk_slots')
       .select('*, survey_rounds(name)')
@@ -34,6 +34,11 @@ export default async function EditReportPage({
       .eq('slot_id', walkId)
       .eq('user_id', user.id)
       .single(),
+    supabase
+      .from('app_settings')
+      .select('max_media_per_report')
+      .limit(1)
+      .single(),
   ])
 
   const walk = walkResult.data
@@ -43,6 +48,7 @@ export default async function EditReportPage({
   if (!membership) redirect('/report')
 
   const existingObs = obsResult.data
+  const maxMediaPerReport = settingsResult.data?.max_media_per_report ?? 10
 
   // Can't edit submitted observations
   if (existingObs?.status === 'SUBMITTED') {
@@ -59,6 +65,7 @@ export default async function EditReportPage({
         endTime: walk.end_time,
         roundName: walk.survey_rounds.name,
       }}
+      maxMediaPerReport={maxMediaPerReport}
       existingObservation={existingObs ? {
         id: existingObs.id,
         walkCompletion: existingObs.walk_completion,

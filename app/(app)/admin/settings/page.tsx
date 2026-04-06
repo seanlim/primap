@@ -17,6 +17,7 @@ export default async function AdminSettingsPage() {
       settings={{
         requiredWalksPerRound: settings?.required_walks_per_round || 4,
         lateCancelHours: settings?.late_cancel_hours || 48,
+        maxMediaPerReport: settings?.max_media_per_report || 10,
       }}
     />
   )

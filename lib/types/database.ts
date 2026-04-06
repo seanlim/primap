@@ -17,6 +17,7 @@ export type Database = {
           created_at: string
           id: string
           late_cancel_hours: number
+          max_media_per_report: number
           required_walks_per_round: number
           updated_at: string
         }
@@ -24,6 +25,7 @@ export type Database = {
           created_at?: string
           id?: string
           late_cancel_hours?: number
+          max_media_per_report?: number
           required_walks_per_round?: number
           updated_at?: string
         }
@@ -31,6 +33,7 @@ export type Database = {
           created_at?: string
           id?: string
           late_cancel_hours?: number
+          max_media_per_report?: number
           required_walks_per_round?: number
           updated_at?: string
         }

@@ -23,6 +23,7 @@ interface Props {
     endTime: string
     roundName: string
   }
+  maxMediaPerReport?: number
   existingObservation: {
     id: string
     walkCompletion: 'COMPLETED' | 'PARTIAL' | 'ABORTED'
@@ -57,7 +58,7 @@ const SPECIES_OPTIONS = [
   { value: 'DUSKY', label: 'Dusky Langur' },
 ]
 
-export function ObservationFormClient({ slot, existingObservation }: Props) {
+export function ObservationFormClient({ slot, maxMediaPerReport = 10, existingObservation }: Props) {
   const [walkCompletion, setWalkCompletion] = useState(existingObservation?.walkCompletion ?? 'PARTIAL')
   const [notes, setNotes] = useState(existingObservation?.notes ?? '')
   const [lat, setLat] = useState<number | null>(existingObservation?.lat ?? null)
@@ -854,6 +855,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
                     parentId={sighting.id ?? null}
                     clientParentId={sighting.clientTempId}
                     existingMedia={sighting.media}
+                    maxFiles={maxMediaPerReport}
                     onExifGps={(exifLat, exifLng) => {
                       if (!sighting.lat && !sighting.lng) {
                         updateSighting(index, 'lat', exifLat)
@@ -918,6 +920,7 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
             parentId={observationId ?? null}
             clientParentId={clientDraftId}
             existingMedia={existingObservation?.media || []}
+            maxFiles={maxMediaPerReport}
             onExifGps={(exifLat, exifLng) => {
               if (!lat && !lng) {
                 setLat(exifLat)

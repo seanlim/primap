@@ -27,6 +27,7 @@ interface MediaUploaderProps {
   parentId: string | null
   existingMedia: MediaItem[]
   maxFiles?: number
+  label?: string
   onExifGps?: (lat: number, lng: number) => void
   onExifDatetime?: (datetime: string) => void
   offline?: boolean
@@ -39,6 +40,7 @@ export function MediaUploader({
   parentId,
   existingMedia,
   maxFiles = 10,
+  label,
   onExifGps,
   onExifDatetime,
   offline = false,
@@ -308,6 +310,16 @@ export function MediaUploader({
 
   return (
     <div className="space-y-2">
+      {/* Label with counter */}
+      {label && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-gray-500">{label}</span>
+          <span className={`text-xs tabular-nums ${totalMedia >= maxFiles ? 'text-amber-500 font-medium' : 'text-gray-400'}`}>
+            {totalMedia}/{maxFiles}
+          </span>
+        </div>
+      )}
+
       {/* Preview grid */}
       {(totalMedia > 0 || uploading.size > 0) && (
         <div className="grid grid-cols-3 gap-2">
@@ -395,7 +407,7 @@ export function MediaUploader({
         <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
       )}
 
-      {/* Upload button — always shown (works both online and offline) */}
+      {/* Upload button */}
       {totalMedia < maxFiles && (
         <button
           type="button"

@@ -849,8 +849,8 @@ export function ObservationFormClient({ slot, maxMediaPerReport = 10, existingOb
 
                 {/* Media for this sighting */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Photos/Videos</label>
                   <MediaUploader
+                    label="Photos/Videos"
                     parentType="sighting"
                     parentId={sighting.id ?? null}
                     clientParentId={sighting.clientTempId}
@@ -916,6 +916,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = 10, existingOb
         <div id="step-photos" className="bg-white rounded-2xl p-5 shadow-sm space-y-3 scroll-mt-20">
           <h2 className="text-sm font-semibold text-gray-900">5. Photos/Videos</h2>
           <MediaUploader
+            label="Photos/Videos"
             parentType="observation"
             parentId={observationId ?? null}
             clientParentId={clientDraftId}

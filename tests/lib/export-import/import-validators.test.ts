@@ -52,15 +52,18 @@ function createMockAdminClient(
   profiles: { email: string }[] = [{ email: 'alice@test.com' }],
   rounds: { name: string }[] = [{ name: 'Round 1' }]
 ) {
+  const chainedSelect = (data: unknown[]) => ({
+    select: vi.fn().mockReturnValue({
+      order: vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValue({ data, error: null }),
+      }),
+    }),
+  })
   return {
     from: vi.fn((table: string) => {
-      if (table === 'profiles') {
-        return { select: vi.fn().mockResolvedValue({ data: profiles, error: null }) }
-      }
-      if (table === 'survey_rounds') {
-        return { select: vi.fn().mockResolvedValue({ data: rounds, error: null }) }
-      }
-      return { select: vi.fn().mockResolvedValue({ data: [], error: null }) }
+      if (table === 'profiles') return chainedSelect(profiles)
+      if (table === 'survey_rounds') return chainedSelect(rounds)
+      return chainedSelect([])
     }),
   } as unknown as Parameters<typeof validateLegacyWorkbook>[1]
 }

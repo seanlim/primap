@@ -11,10 +11,12 @@ function createMockClient(options: {
 
   const mockFrom = vi.fn().mockReturnValue({
     select: vi.fn().mockReturnValue({
-      range: vi.fn().mockImplementation(() => {
-        const result = selectResults[callIndex] ?? { data: [], error: null }
-        callIndex++
-        return Promise.resolve(result)
+      order: vi.fn().mockReturnValue({
+        range: vi.fn().mockImplementation(() => {
+          const result = selectResults[callIndex] ?? { data: [], error: null }
+          callIndex++
+          return Promise.resolve(result)
+        }),
       }),
     }),
   })

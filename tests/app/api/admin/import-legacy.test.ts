@@ -55,15 +55,19 @@ function makeEmptyRequest() {
 
 function setupAdminMocks() {
   // Rounds lookup
-  const roundsSelect = vi.fn().mockResolvedValue({
-    data: [{ id: 'r1', name: 'Round 1' }],
-    error: null,
+  const roundsData = { data: [{ id: 'r1', name: 'Round 1' }], error: null }
+  const roundsSelect = vi.fn().mockReturnValue({
+    order: vi.fn().mockReturnValue({
+      limit: vi.fn().mockResolvedValue(roundsData),
+    }),
   })
 
   // Profiles lookup
-  const profilesSelect = vi.fn().mockResolvedValue({
-    data: [{ id: 'u1', email: 'alice@test.com' }],
-    error: null,
+  const profilesData = { data: [{ id: 'u1', email: 'alice@test.com' }], error: null }
+  const profilesSelect = vi.fn().mockReturnValue({
+    order: vi.fn().mockReturnValue({
+      limit: vi.fn().mockResolvedValue(profilesData),
+    }),
   })
 
   // Walk slot lookup (existing)
@@ -381,9 +385,9 @@ describe('POST /api/admin/import-legacy', () => {
       const result = (() => {
         switch (table) {
           case 'survey_rounds':
-            return { select: vi.fn().mockResolvedValue({ data: [{ id: 'r1', name: 'Round 1' }], error: null }) }
+            return { select: vi.fn().mockReturnValue({ order: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue({ data: [{ id: 'r1', name: 'Round 1' }], error: null }) }) }) }
           case 'profiles':
-            return { select: vi.fn().mockResolvedValue({ data: [{ id: 'u1', email: 'alice@test.com' }], error: null }) }
+            return { select: vi.fn().mockReturnValue({ order: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue({ data: [{ id: 'u1', email: 'alice@test.com' }], error: null }) }) }) }
           case 'walk_slots':
             return {
               select: vi.fn().mockReturnValue({
@@ -504,9 +508,9 @@ describe('POST /api/admin/import-legacy', () => {
     mockAdminFrom.mockImplementation((table: string) => {
       switch (table) {
         case 'survey_rounds':
-          return { select: vi.fn().mockResolvedValue({ data: [{ id: 'r1', name: 'Round 1' }], error: null }) }
+          return { select: vi.fn().mockReturnValue({ order: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue({ data: [{ id: 'r1', name: 'Round 1' }], error: null }) }) }) }
         case 'profiles':
-          return { select: vi.fn().mockResolvedValue({ data: [{ id: 'u1', email: 'alice@test.com' }], error: null }) }
+          return { select: vi.fn().mockReturnValue({ order: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue({ data: [{ id: 'u1', email: 'alice@test.com' }], error: null }) }) }) }
         case 'walk_slots':
           return {
             select: vi.fn().mockReturnValue({

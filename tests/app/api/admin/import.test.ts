@@ -242,7 +242,7 @@ describe('POST /api/admin/import', () => {
 
   // --- Error handling ---
 
-  it('reports upsert errors without failing import', async () => {
+  it('reports upsert errors as partial failure', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'admin1' } } })
     mockProfileSingle.mockResolvedValue({ data: { role: 'ADMIN' } })
     mockParseWorkbook.mockResolvedValue({ profiles: [{ id: 'p1' }] })
@@ -252,7 +252,8 @@ describe('POST /api/admin/import', () => {
 
     const response = await POST(makeRequest())
     const body = await response.json()
-    expect(body.success).toBe(true)
+    expect(body.success).toBe(false)
+    expect(body.partial).toBe(true)
     expect(body.summary.profiles.errors[0]).toContain('FK violation')
   })
 

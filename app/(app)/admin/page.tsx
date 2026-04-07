@@ -56,7 +56,7 @@ function DonutMetricCard({
         <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
       </div>
 
-      <div className="mt-4 flex items-start gap-3">
+      <div className="mt-4 flex items-start gap-3" style={{flexWrap: "wrap"}}>
         <div className="relative h-36 w-36 shrink-0">
           <svg viewBox="0 0 92 92" className="h-full w-full -rotate-90" aria-hidden="true">
             <circle cx="46" cy="46" r={radius} fill="none" stroke={trackColor} strokeWidth="10" />

@@ -86,7 +86,7 @@ export default async function HomePage() {
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-white rounded-2xl p-4 shadow-sm border-l-4 border-green-500">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-green-50 rounded-lg flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 bg-green-50 rounded-lg flex items-center justify-center">
               <Calendar className="w-4 h-4 text-green-600" />
             </div>
             <div>
@@ -97,7 +97,7 @@ export default async function HomePage() {
         </div>
         <div className="bg-white rounded-2xl p-4 shadow-sm border-l-4 border-yellow-500">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-yellow-50 rounded-lg flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 bg-yellow-50 rounded-lg flex items-center justify-center">
               <PenLine className="w-4 h-4 text-yellow-600" />
             </div>
             <div>
@@ -108,7 +108,7 @@ export default async function HomePage() {
         </div>
         <div className="bg-white rounded-2xl p-4 shadow-sm border-l-4 border-blue-500">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center">
               <CheckCircle className="w-4 h-4 text-blue-600" />
             </div>
             <div>

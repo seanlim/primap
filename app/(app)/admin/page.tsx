@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { Users, Calendar, AlertTriangle, Settings, ClipboardList, CheckCircle, Gauge, ArrowRight, Footprints } from 'lucide-react'
+import { Users, Calendar, AlertTriangle, Settings, ClipboardList, CheckCircle, Gauge, ArrowRight, Footprints, Database } from 'lucide-react'
 import { getAdminVolunteerAnalyticsLanding } from '@/lib/admin-volunteer-analytics'
 
 export const dynamic = 'force-dynamic'
@@ -119,6 +119,7 @@ export default async function AdminDashboard() {
     { label: 'Walks', value: totalWalks || 0, sub: 'Total', href: '/admin/walks', icon: Footprints, color: 'bg-purple-50 text-purple-600', accentColor: '#9333ea' },
     { label: 'Reports', value: totalObservations || 0, sub: 'Submitted', href: '/admin/reports', icon: ClipboardList, color: 'bg-indigo-50 text-indigo-600', accentColor: '#4f46e5' },
     { label: 'Incidents', value: openIncidents || 0, sub: 'Open', href: '/admin/incidents', icon: AlertTriangle, color: 'bg-red-50 text-red-600', accentColor: '#dc2626' },
+    { label: 'Data', value: '', sub: '', href: '/admin/data', icon: Database, color: 'bg-orange-50 text-orange-600', reserveValueSpace: true, accentColor: '#f97316' },
     { label: 'Settings', value: '', sub: '', href: '/admin/settings', icon: Settings, color: 'bg-gray-50 text-gray-600', reserveValueSpace: true, accentColor: '#9ca3af' },
   ]
 

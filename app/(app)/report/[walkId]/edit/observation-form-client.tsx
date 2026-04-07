@@ -13,6 +13,7 @@ import { Breadcrumb } from '@/components/ui/breadcrumb'
 import { getDraft, putDraft, deleteDraft, clearSyncStateForWalk, getMediaByClientParent, updateMediaResolvedParentId, getOutboxItems } from '@/lib/offline/db'
 import { processOutbox } from '@/lib/offline/sync-engine'
 import { type SightingForm } from '@/lib/types/observation'
+import { DEFAULT_MAX_MEDIA_PER_REPORT } from '@/lib/constants/settings'
 
 interface Props {
   slot: {
@@ -58,7 +59,7 @@ const SPECIES_OPTIONS = [
   { value: 'DUSKY', label: 'Dusky Langur' },
 ]
 
-export function ObservationFormClient({ slot, maxMediaPerReport = 10, existingObservation }: Props) {
+export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_MEDIA_PER_REPORT, existingObservation }: Props) {
   const [walkCompletion, setWalkCompletion] = useState(existingObservation?.walkCompletion ?? 'PARTIAL')
   const [notes, setNotes] = useState(existingObservation?.notes ?? '')
   const [lat, setLat] = useState<number | null>(existingObservation?.lat ?? null)

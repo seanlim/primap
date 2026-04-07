@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import { ObservationFormClient } from './observation-form-client'
+import { DEFAULT_MAX_MEDIA_PER_REPORT } from '@/lib/constants/settings'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,7 +49,7 @@ export default async function EditReportPage({
   if (!membership) redirect('/report')
 
   const existingObs = obsResult.data
-  const maxMediaPerReport = settingsResult.data?.max_media_per_report ?? 10
+  const maxMediaPerReport = settingsResult.data?.max_media_per_report ?? DEFAULT_MAX_MEDIA_PER_REPORT
 
   // Can't edit submitted observations
   if (existingObs?.status === 'SUBMITTED') {

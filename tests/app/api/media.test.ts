@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server'
 
 const mockStorage = {
   upload: vi.fn().mockResolvedValue({ error: null }),
+  remove: vi.fn().mockResolvedValue({ error: null }),
 }
 
 const mockSupabase = {
@@ -123,6 +124,7 @@ describe('POST /api/media', () => {
     vi.clearAllMocks()
     mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
     mockStorage.upload.mockResolvedValue({ error: null })
+    mockStorage.remove.mockResolvedValue({ error: null })
   })
 
   // ─── Auth ──────────────────────────────────────────────────────────────
@@ -522,6 +524,116 @@ describe('POST /api/media', () => {
 
       expect(mockSupabase.storage.from).toHaveBeenCalledWith('observation-media')
       expect(mockStorage.upload).toHaveBeenCalled()
+    })
+  })
+
+  // ─── Trigger-enforced limit (race-safe path) ──────────────────────────
+  // The DB trigger `enforce_max_media_per_report_trigger` is the source of
+  // truth and serializes concurrent inserts per parent. The route handler
+  // pre-check is only an optimization; if two requests race past it, one
+  // lands in the insert error branch with the trigger's RAISE EXCEPTION
+  // message and must (a) clean up the just-uploaded storage object and
+  // (b) translate the error into HTTP 422 instead of a generic 500.
+
+  describe('trigger-enforced limit', () => {
+    it('returns 422 when insert fails with the trigger error message', async () => {
+      setupUser()
+      setupMediaUploadMocks({
+        // Pre-check passes (count below limit) so the request reaches the insert
+        count: 0,
+        // …but the trigger fires because some other concurrent request inserted first
+        insertError: { message: 'Maximum of 10 media files allowed per report' },
+      })
+
+      const response = await POST(makeRequest(makeFormData()))
+      const body = await response.json()
+
+      expect(response.status).toBe(422)
+      expect(body.error).toBe('Maximum of 10 media files allowed per report')
+    })
+
+    it('cleans up the storage object when the insert fails with the trigger error', async () => {
+      setupUser()
+      setupMediaUploadMocks({
+        count: 0,
+        insertError: { message: 'Maximum of 10 media files allowed per report' },
+      })
+
+      await POST(makeRequest(makeFormData()))
+
+      expect(mockStorage.remove).toHaveBeenCalledTimes(1)
+      // The path is `${user.id}/${parentId}/${uuid}.${ext}` — assert prefix only
+      const removeArg = mockStorage.remove.mock.calls[0]?.[0] as string[]
+      expect(removeArg).toHaveLength(1)
+      expect(removeArg[0]).toMatch(/^user-1\/parent-1\/.+\.jpg$/)
+    })
+
+    it('cleans up the storage object on a generic insert failure too', async () => {
+      setupUser()
+      setupMediaUploadMocks({
+        count: 0,
+        insertError: { message: 'Insert failed' },
+      })
+
+      await POST(makeRequest(makeFormData()))
+
+      expect(mockStorage.remove).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not return 422 for generic insert failures (only trigger limit errors map to 422)', async () => {
+      setupUser()
+      setupMediaUploadMocks({
+        count: 0,
+        insertError: { message: 'Insert failed' },
+      })
+
+      const response = await POST(makeRequest(makeFormData()))
+      const body = await response.json()
+
+      expect(response.status).not.toBe(422)
+      expect(body.error).toBe('Insert failed')
+    })
+
+    it('does not call storage.remove on a successful insert', async () => {
+      setupUser()
+      setupMediaUploadMocks({
+        count: 0,
+        insertData: { id: 'media-1' },
+      })
+
+      await POST(makeRequest(makeFormData()))
+
+      expect(mockStorage.remove).not.toHaveBeenCalled()
+    })
+
+    it('swallows storage.remove failures so the original error is still returned', async () => {
+      setupUser()
+      setupMediaUploadMocks({
+        count: 0,
+        insertError: { message: 'Maximum of 10 media files allowed per report' },
+      })
+      mockStorage.remove.mockRejectedValueOnce(new Error('Storage cleanup blew up'))
+
+      const response = await POST(makeRequest(makeFormData()))
+      const body = await response.json()
+
+      expect(response.status).toBe(422)
+      expect(body.error).toBe('Maximum of 10 media files allowed per report')
+    })
+
+    it('matches the trigger error message regardless of the configured limit value', async () => {
+      setupUser()
+      setupMediaUploadMocks({
+        settings: { max_media_per_report: 25 },
+        count: 0,
+        insertError: { message: 'Maximum of 25 media files allowed per report' },
+      })
+
+      const response = await POST(makeRequest(makeFormData()))
+      const body = await response.json()
+
+      expect(response.status).toBe(422)
+      expect(body.error).toBe('Maximum of 25 media files allowed per report')
     })
   })
 })

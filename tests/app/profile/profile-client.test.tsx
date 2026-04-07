@@ -48,7 +48,7 @@ describe('ProfileClient', () => {
       />
     )
 
-    expect(screen.getByText('My Report Map')).toBeInTheDocument()
+    expect(screen.getByText('My Sighting Map')).toBeInTheDocument()
     expect(screen.getByText('2 report coordinates plotted from your submitted reports.')).toBeInTheDocument()
     expect(mockMapView).toHaveBeenCalledWith(
       expect.objectContaining({

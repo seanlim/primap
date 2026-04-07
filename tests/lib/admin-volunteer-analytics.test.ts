@@ -1,5 +1,7 @@
 import {
   buildVolunteerAnalyticsSnapshot,
+  getAdminRoundsAnalyticsPageSnapshot,
+  getAdminVolunteerAnalyticsLanding,
   getAdminWalksAnalyticsPageSnapshotByRound,
 } from '@/lib/admin-volunteer-analytics'
 
@@ -173,6 +175,7 @@ describe('getAdminWalksAnalyticsPageSnapshotByRound', () => {
           }
           if (table === 'slot_memberships') return createQuery({ data: [] })
           if (table === 'observations') return createQuery({ data: [] })
+          if (table === 'sightings') return createQuery({ data: [] })
           if (table === 'profiles') return createQuery({ count: 0 })
           throw new Error(`Unexpected table ${table}`)
         },
@@ -186,6 +189,256 @@ describe('getAdminWalksAnalyticsPageSnapshotByRound', () => {
       targetWalk: null,
       targetWalkRoundName: null,
       overview: null,
+      reportMapPoints: [],
     })
+  })
+
+  it('includes sighted and not-sighted coordinates for the selected walk', async () => {
+    const supabase = {
+      from: (table: string) => ({
+        select: (..._args: unknown[]) => {
+          if (table === 'survey_rounds') {
+            return createQuery({
+              data: [
+                {
+                  id: 'round-1',
+                  name: 'Round 1',
+                  start_date: '2026-03-01',
+                  end_date: '2026-03-31',
+                  status: 'OPEN',
+                },
+              ],
+            })
+          }
+          if (table === 'walk_slots') {
+            return createQuery({
+              data: [
+                {
+                  id: 'slot-1',
+                  round_id: 'round-1',
+                  walk_date: '2026-03-10',
+                  start_time: '07:00:00',
+                  end_time: '10:00:00',
+                  location_name: 'Hill',
+                  max_volunteers: 3,
+                },
+              ],
+            })
+          }
+          if (table === 'slot_memberships') {
+            return createQuery({
+              data: [
+                { slot_id: 'slot-1', user_id: 'user-1', status: 'ACTIVE' },
+              ],
+            })
+          }
+          if (table === 'observations') {
+            return createQuery({
+              data: [
+                { id: 'obs-1', slot_id: 'slot-1', status: 'SUBMITTED', outcome: 'SIGHTED', lat: 1.35, lng: 103.81 },
+                { id: 'obs-2', slot_id: 'slot-1', status: 'SUBMITTED', outcome: 'NOT_SIGHTED', lat: 1.333, lng: 103.799 },
+              ],
+            })
+          }
+          if (table === 'sightings') {
+            return createQuery({
+              data: [
+                { observation_id: 'obs-1', lat: 1.3521, lng: 103.8198, species: 'RBL' },
+                { observation_id: 'obs-1', lat: null, lng: 103.81, species: 'RBL' },
+                { observation_id: 'obs-1', lat: 1.301, lng: 103.77, species: 'LTM' },
+              ],
+            })
+          }
+          if (table === 'profiles') return createQuery({ count: 0 })
+          throw new Error(`Unexpected table ${table}`)
+        },
+      }),
+    }
+
+    const snapshot = await getAdminWalksAnalyticsPageSnapshotByRound(supabase as never, {
+      roundId: 'round-1',
+      walkId: 'slot-1',
+      now: new Date('2026-03-20T12:00:00+08:00'),
+    })
+
+    expect(snapshot.reportMapPoints).toEqual([
+      {
+        lat: 1.3521,
+        lng: 103.8198,
+        outcome: 'SIGHTED',
+        label: 'RBL',
+        popupMeta: ['Hill', '10/03/2026 07:00', 'Round 1'],
+        species: 'RBL',
+      },
+      {
+        lat: 1.301,
+        lng: 103.77,
+        outcome: 'SIGHTED',
+        label: 'LTM',
+        popupMeta: ['Hill', '10/03/2026 07:00', 'Round 1'],
+        species: 'LTM',
+      },
+      {
+        lat: 1.333,
+        lng: 103.799,
+        outcome: 'NOT_SIGHTED',
+        label: 'No sighting report 1',
+        popupMeta: ['Hill', '10/03/2026 07:00', 'Round 1'],
+      },
+    ])
+  })
+})
+
+describe('admin analytics report maps', () => {
+  function createQuery(result: { data?: unknown; count?: number | null }) {
+    const query = {
+      eq: () => query,
+      order: () => query,
+      limit: () => query,
+      in: () => query,
+      then: (resolve: (value: unknown) => unknown) =>
+        Promise.resolve(resolve({ data: result.data ?? null, error: null, count: result.count ?? null })),
+    }
+
+    return query
+  }
+
+  function createAnalyticsSupabase() {
+    const sightings = [
+      { observation_id: 'obs-1', lat: 1.3521, lng: 103.8198, species: 'RBL' },
+      { observation_id: 'obs-3', lat: 1.3099, lng: 103.7801, species: 'DUSKY' },
+    ]
+
+    return {
+      from: (table: string) => ({
+        select: (..._args: unknown[]) => {
+          if (table === 'survey_rounds') {
+            return createQuery({
+              data: [
+                {
+                  id: 'round-1',
+                  name: 'Round 1',
+                  start_date: '2026-03-01',
+                  end_date: '2026-03-31',
+                  status: 'OPEN',
+                },
+                {
+                  id: 'round-2',
+                  name: 'Round 2',
+                  start_date: '2026-04-01',
+                  end_date: '2026-04-30',
+                  status: 'DRAFT',
+                },
+              ],
+            })
+          }
+          if (table === 'walk_slots') {
+            return createQuery({
+              data: [
+                {
+                  id: 'slot-1',
+                  round_id: 'round-1',
+                  walk_date: '2026-03-10',
+                  start_time: '07:00:00',
+                  end_time: '10:00:00',
+                  location_name: 'Hill',
+                  max_volunteers: 3,
+                },
+                {
+                  id: 'slot-2',
+                  round_id: 'round-2',
+                  walk_date: '2026-04-12',
+                  start_time: '08:00:00',
+                  end_time: '10:00:00',
+                  location_name: 'Coast',
+                  max_volunteers: 3,
+                },
+              ],
+            })
+          }
+          if (table === 'slot_memberships') return createQuery({ data: [] })
+          if (table === 'observations') {
+            return createQuery({
+              data: [
+                { id: 'obs-1', slot_id: 'slot-1', status: 'SUBMITTED', outcome: 'SIGHTED', lat: 1.35, lng: 103.81 },
+                { id: 'obs-2', slot_id: 'slot-1', status: 'SUBMITTED', outcome: 'NOT_SIGHTED', lat: 1.333, lng: 103.799 },
+                { id: 'obs-3', slot_id: 'slot-2', status: 'SUBMITTED', outcome: 'SIGHTED', lat: 1.31, lng: 103.78 },
+              ],
+            })
+          }
+          if (table === 'sightings') {
+            const query = {
+              eq: () => query,
+              order: () => query,
+              limit: () => query,
+              in: (_column: string, ids: string[]) =>
+                createQuery({
+                  data: sightings.filter((sighting) => ids.includes(sighting.observation_id)),
+                }),
+              then: (resolve: (value: unknown) => unknown) =>
+                Promise.resolve(resolve({ data: sightings, error: null, count: null })),
+            }
+            return query
+          }
+          if (table === 'profiles') return createQuery({ count: 0 })
+          throw new Error(`Unexpected table ${table}`)
+        },
+      }),
+    }
+  }
+
+  it('includes report map points in the overall landing snapshot', async () => {
+    const snapshot = await getAdminVolunteerAnalyticsLanding(createAnalyticsSupabase() as never, new Date('2026-03-20T12:00:00+08:00'))
+
+    expect(snapshot.reportMapPoints).toEqual([
+      {
+        lat: 1.3521,
+        lng: 103.8198,
+        outcome: 'SIGHTED',
+        label: 'RBL',
+        popupMeta: ['Hill', '10/03/2026 07:00', 'Round 1'],
+        species: 'RBL',
+      },
+      {
+        lat: 1.3099,
+        lng: 103.7801,
+        outcome: 'SIGHTED',
+        label: 'DUSKY',
+        popupMeta: ['Coast', '12/04/2026 08:00', 'Round 2'],
+        species: 'DUSKY',
+      },
+      {
+        lat: 1.333,
+        lng: 103.799,
+        outcome: 'NOT_SIGHTED',
+        label: 'No sighting report 1',
+        popupMeta: ['Hill', '10/03/2026 07:00', 'Round 1'],
+      },
+    ])
+  })
+
+  it('includes only the selected round report map points on the rounds analytics page', async () => {
+    const snapshot = await getAdminRoundsAnalyticsPageSnapshot(createAnalyticsSupabase() as never, {
+      roundId: 'round-1',
+      now: new Date('2026-03-20T12:00:00+08:00'),
+    })
+
+    expect(snapshot.reportMapPoints).toEqual([
+      {
+        lat: 1.3521,
+        lng: 103.8198,
+        outcome: 'SIGHTED',
+        label: 'RBL',
+        popupMeta: ['Hill', '10/03/2026 07:00', 'Round 1'],
+        species: 'RBL',
+      },
+      {
+        lat: 1.333,
+        lng: 103.799,
+        outcome: 'NOT_SIGHTED',
+        label: 'No sighting report 1',
+        popupMeta: ['Hill', '10/03/2026 07:00', 'Round 1'],
+      },
+    ])
   })
 })

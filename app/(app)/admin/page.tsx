@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Users, Calendar, AlertTriangle, Settings, ClipboardList, CheckCircle, Gauge, ArrowRight, Footprints, Database } from 'lucide-react'
 import { getAdminVolunteerAnalyticsLanding } from '@/lib/admin-volunteer-analytics'
 import DonutMetricCard from '../../../components/ui/DonutMetricCard'
+import { ReportMapCard } from '@/components/admin/analytics-shared'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,6 +47,16 @@ export default async function AdminDashboard() {
   return (
     <div className="space-y-6 animate-fade-in">
       <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+
+      <ReportMapCard
+        title="Overall Sighting Map"
+        description={
+          analytics.reportMapPoints.length === 0
+            ? 'No report coordinates have been submitted yet.'
+            : `${analytics.reportMapPoints.length} report coordinate${analytics.reportMapPoints.length === 1 ? '' : 's'} plotted across all rounds.`
+        }
+        reportMapPoints={analytics.reportMapPoints}
+      />
 
       {overall ? (
         <div className="grid grid-cols-2 gap-4">

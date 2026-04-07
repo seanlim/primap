@@ -63,6 +63,4 @@ export type RoundWithCount = SurveyRound & {
 
 // --- Profile page walk history observation ---
 
-export type HistoryObservation = Pick<Observation, 'slot_id' | 'status' | 'outcome'> & {
-  sightings: { count: number }[]
-}
+export type HistoryObservation = Pick<Observation, 'id' | 'slot_id' | 'status' | 'outcome'>

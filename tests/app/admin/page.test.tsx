@@ -14,6 +14,12 @@ vi.mock('@/lib/admin-volunteer-analytics', () => ({
   getAdminVolunteerAnalyticsLanding: (...args: unknown[]) => mockLanding(...args),
 }))
 
+vi.mock('@/components/map/map-view', () => ({
+  MapView: ({ markers }: { markers?: Array<{ label?: string }> }) => (
+    <div data-testid="map-view">Markers: {markers?.length ?? 0}</div>
+  ),
+}))
+
 import AdminDashboard from '../../../app/(app)/admin/page'
 
 function makeAwaitableChain(resolvedValue: unknown) {
@@ -58,6 +64,7 @@ describe('AdminDashboard', () => {
         participatingVolunteers: 7,
         walkCancellations: 2,
       },
+      reportMapPoints: [],
     })
 
     render(await AdminDashboard())
@@ -69,6 +76,8 @@ describe('AdminDashboard', () => {
     expect(screen.getByText('total reports required')).toBeInTheDocument()
     expect(screen.getByText('sign-ups')).toBeInTheDocument()
     expect(screen.getByText('total available capacity')).toBeInTheDocument()
+    expect(screen.getByText('Overall Sighting Map')).toBeInTheDocument()
+    expect(screen.getByTestId('map-view')).toHaveTextContent('Markers: 0')
     expect(screen.getByRole('link', { name: /Users/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Rounds/i })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /^Volunteer Analytics$/i })).not.toBeInTheDocument()

@@ -8,6 +8,7 @@ import { formatDate } from '@/lib/utils/format-date'
 import { updateProfile } from '@/lib/actions/profile-actions'
 import { signOut } from '@/lib/actions/auth-actions'
 import { EmptyState } from '@/components/ui/empty-state'
+import { MapView } from '@/components/map/map-view'
 
 interface Props {
   profile: {
@@ -25,6 +26,14 @@ interface Props {
     draftsPending: number
     requiredWalks: number
   }
+  reportMapPoints: {
+    lat: number
+    lng: number
+    outcome: 'SIGHTED' | 'NOT_SIGHTED'
+    species?: string
+    label?: string
+    popupMeta?: string[]
+  }[]
   walkHistory: {
     membershipId: string
     slotId: string
@@ -74,7 +83,15 @@ function ProgressRing({ percent, size = 80, stroke = 6 }: { percent: number; siz
   )
 }
 
-export function ProfileClient({ profile, stats, walkHistory }: Props) {
+function getSpeciesColor(species?: string) {
+  if (species === 'RBL') return '#111111'
+  if (species === 'LTM') return '#8b5e3c'
+  if (species === 'DUSKY') return '#f97316'
+  if (species === 'OTHER') return '#6b7280'
+  return '#16a34a'
+}
+
+export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: Props) {
   const [editingName, setEditingName] = useState(false)
   const [name, setName] = useState(profile.fullName || '')
   const [saving, setSaving] = useState(false)
@@ -93,6 +110,12 @@ export function ProfileClient({ profile, stats, walkHistory }: Props) {
   }
 
   const progressPercent = Math.min((stats.reportsSubmitted / stats.requiredWalks) * 100, 100)
+  const sightedCount = reportMapPoints.filter((point) => point.outcome === 'SIGHTED').length
+  const notSightedCount = reportMapPoints.filter((point) => point.outcome === 'NOT_SIGHTED').length
+  const rblCount = reportMapPoints.filter((point) => point.outcome === 'SIGHTED' && point.species === 'RBL').length
+  const ltmCount = reportMapPoints.filter((point) => point.outcome === 'SIGHTED' && point.species === 'LTM').length
+  const duskyCount = reportMapPoints.filter((point) => point.outcome === 'SIGHTED' && point.species === 'DUSKY').length
+  const otherCount = reportMapPoints.filter((point) => point.outcome === 'SIGHTED' && point.species === 'OTHER').length
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -204,6 +227,72 @@ export function ProfileClient({ profile, stats, walkHistory }: Props) {
             <p className="text-sm font-medium text-green-700">Round requirement completed!</p>
           </div>
         )}
+      </div>
+
+      <div className="bg-white rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50">
+            <MapPin className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">My Sighting Map</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              {reportMapPoints.length === 0
+                ? 'No submitted report coordinates yet.'
+                : `${reportMapPoints.length} report coordinate${reportMapPoints.length === 1 ? '' : 's'} plotted from your submitted reports.`}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-3 text-xs text-gray-600">
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Sighted</span>
+              <div className="flex items-center gap-2">
+                <span className="h-3 w-3 rounded-full bg-emerald-600 ring-2 ring-white shadow-sm" />
+                <span>Total: {sightedCount}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="h-3 w-3 rounded-full bg-black ring-2 ring-white shadow-sm" />
+                <span>RBL: {rblCount}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: '#8b5e3c' }} />
+                <span>LTM: {ltmCount}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: '#f97316' }} />
+                <span>DUSKY: {duskyCount}</span>
+              </div>
+              {otherCount > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: '#6b7280' }} />
+                  <span>OTHER: {otherCount}</span>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Not Sighted</span>
+              <div className="flex items-center gap-2">
+                <span className="h-3 w-3 rounded-sm bg-amber-500 ring-2 ring-white shadow-sm" />
+                <span>Total: {notSightedCount}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <MapView
+          className="h-80 w-full overflow-hidden rounded-2xl"
+          markers={reportMapPoints.map((location, index) => ({
+            ...location,
+            color: location.outcome === 'SIGHTED' ? getSpeciesColor(location.species) : '#f59e0b',
+            variant: location.outcome === 'SIGHTED' ? 'sighted' : 'not_sighted',
+            label: location.label || `My sighting ${index + 1}`,
+            popupMeta: location.popupMeta,
+          }))}
+        />
       </div>
 
       {/* Walk History Timeline */}

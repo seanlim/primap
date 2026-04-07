@@ -56,6 +56,9 @@ export default async function ProfilePage() {
         id,
         slot_id,
         status,
+        outcome,
+        lat,
+        lng,
         walk_slots (
           id,
           location_name,
@@ -112,14 +115,68 @@ export default async function ProfilePage() {
   const { data: historyObservations } = walkSlotIds.length > 0
     ? await supabase
         .from('observations')
-        .select('slot_id, status, outcome, sightings(count)')
+        .select('id, slot_id, status, outcome, lat, lng')
         .eq('user_id', user.id)
         .in('slot_id', walkSlotIds)
     : { data: [] }
 
   const obsMap = new Map(
-    (historyObservations || []).map(o => [o.slot_id, o as unknown as HistoryObservation])
+    (historyObservations || []).map(o => [o.slot_id, o as HistoryObservation & { id: string }])
   )
+
+  const submittedObservationIds = (submittedObservationHistory || []).map((observation) => observation.id)
+  const { data: submittedSightings } = submittedObservationIds.length > 0
+    ? await supabase
+        .from('sightings')
+        .select('observation_id, lat, lng, species')
+        .in('observation_id', submittedObservationIds)
+    : { data: [] }
+
+  const sightingCountByObservationId = new Map<string, number>()
+  const reportMapPoints = (submittedSightings || []).flatMap((sighting) => {
+    if (!sighting.observation_id) return []
+    sightingCountByObservationId.set(
+      sighting.observation_id,
+      (sightingCountByObservationId.get(sighting.observation_id) ?? 0) + 1
+    )
+
+    if (sighting.lat === null || sighting.lng === null) return []
+
+    const observation = (submittedObservationHistory || []).find(
+      (item) => item.id === sighting.observation_id
+    )
+    const slot = observation?.walk_slots as unknown as WalkRef | undefined
+
+    return [{
+      lat: sighting.lat,
+      lng: sighting.lng,
+      outcome: 'SIGHTED' as const,
+      species: sighting.species,
+      label: sighting.species,
+      popupMeta: [
+        slot?.location_name || 'My sighting',
+        slot?.walk_date ? new Date(slot.walk_date).toLocaleDateString('en-SG') : null,
+        slot?.survey_rounds?.name || null,
+      ].filter(Boolean) as string[],
+    }]
+  })
+
+  const notSightedPoints = (submittedObservationHistory || [])
+    .filter((observation) => observation.outcome === 'NOT_SIGHTED' && observation.lat !== null && observation.lng !== null)
+    .map((observation) => {
+      const slot = observation.walk_slots as unknown as WalkRef | undefined
+      return {
+        lat: observation.lat as number,
+        lng: observation.lng as number,
+        outcome: 'NOT_SIGHTED' as const,
+        label: slot?.location_name || 'No sighting report',
+        popupMeta: [
+          slot?.location_name || 'No sighting report',
+          slot?.walk_date ? new Date(slot.walk_date).toLocaleDateString('en-SG') : null,
+          slot?.survey_rounds?.name || null,
+        ].filter(Boolean),
+      }
+    })
 
   // Get app settings for progress
   const { data: settings } = await supabase
@@ -145,6 +202,7 @@ export default async function ProfilePage() {
         draftsPending: draftsPending || 0,
         requiredWalks: settings?.required_walks_per_round || 4,
       }}
+      reportMapPoints={[...reportMapPoints, ...notSightedPoints]}
       walkHistory={walkHistoryItems.map(w => {
         const slot = w.slot
         const obs = obsMap.get(slot?.id)
@@ -156,7 +214,7 @@ export default async function ProfilePage() {
           startTime: slot?.start_time || '',
           roundName: slot?.survey_rounds?.name || '',
           reportStatus: !obs ? 'none' : obs.status as string,
-          sightingCount: obs?.outcome === 'SIGHTED' ? ((obs.sightings as unknown as { count: number }[])?.[0]?.count || 0) : 0,
+          sightingCount: obs?.outcome === 'SIGHTED' && obs.id ? (sightingCountByObservationId.get(obs.id) || 0) : 0,
         }
       })}
     />

@@ -1,4 +1,5 @@
 import { hasWalkEnded } from '@/lib/utils/walk-participation'
+import { formatDate } from '@/lib/utils/format-date'
 
 type QueryResult<T> = { data: T | null; error: { message: string } | null }
 type CountResult = { count: number | null; error: { message: string } | null }
@@ -439,7 +440,7 @@ async function getReportMapPoints(
         label: speciesLabel ?? `Sighting ${sequence}`,
         popupMeta: [
           slot?.location_name ?? null,
-          slot ? `${new Date(slot.walk_date).toLocaleDateString('en-SG')} ${slot.start_time.slice(0, 5)}` : null,
+          slot ? `${formatDate(slot.walk_date, 'compact')} ${slot.start_time.slice(0, 5)}` : null,
           slot?.round_id ? (roundNameById.get(slot.round_id) ?? null) : null,
         ].filter(Boolean) as string[],
         species: sighting.species,
@@ -467,7 +468,7 @@ async function getReportMapPoints(
         label: `No sighting report ${sequence}`,
         popupMeta: [
           slot?.location_name ?? null,
-          slot ? `${new Date(slot.walk_date).toLocaleDateString('en-SG')} ${slot.start_time.slice(0, 5)}` : null,
+          slot ? `${formatDate(slot.walk_date, 'compact')} ${slot.start_time.slice(0, 5)}` : null,
           slot?.round_id ? (roundNameById.get(slot.round_id) ?? null) : null,
         ].filter(Boolean) as string[],
       }

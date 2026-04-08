@@ -78,6 +78,7 @@ export default async function EditReportPage({
         sightings: existingObs.sightings.map(s => ({
           id: s.id,
           species: s.species,
+          speciesOther: s.species_other ?? '',
           count: s.count,
           observedAt: s.observed_at?.slice(0, 16) ?? null,
           lat: s.lat,

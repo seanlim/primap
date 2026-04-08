@@ -7,6 +7,8 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
@@ -184,8 +186,7 @@ export type Database = {
           submitted_at?: string | null
           updated_at?: string
           user_id: string
-          walk_completion?:
-            | Database["public"]["Enums"]["walk_completion"]
+          walk_completion?: Database["public"]["Enums"]["walk_completion"]
         }
         Update: {
           client_draft_id?: string | null
@@ -201,8 +202,7 @@ export type Database = {
           submitted_at?: string | null
           updated_at?: string
           user_id?: string
-          walk_completion?:
-            | Database["public"]["Enums"]["walk_completion"]
+          walk_completion?: Database["public"]["Enums"]["walk_completion"]
         }
         Relationships: [
           {
@@ -265,6 +265,7 @@ export type Database = {
           observation_id: string
           observed_at: string | null
           species: Database["public"]["Enums"]["species_type"]
+          species_other: string | null
         }
         Insert: {
           count?: string
@@ -276,6 +277,7 @@ export type Database = {
           observation_id: string
           observed_at?: string | null
           species: Database["public"]["Enums"]["species_type"]
+          species_other?: string | null
         }
         Update: {
           count?: string
@@ -287,6 +289,7 @@ export type Database = {
           observation_id?: string
           observed_at?: string | null
           species?: Database["public"]["Enums"]["species_type"]
+          species_other?: string | null
         }
         Relationships: [
           {
@@ -450,7 +453,7 @@ export type Database = {
       observation_outcome: "SIGHTED" | "NOT_SIGHTED"
       observation_status: "DRAFT" | "SUBMITTED"
       round_status: "DRAFT" | "OPEN" | "CLOSED"
-      species_type: "RBL" | "LTM" | "DUSKY"
+      species_type: "RBL" | "LTM" | "DUSKY" | "OTHER"
       user_role: "ADMIN" | "VOLUNTEER"
       user_status: "PENDING" | "ACTIVE" | "REJECTED" | "DISABLED"
       walk_completion: "COMPLETED" | "PARTIAL" | "ABORTED"
@@ -561,14 +564,42 @@ export type Enums<
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
 
-export type Profile = Tables<"profiles">
-export type AppSettings = Tables<"app_settings">
-export type SurveyRound = Tables<"survey_rounds">
-export type WalkSlot = Tables<"walk_slots">
-export type SlotMembership = Tables<"slot_memberships">
-export type Observation = Tables<"observations">
-export type Sighting = Tables<"sightings">
-export type Media = Tables<"media">
-export type Incident = Tables<"incidents">
-export type UserRole = Enums<'user_role'>
-export type UserStatus = Enums<'user_status'>
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      incident_type: [
+        "INJURED_ANIMAL",
+        "DEAD_ANIMAL",
+        "HUMAN_WILDLIFE_CONFLICT",
+        "HABITAT_DAMAGE",
+        "OTHER",
+      ],
+      media_type: ["PHOTO", "VIDEO"],
+      membership_status: ["ACTIVE", "CANCELLED"],
+      observation_outcome: ["SIGHTED", "NOT_SIGHTED"],
+      observation_status: ["DRAFT", "SUBMITTED"],
+      round_status: ["DRAFT", "OPEN", "CLOSED"],
+      species_type: ["RBL", "LTM", "DUSKY", "OTHER"],
+      user_role: ["ADMIN", "VOLUNTEER"],
+      user_status: ["PENDING", "ACTIVE", "REJECTED", "DISABLED"],
+      walk_completion: ["COMPLETED", "PARTIAL", "ABORTED"],
+    },
+  },
+} as const

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Trash2, Loader2 } from 'lucide-react'
 import { formatDate, toLocalDateString } from '@/lib/utils/format-date'
@@ -35,7 +35,8 @@ interface Props {
     serverUpdatedAt: string
     sightings: {
       id: string
-      species: 'RBL' | 'LTM' | 'DUSKY'
+      species: 'RBL' | 'LTM' | 'DUSKY' | 'OTHER'
+      speciesOther: string | null
       count: string
       observedAt: string | null
       lat: number
@@ -57,6 +58,7 @@ const SPECIES_OPTIONS = [
   { value: 'RBL', label: "Raffles' Banded Langur" },
   { value: 'LTM', label: 'Long-tailed Macaque' },
   { value: 'DUSKY', label: 'Dusky Langur' },
+  { value: 'OTHER', label: 'Other (specify)' },
 ]
 
 export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_MEDIA_PER_REPORT, existingObservation }: Props) {
@@ -71,6 +73,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
       id: s.id,
       clientTempId: s.id,
       species: s.species,
+      speciesOther: s.speciesOther || '',
       count: s.count,
       observedAt: s.observedAt || '',
       lat: s.lat,
@@ -140,6 +143,64 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
   const formStateRef = useRef({ walkCompletion, notes, lat, lng, observationId, clientDraftId, sightings })
   formStateRef.current = { walkCompletion, notes, lat, lng, observationId, clientDraftId, sightings }
 
+  // --- DIRTY STATE TRACKING (two-tier) ---
+  const lastLocalSnapshotRef = useRef<string>('')
+  const lastServerSnapshotRef = useRef<string>('')
+
+  const serializeFormState = useCallback((state: typeof formStateRef.current) => {
+    return JSON.stringify({
+      wc: state.walkCompletion,
+      n: state.notes,
+      la: state.lat,
+      ln: state.lng,
+      s: state.sightings.map(s => ({
+        sp: s.species, so: s.speciesOther, c: s.count, o: s.observedAt, la: s.lat, ln: s.lng, n: s.notes,
+      })),
+    })
+  }, [])
+
+  const getDirtyState = useCallback(() => {
+    const current = serializeFormState(formStateRef.current)
+    return {
+      localDirty: lastLocalSnapshotRef.current !== '' && current !== lastLocalSnapshotRef.current,
+      serverDirty: lastServerSnapshotRef.current !== '' && current !== lastServerSnapshotRef.current,
+    }
+  }, [serializeFormState])
+
+  const updateLocalSnapshot = useCallback(() => {
+    lastLocalSnapshotRef.current = serializeFormState(formStateRef.current)
+  }, [serializeFormState])
+
+  const updateServerSnapshot = useCallback(() => {
+    lastServerSnapshotRef.current = serializeFormState(formStateRef.current)
+  }, [serializeFormState])
+
+  const updateBothSnapshots = useCallback(() => {
+    const snap = serializeFormState(formStateRef.current)
+    lastLocalSnapshotRef.current = snap
+    lastServerSnapshotRef.current = snap
+  }, [serializeFormState])
+
+  // Cached serverUpdatedAt for fast IndexedDB flushes (avoids extra getDraft call)
+  const lastServerUpdatedAtRef = useRef<string | null>(null)
+
+  const flushToIndexedDB = useCallback(async () => {
+    const fs = formStateRef.current
+    const filtered = fs.sightings.filter(s => s.species)
+    const has = filtered.length > 0
+    await putDraft(slot.id, {
+      observationId: fs.observationId,
+      clientDraftId: fs.clientDraftId,
+      walkCompletion: fs.walkCompletion as 'COMPLETED' | 'PARTIAL' | 'ABORTED',
+      outcome: has ? 'SIGHTED' : 'NOT_SIGHTED',
+      notes: fs.notes || undefined,
+      lat: fs.lat ?? undefined,
+      lng: fs.lng ?? undefined,
+      sightings: filtered,
+    }, lastServerUpdatedAtRef.current)
+    updateLocalSnapshot()
+  }, [slot.id, updateLocalSnapshot])
+
   // --- LOCAL-FIRST INITIALIZATION ---
   useEffect(() => {
     async function initializeFromLocalFirst() {
@@ -154,13 +215,15 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
         setLng(data.lng ?? null)
         setObservationId(data.observationId)
         if (data.observationId) setClientDraftId(data.observationId)
+        lastServerUpdatedAtRef.current = draft.serverUpdatedAt ?? null
         // Merge media from server props (media can't be stored in IndexedDB)
         setSightings((data.sightings ?? []).map(ds => {
+          const withOther = { ...ds, speciesOther: ds.speciesOther || '' }
           if (ds.id && existingObservation?.sightings) {
             const ss = existingObservation.sightings.find(s => s.id === ds.id)
-            if (ss) return { ...ds, media: ss.media || [] }
+            if (ss) return { ...withOther, media: ss.media || [] }
           }
-          return { ...ds, media: ds.media ?? [] }
+          return { ...withOther, media: ds.media ?? [] }
         }))
       } else if (existingObservation) {
         // No local draft, server has data — seed IndexedDB from server
@@ -176,6 +239,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
             id: s.id,
             clientTempId: s.id,
             species: s.species,
+            speciesOther: s.speciesOther || '',
             count: s.count,
             observedAt: s.observedAt || '',
             lat: s.lat,
@@ -184,11 +248,40 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
             media: s.media || [],
           })),
         }, existingObservation.serverUpdatedAt)
+        lastServerUpdatedAtRef.current = existingObservation.serverUpdatedAt
         // State already initialized from props
       }
       // If neither: empty defaults (new observation or offline first visit)
     }
-    initializeFromLocalFirst()
+    initializeFromLocalFirst().then(async () => {
+      // Initialize dirty-state snapshots after form state is loaded
+      // Use requestAnimationFrame to ensure state updates have flushed
+      requestAnimationFrame(() => {
+        updateBothSnapshots()
+      })
+
+      // If there's a local draft and we're online, push to server
+      // (covers case where tab-close save wrote to IndexedDB but server push didn't complete)
+      const draft = await getDraft(slot.id)
+      if (draft && navigator.onLine) {
+        // Check for conflicts before pushing (same logic as syncOnReconnect)
+        const serverMeta = await getObservationMeta(slot.id)
+        if (serverMeta && draft.serverUpdatedAt) {
+          const serverTime = new Date(serverMeta.updatedAt).getTime()
+          const localKnownServerTime = new Date(draft.serverUpdatedAt).getTime()
+          if (serverTime > localKnownServerTime) {
+            if (serverMeta.lastUserAgent && serverMeta.lastUserAgent !== navigator.userAgent) {
+              setConflictState({
+                serverUpdatedAt: serverMeta.updatedAt,
+                localLastModified: draft.lastModified,
+              })
+              return
+            }
+          }
+        }
+        pushLocalToServer()
+      }
+    })
   }, [slot.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- ONLINE/OFFLINE DETECTION + RECONNECT ---
@@ -208,7 +301,8 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
       lng: draft.data.lng,
       sightings: draftSightings.map(s => ({
         id: s.id,
-        species: s.species as 'RBL' | 'LTM' | 'DUSKY',
+        species: s.species as 'RBL' | 'LTM' | 'DUSKY' | 'OTHER',
+        species_other: s.speciesOther || undefined,
         count: s.count || '1',
         observed_at: s.observedAt || undefined,
         lat: s.lat || 0,
@@ -222,6 +316,8 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
       setError('Failed to sync: ' + saveResult.error)
       return
     }
+
+    updateServerSnapshot()
 
     // Map sighting IDs → media-queue
     const freshSightingIds = saveResult.sightingIds || []
@@ -381,6 +477,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
         id: s.id,
         clientTempId: s.id,
         species: s.species as SightingForm['species'],
+        speciesOther: s.speciesOther || '',
         count: s.count,
         observedAt: s.observedAt || '',
         lat: s.lat,
@@ -398,6 +495,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
         lng: serverData.lng ?? undefined,
         sightings: serverSightings,
       }, serverData.serverUpdatedAt)
+      lastServerUpdatedAtRef.current = serverData.serverUpdatedAt
 
       setWalkCompletion(serverData.walkCompletion)
       setNotes(serverData.notes ?? '')
@@ -411,6 +509,9 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
       setMediaSyncKey(k => k + 1)
       setSavedMessage('Loaded server version')
       setTimeout(() => setSavedMessage(''), 3000)
+
+      // Reset dirty-state snapshots after applying server data
+      requestAnimationFrame(() => updateBothSnapshots())
     } catch (err) {
       setError('Failed to load server version: ' + String(err))
     }
@@ -438,30 +539,61 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
     }
   }, [])
 
-  // Flush to IndexedDB when page goes to background (closes debounce gap on mobile)
+  // --- SILENT SAVE ON NAVIGATION ---
+  // Ref for handleSaveDraft (assigned after function is defined below)
+  const handleSaveDraftRef = useRef<(silent?: boolean) => Promise<void>>(() => Promise.resolve())
+
+  // Full save (IndexedDB + server) on page background / tab close (best-effort)
   useEffect(() => {
     const handler = () => {
       if (document.visibilityState === 'hidden') {
-        const fs = formStateRef.current
-        const filtered = fs.sightings.filter(s => s.species)
-        const has = filtered.length > 0
-        getDraft(slot.id).then(existing => {
-          putDraft(slot.id, {
-            observationId: fs.observationId,
-            clientDraftId: fs.clientDraftId,
-            walkCompletion: fs.walkCompletion as 'COMPLETED' | 'PARTIAL' | 'ABORTED',
-            outcome: has ? 'SIGHTED' : 'NOT_SIGHTED',
-            notes: fs.notes || undefined,
-            lat: fs.lat ?? undefined,
-            lng: fs.lng ?? undefined,
-            sightings: filtered,
-          }, existing?.serverUpdatedAt ?? null)
-        })
+        const { localDirty } = getDirtyState()
+        if (localDirty) {
+          handleSaveDraftRef.current(true)
+        }
       }
     }
     document.addEventListener('visibilitychange', handler)
     return () => document.removeEventListener('visibilitychange', handler)
-  }, [slot.id])
+  }, [getDirtyState])
+
+  // Global link click interceptor: full save before navigating
+  useEffect(() => {
+    const handler = async (e: MouseEvent) => {
+      const anchor = (e.target as HTMLElement).closest('a')
+      if (!anchor) return
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return
+      if (anchor.target === '_blank') return
+      const href = anchor.getAttribute('href')
+      if (!href || href.startsWith('http') || href.startsWith('#')) return
+      if (href === window.location.pathname) return
+
+      const { localDirty } = getDirtyState()
+      if (!localDirty) return // clean state, let navigation proceed normally
+
+      e.preventDefault()
+      e.stopPropagation()
+      try {
+        await handleSaveDraftRef.current(true)
+        router.push(href)
+      } catch {
+        setError('Failed to save draft. Please try again.')
+      }
+    }
+    document.addEventListener('click', handler, true)
+    return () => document.removeEventListener('click', handler, true)
+  }, [getDirtyState, router])
+
+  // Component unmount: fire-and-forget full save (covers browser back, programmatic navigation)
+  // Page doesn't unload during Next.js client-side nav, so the async operation completes.
+  useEffect(() => {
+    return () => {
+      const { localDirty } = getDirtyState()
+      if (localDirty) {
+        handleSaveDraftRef.current(true)
+      }
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- SIGHTING MANAGEMENT ---
   const addSighting = () => {
@@ -473,6 +605,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
     setSightings(prev => [...prev, {
       clientTempId: crypto.randomUUID(),
       species: '',
+      speciesOther: '',
       count: '1',
       observedAt: currentTime,
       lat: null,
@@ -513,7 +646,8 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
   const buildSightingsPayload = (fromSightings?: SightingForm[]) => {
     return (fromSightings ?? sightings).filter(s => s.species).map(s => ({
       id: s.id,
-      species: s.species as 'RBL' | 'LTM' | 'DUSKY',
+      species: s.species as 'RBL' | 'LTM' | 'DUSKY' | 'OTHER',
+      species_other: s.speciesOther || undefined,
       count: s.count || '1',
       observed_at: s.observedAt || undefined,
       lat: s.lat || 0,
@@ -523,7 +657,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
   }
 
   // --- SAVE DRAFT (LOCAL-FIRST) ---
-  const handleSaveDraft = async (silent = false) => {
+  const handleSaveDraft = async (silent = false): Promise<void> => {
     if (syncingRef.current) return // Don't save during sync
     setSaving(true)
     if (!silent) { setError(''); setSavedMessage('') }
@@ -543,14 +677,15 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
 
     // 1. Always write to IndexedDB first (local-first)
     const existingDraft = await getDraft(slot.id)
-    await putDraft(slot.id, formData, existingDraft?.serverUpdatedAt ?? null)
+    const cachedServerUpdatedAt = existingDraft?.serverUpdatedAt ?? null
+    lastServerUpdatedAtRef.current = cachedServerUpdatedAt
+    await putDraft(slot.id, formData, cachedServerUpdatedAt)
+    updateLocalSnapshot()
 
     // 2. If offline, we're done
     if (!navigator.onLine) {
-      if (!silent) {
-        setSavedMessage('Draft saved offline')
-        setTimeout(() => setSavedMessage(''), 3000)
-      }
+      setSavedMessage('Saved locally')
+      setTimeout(() => setSavedMessage(''), 3000)
       setSaving(false)
       return
     }
@@ -570,6 +705,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
 
     if (result.error) {
       if (!silent) setError(result.error)
+      else setSavedMessage('Saved locally')
     } else {
       // 4. Update draft with server IDs + serverUpdatedAt (NEVER delete draft)
       const newObsId = result.observationId || observationId
@@ -598,19 +734,20 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
         ...s,
         id: i < newSightingIds.length ? newSightingIds[i] : s.id,
       }))
+      lastServerUpdatedAtRef.current = result.serverUpdatedAt ?? null
       await putDraft(slot.id, {
         ...formData,
         observationId: newObsId,
         sightings: updatedSightings,
       }, result.serverUpdatedAt ?? null)
+      updateServerSnapshot()
 
-      if (!silent) {
-        setSavedMessage('Draft saved')
-        setTimeout(() => setSavedMessage(''), 2000)
-      }
+      setSavedMessage('Synced')
+      setTimeout(() => setSavedMessage(''), 2000)
     }
     setSaving(false)
   }
+  handleSaveDraftRef.current = handleSaveDraft
 
   // Auto-save
   const autoSaveRef = useRef(0)
@@ -639,6 +776,15 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
     const validSightings = buildSightingsPayload()
     const hasSightingsNow = validSightings.length > 0
     const outcome = hasSightingsNow ? 'SIGHTED' : 'NOT_SIGHTED'
+
+    // Client-side validation for OTHER species
+    const otherWithoutName = sightings.find(s => s.species === 'OTHER' && !s.speciesOther.trim())
+    if (otherWithoutName) {
+      setError('Species name is required when "Other" is selected.')
+      setSaving(false)
+      setSubmitting(false)
+      return
+    }
 
     const saveResult = await saveDraft({
       walkId: slot.id,
@@ -684,11 +830,13 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
 
   return (
     <div className="space-y-6">
-      <Breadcrumb items={[
-        { label: 'Reports', href: '/report' },
-        { label: slot.locationName, href: `/report/${slot.id}` },
-        { label: 'Edit' },
-      ]} />
+      <Breadcrumb
+        items={[
+          { label: 'Reports', href: '/report' },
+          { label: slot.locationName, href: `/report/${slot.id}` },
+          { label: 'Edit' },
+        ]}
+      />
 
       <div>
         <h1 className="text-xl font-bold text-gray-900">Edit Report</h1>
@@ -789,6 +937,19 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
                 ))}
               </select>
             </div>
+
+            {sighting.species === 'OTHER' && (
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Species Name *</label>
+                <input
+                  type="text"
+                  value={sighting.speciesOther}
+                  onChange={(e) => updateSighting(index, 'speciesOther', e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Enter species name..."
+                />
+              </div>
+            )}
 
             {sighting.species && autoSavingIndexes.has(index) && (
               <div className="flex items-center justify-center py-4">
@@ -981,6 +1142,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
         onConfirm={confirmSubmit}
         onCancel={() => setShowSubmitDialog(false)}
       />
+
     </div>
   )
 }

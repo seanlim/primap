@@ -3,7 +3,8 @@ import { type MediaItem } from '@/components/report/media-uploader'
 export interface SightingForm {
   id?: string
   clientTempId: string
-  species: 'RBL' | 'LTM' | 'DUSKY' | ''
+  species: 'RBL' | 'LTM' | 'DUSKY' | 'OTHER' | ''
+  speciesOther: string
   count: string
   observedAt: string
   lat: number | null

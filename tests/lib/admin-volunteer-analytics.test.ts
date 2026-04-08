@@ -267,7 +267,7 @@ describe('getAdminWalksAnalyticsPageSnapshotByRound', () => {
         lng: 103.8198,
         outcome: 'SIGHTED',
         label: 'RBL',
-        popupMeta: ['Hill', '10/03/2026 07:00', 'Round 1'],
+        popupMeta: ['Hill', '10 Mar 2026 07:00', 'Round 1'],
         species: 'RBL',
       },
       {
@@ -275,7 +275,7 @@ describe('getAdminWalksAnalyticsPageSnapshotByRound', () => {
         lng: 103.77,
         outcome: 'SIGHTED',
         label: 'LTM',
-        popupMeta: ['Hill', '10/03/2026 07:00', 'Round 1'],
+        popupMeta: ['Hill', '10 Mar 2026 07:00', 'Round 1'],
         species: 'LTM',
       },
       {
@@ -283,7 +283,7 @@ describe('getAdminWalksAnalyticsPageSnapshotByRound', () => {
         lng: 103.799,
         outcome: 'NOT_SIGHTED',
         label: 'No sighting report 1',
-        popupMeta: ['Hill', '10/03/2026 07:00', 'Round 1'],
+        popupMeta: ['Hill', '10 Mar 2026 07:00', 'Round 1'],
       },
     ])
   })
@@ -396,7 +396,7 @@ describe('admin analytics report maps', () => {
         lng: 103.8198,
         outcome: 'SIGHTED',
         label: 'RBL',
-        popupMeta: ['Hill', '10/03/2026 07:00', 'Round 1'],
+        popupMeta: ['Hill', '10 Mar 2026 07:00', 'Round 1'],
         species: 'RBL',
       },
       {
@@ -404,7 +404,7 @@ describe('admin analytics report maps', () => {
         lng: 103.799,
         outcome: 'NOT_SIGHTED',
         label: 'No sighting report 1',
-        popupMeta: ['Hill', '10/03/2026 07:00', 'Round 1'],
+        popupMeta: ['Hill', '10 Mar 2026 07:00', 'Round 1'],
       },
     ])
   })
@@ -421,7 +421,7 @@ describe('admin analytics report maps', () => {
         lng: 103.8198,
         outcome: 'SIGHTED',
         label: 'RBL',
-        popupMeta: ['Hill', '10/03/2026 07:00', 'Round 1'],
+        popupMeta: ['Hill', '10 Mar 2026 07:00', 'Round 1'],
         species: 'RBL',
       },
       {
@@ -429,7 +429,7 @@ describe('admin analytics report maps', () => {
         lng: 103.799,
         outcome: 'NOT_SIGHTED',
         label: 'No sighting report 1',
-        popupMeta: ['Hill', '10/03/2026 07:00', 'Round 1'],
+        popupMeta: ['Hill', '10 Mar 2026 07:00', 'Round 1'],
       },
     ])
   })

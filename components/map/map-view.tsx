@@ -176,7 +176,8 @@ export function MapView({
 
     const groupedMarkers = new Map<string, MapMarker[]>()
     for (const marker of markers) {
-      const key = `${marker.lat.toFixed(6)}:${marker.lng.toFixed(6)}`
+      // Bucket nearby points together so real-world GPS jitter still clusters on the analytics map.
+      const key = `${marker.lat.toFixed(4)}:${marker.lng.toFixed(4)}`
       const group = groupedMarkers.get(key) ?? []
       group.push(marker)
       groupedMarkers.set(key, group)

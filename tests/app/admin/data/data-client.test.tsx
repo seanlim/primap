@@ -24,7 +24,8 @@ describe('DataClient', () => {
   it('renders export, restore, and import buttons', () => {
     render(<DataClient />)
 
-    expect(screen.getByText('Export All Data')).toBeInTheDocument()
+    expect(screen.getByText('Export Backup')).toBeInTheDocument()
+    expect(screen.getByText('Export for Viewing')).toBeInTheDocument()
     expect(screen.getByText('Upload & Restore')).toBeInTheDocument()
     expect(screen.getByText('Validate & Import')).toBeInTheDocument()
   })
@@ -88,5 +89,12 @@ describe('DataClient', () => {
     render(<DataClient />)
 
     expect(screen.getByText(/Existing data will NOT be overwritten/)).toBeInTheDocument()
+  })
+
+  it('explains the difference between backup and view exports', () => {
+    render(<DataClient />)
+
+    expect(screen.getByText(/Backup export preserves the restore format/)).toBeInTheDocument()
+    expect(screen.getByText(/View export creates readable report sheets/)).toBeInTheDocument()
   })
 })

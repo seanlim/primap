@@ -41,8 +41,8 @@ describe('ProfileClient', () => {
           requiredWalks: 4,
         }}
         reportMapPoints={[
-          { lat: 1.3521, lng: 103.8198, outcome: 'SIGHTED', label: 'Hill', popupText: 'Hill' },
-          { lat: 1.301, lng: 103.77, outcome: 'NOT_SIGHTED', label: 'River', popupText: 'River' },
+          { lat: 1.3521, lng: 103.8198, outcome: 'SIGHTED', label: 'Hill' },
+          { lat: 1.301, lng: 103.77, outcome: 'NOT_SIGHTED', label: 'River' },
         ]}
         walkHistory={[]}
       />

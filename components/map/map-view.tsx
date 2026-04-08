@@ -11,7 +11,6 @@ export interface MapMarker {
   lng: number
   color?: string
   label?: string
-  popupText?: string
   popupHtml?: string
   popupMeta?: string[]
   variant?: 'sighted' | 'not_sighted'

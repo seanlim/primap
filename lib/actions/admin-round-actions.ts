@@ -2,6 +2,11 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import {
+  LATE_CANCEL_HOURS_RANGE,
+  MAX_MEDIA_PER_REPORT_RANGE,
+  REQUIRED_WALKS_PER_ROUND_RANGE,
+} from '@/lib/constants/settings'
 
 async function requireAdmin() {
   const supabase = await createClient()
@@ -244,7 +249,22 @@ export async function bulkCreateWalks(data: {
 export async function updateSettings(data: {
   requiredWalksPerRound: number
   lateCancelHours: number
+  maxMediaPerReport: number
 }) {
+  const errors: string[] = []
+  const inRange = (n: number, min: number, max: number) =>
+    Number.isInteger(n) && n >= min && n <= max
+  if (!inRange(data.requiredWalksPerRound, REQUIRED_WALKS_PER_ROUND_RANGE.min, REQUIRED_WALKS_PER_ROUND_RANGE.max)) {
+    errors.push(`Required walks per round must be an integer between ${REQUIRED_WALKS_PER_ROUND_RANGE.min} and ${REQUIRED_WALKS_PER_ROUND_RANGE.max}`)
+  }
+  if (!inRange(data.lateCancelHours, LATE_CANCEL_HOURS_RANGE.min, LATE_CANCEL_HOURS_RANGE.max)) {
+    errors.push(`Late cancellation window must be an integer between ${LATE_CANCEL_HOURS_RANGE.min} and ${LATE_CANCEL_HOURS_RANGE.max} hours`)
+  }
+  if (!inRange(data.maxMediaPerReport, MAX_MEDIA_PER_REPORT_RANGE.min, MAX_MEDIA_PER_REPORT_RANGE.max)) {
+    errors.push(`Max media per report must be an integer between ${MAX_MEDIA_PER_REPORT_RANGE.min} and ${MAX_MEDIA_PER_REPORT_RANGE.max}`)
+  }
+  if (errors.length > 0) return { error: errors.join('; ') }
+
   const { supabase } = await requireAdmin()
 
   const { data: existing } = await supabase
@@ -260,6 +280,7 @@ export async function updateSettings(data: {
     .update({
       required_walks_per_round: data.requiredWalksPerRound,
       late_cancel_hours: data.lateCancelHours,
+      max_media_per_report: data.maxMediaPerReport,
     })
     .eq('id', existing.id)
 

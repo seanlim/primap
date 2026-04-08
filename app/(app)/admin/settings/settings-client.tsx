@@ -8,10 +8,11 @@ import { updateSettings } from '@/lib/actions/admin-round-actions'
 import { useToast } from '@/components/ui/toast'
 
 export function SettingsClient({ settings }: {
-  settings: { requiredWalksPerRound: number; lateCancelHours: number }
+  settings: { requiredWalksPerRound: number; lateCancelHours: number; maxMediaPerReport: number }
 }) {
   const [requiredWalks, setRequiredWalks] = useState(settings.requiredWalksPerRound.toString())
   const [lateCancelHours, setLateCancelHours] = useState(settings.lateCancelHours.toString())
+  const [maxMedia, setMaxMedia] = useState(settings.maxMediaPerReport.toString())
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const router = useRouter()
@@ -23,6 +24,7 @@ export function SettingsClient({ settings }: {
     const result = await updateSettings({
       requiredWalksPerRound: parseInt(requiredWalks),
       lateCancelHours: parseInt(lateCancelHours),
+      maxMediaPerReport: parseInt(maxMedia),
     })
     if (result.error) showToast(result.error, 'error')
     else {
@@ -73,6 +75,22 @@ export function SettingsClient({ settings }: {
           />
           <p className="text-xs text-gray-400 mt-1">
             Cancellations within this many hours before a walk are considered late.
+          </p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Max Media Files Per Report
+          </label>
+          <input
+            type="number"
+            min="1"
+            max="50"
+            value={maxMedia}
+            onChange={e => setMaxMedia(e.target.value)}
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Maximum number of photos/videos allowed per sighting or observation.
           </p>
         </div>
         <button

@@ -13,6 +13,7 @@ import { Breadcrumb } from '@/components/ui/breadcrumb'
 import { getDraft, putDraft, deleteDraft, clearSyncStateForWalk, getMediaByClientParent, updateMediaResolvedParentId, getOutboxItems } from '@/lib/offline/db'
 import { processOutbox } from '@/lib/offline/sync-engine'
 import { type SightingForm } from '@/lib/types/observation'
+import { DEFAULT_MAX_MEDIA_PER_REPORT } from '@/lib/constants/settings'
 
 interface Props {
   slot: {
@@ -23,6 +24,7 @@ interface Props {
     endTime: string
     roundName: string
   }
+  maxMediaPerReport?: number
   existingObservation: {
     id: string
     walkCompletion: 'COMPLETED' | 'PARTIAL' | 'ABORTED'
@@ -57,7 +59,7 @@ const SPECIES_OPTIONS = [
   { value: 'DUSKY', label: 'Dusky Langur' },
 ]
 
-export function ObservationFormClient({ slot, existingObservation }: Props) {
+export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_MEDIA_PER_REPORT, existingObservation }: Props) {
   const [walkCompletion, setWalkCompletion] = useState(existingObservation?.walkCompletion ?? 'PARTIAL')
   const [notes, setNotes] = useState(existingObservation?.notes ?? '')
   const [lat, setLat] = useState<number | null>(existingObservation?.lat ?? null)
@@ -848,12 +850,13 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
 
                 {/* Media for this sighting */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Photos/Videos</label>
                   <MediaUploader
+                    label="Photos/Videos"
                     parentType="sighting"
                     parentId={sighting.id ?? null}
                     clientParentId={sighting.clientTempId}
                     existingMedia={sighting.media}
+                    maxFiles={maxMediaPerReport}
                     onExifGps={(exifLat, exifLng) => {
                       if (!sighting.lat && !sighting.lng) {
                         updateSighting(index, 'lat', exifLat)
@@ -914,10 +917,12 @@ export function ObservationFormClient({ slot, existingObservation }: Props) {
         <div id="step-photos" className="bg-white rounded-2xl p-5 shadow-sm space-y-3 scroll-mt-20">
           <h2 className="text-sm font-semibold text-gray-900">5. Photos/Videos</h2>
           <MediaUploader
+            label="Photos/Videos"
             parentType="observation"
             parentId={observationId ?? null}
             clientParentId={clientDraftId}
             existingMedia={existingObservation?.media || []}
+            maxFiles={maxMediaPerReport}
             onExifGps={(exifLat, exifLng) => {
               if (!lat && !lng) {
                 setLat(exifLat)

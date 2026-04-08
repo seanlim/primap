@@ -264,12 +264,14 @@ describe('admin-round-actions', () => {
       const result = await updateSettings({
         requiredWalksPerRound: 4,
         lateCancelHours: 24,
+        maxMediaPerReport: 10,
       })
 
       expect(result).toEqual({ success: true })
       expect(methods.update).toHaveBeenCalledWith({
         required_walks_per_round: 4,
         late_cancel_hours: 24,
+        max_media_per_report: 10,
       })
       expect(revalidatePath).toHaveBeenCalledWith('/admin/settings')
     })
@@ -281,6 +283,7 @@ describe('admin-round-actions', () => {
       const result = await updateSettings({
         requiredWalksPerRound: 4,
         lateCancelHours: 24,
+        maxMediaPerReport: 10,
       })
 
       expect(result).toEqual({ error: 'Settings not found' })
@@ -300,9 +303,154 @@ describe('admin-round-actions', () => {
       const result = await updateSettings({
         requiredWalksPerRound: 4,
         lateCancelHours: 24,
+        maxMediaPerReport: 10,
       })
 
       expect(result).toEqual({ error: 'Update failed' })
+    })
+
+    it('includes maxMediaPerReport in update call', async () => {
+      setupAdmin()
+      methods.single.mockResolvedValueOnce({
+        data: { id: 'settings-1' },
+        error: null,
+      })
+
+      await updateSettings({
+        requiredWalksPerRound: 4,
+        lateCancelHours: 48,
+        maxMediaPerReport: 15,
+      })
+
+      expect(methods.update).toHaveBeenCalledWith(
+        expect.objectContaining({ max_media_per_report: 15 })
+      )
+    })
+
+    describe('input validation', () => {
+      it('rejects maxMediaPerReport below the allowed range', async () => {
+        const result = await updateSettings({
+          requiredWalksPerRound: 4,
+          lateCancelHours: 48,
+          maxMediaPerReport: 0,
+        })
+        expect(result).toEqual({
+          error: expect.stringContaining('Max media per report must be an integer between 1 and 50'),
+        })
+        expect(methods.update).not.toHaveBeenCalled()
+      })
+
+      it('rejects maxMediaPerReport above the allowed range', async () => {
+        const result = await updateSettings({
+          requiredWalksPerRound: 4,
+          lateCancelHours: 48,
+          maxMediaPerReport: 51,
+        })
+        expect(result).toEqual({
+          error: expect.stringContaining('Max media per report must be an integer between 1 and 50'),
+        })
+        expect(methods.update).not.toHaveBeenCalled()
+      })
+
+      it('rejects non-integer maxMediaPerReport', async () => {
+        const result = await updateSettings({
+          requiredWalksPerRound: 4,
+          lateCancelHours: 48,
+          maxMediaPerReport: 5.5,
+        })
+        expect(result).toEqual({
+          error: expect.stringContaining('Max media per report must be an integer between 1 and 50'),
+        })
+        expect(methods.update).not.toHaveBeenCalled()
+      })
+
+      it('rejects NaN maxMediaPerReport (e.g. parseInt of empty input)', async () => {
+        const result = await updateSettings({
+          requiredWalksPerRound: 4,
+          lateCancelHours: 48,
+          maxMediaPerReport: Number.NaN,
+        })
+        expect(result).toEqual({
+          error: expect.stringContaining('Max media per report must be an integer between 1 and 50'),
+        })
+      })
+
+      it('rejects requiredWalksPerRound out of range', async () => {
+        const result = await updateSettings({
+          requiredWalksPerRound: 0,
+          lateCancelHours: 48,
+          maxMediaPerReport: 10,
+        })
+        expect(result).toEqual({
+          error: expect.stringContaining('Required walks per round must be an integer between 1 and 20'),
+        })
+      })
+
+      it('rejects lateCancelHours out of range', async () => {
+        const result = await updateSettings({
+          requiredWalksPerRound: 4,
+          lateCancelHours: 200,
+          maxMediaPerReport: 10,
+        })
+        expect(result).toEqual({
+          error: expect.stringContaining('Late cancellation window must be an integer between 1 and 168 hours'),
+        })
+      })
+
+      it('reports multiple validation errors joined together', async () => {
+        const result = await updateSettings({
+          requiredWalksPerRound: 0,
+          lateCancelHours: 0,
+          maxMediaPerReport: 0,
+        })
+        expect(result.error).toContain('Required walks per round must be an integer between 1 and 20')
+        expect(result.error).toContain('Late cancellation window must be an integer between 1 and 168 hours')
+        expect(result.error).toContain('Max media per report must be an integer between 1 and 50')
+      })
+
+      it('does not call requireAdmin/db when validation fails', async () => {
+        await updateSettings({
+          requiredWalksPerRound: 0,
+          lateCancelHours: 48,
+          maxMediaPerReport: 10,
+        })
+        // requireAdmin is not invoked, so neither auth nor db access should happen
+        expect(mockSupabase.from).not.toHaveBeenCalled()
+        const authMock = (mockSupabase as { auth: { getUser: ReturnType<typeof vi.fn> } }).auth
+        expect(authMock.getUser).not.toHaveBeenCalled()
+      })
+
+      it('accepts boundary values: min', async () => {
+        setupAdmin()
+        methods.single.mockResolvedValueOnce({
+          data: { id: 'settings-1' },
+          error: null,
+        })
+
+        const result = await updateSettings({
+          requiredWalksPerRound: 1,
+          lateCancelHours: 1,
+          maxMediaPerReport: 1,
+        })
+
+        expect(result).toEqual({ success: true })
+      })
+
+      it('accepts boundary values: max', async () => {
+        setupAdmin()
+        methods.single.mockResolvedValueOnce({
+          data: { id: 'settings-1' },
+          error: null,
+        })
+
+        const result = await updateSettings({
+          requiredWalksPerRound: 20,
+          lateCancelHours: 168,
+          maxMediaPerReport: 50,
+        })
+
+        expect(result).toEqual({ success: true })
+      })
     })
   })
 

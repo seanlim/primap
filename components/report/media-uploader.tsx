@@ -27,6 +27,7 @@ interface MediaUploaderProps {
   parentId: string | null
   existingMedia: MediaItem[]
   maxFiles?: number
+  label?: string
   onExifGps?: (lat: number, lng: number) => void
   onExifDatetime?: (datetime: string) => void
   offline?: boolean
@@ -39,6 +40,7 @@ export function MediaUploader({
   parentId,
   existingMedia,
   maxFiles = 10,
+  label,
   onExifGps,
   onExifDatetime,
   offline = false,
@@ -46,6 +48,7 @@ export function MediaUploader({
   clientParentId,
 }: MediaUploaderProps) {
   const [media, setMedia] = useState<MediaItem[]>(existingMedia)
+  const [error, setError] = useState<string | null>(null)
 
   // Sync when parent updates existingMedia (e.g., after offline sync fetches server media)
   useEffect(() => {
@@ -219,6 +222,13 @@ export function MediaUploader({
             const res = await fetch('/api/media', { method: 'POST', body: formData })
             const result = await res.json()
 
+            if (res.status === 422) {
+              // Server-side limit reached — show error, don't queue offline
+              setError(result.error || 'Media limit reached')
+              setTimeout(() => setError(null), 5000)
+              break // Stop processing remaining files
+            }
+
             if (result.success && result.media) {
               setMedia(prev => [...prev, result.media as MediaItem])
             } else {
@@ -300,6 +310,16 @@ export function MediaUploader({
 
   return (
     <div className="space-y-2">
+      {/* Label with counter */}
+      {label && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-gray-500">{label}</span>
+          <span className={`text-xs tabular-nums ${totalMedia >= maxFiles ? 'text-amber-500 font-medium' : 'text-gray-400'}`}>
+            {totalMedia}/{maxFiles}
+          </span>
+        </div>
+      )}
+
       {/* Preview grid */}
       {(totalMedia > 0 || uploading.size > 0) && (
         <div className="grid grid-cols-3 gap-2">
@@ -382,7 +402,12 @@ export function MediaUploader({
         </div>
       )}
 
-      {/* Upload button — always shown (works both online and offline) */}
+      {/* Error message */}
+      {error && (
+        <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+      )}
+
+      {/* Upload button */}
       {totalMedia < maxFiles && (
         <button
           type="button"

@@ -45,6 +45,13 @@ export async function processOutbox(): Promise<number> {
           if (queuedMedia.exifDatetime) formData.append('exifDatetime', queuedMedia.exifDatetime)
 
           const res = await fetch('/api/media', { method: 'POST', body: formData })
+
+          if (res.status === 422) {
+            // Media limit reached — drop from queue, don't retry
+            await removeMediaFromQueue(mediaQueueId)
+            break
+          }
+
           const result = await res.json()
 
           if (!result.success) throw new Error(result.error || 'Media upload failed')

@@ -9,6 +9,7 @@ import { updateProfile } from '@/lib/actions/profile-actions'
 import { signOut } from '@/lib/actions/auth-actions'
 import { EmptyState } from '@/components/ui/empty-state'
 import { MapView } from '@/components/map/map-view'
+import { DEFAULT_SIGHTING_COLOR, NOT_SIGHTED_COLOR, SPECIES_COLORS, getSpeciesColor } from '@/lib/constants/species'
 
 interface Props {
   profile: {
@@ -81,14 +82,6 @@ function ProgressRing({ percent, size = 80, stroke = 6 }: { percent: number; siz
       </defs>
     </svg>
   )
-}
-
-function getSpeciesColor(species?: string) {
-  if (species === 'RBL') return '#111111'
-  if (species === 'LTM') return '#8b5e3c'
-  if (species === 'DUSKY') return '#f97316'
-  if (species === 'OTHER') return '#6b7280'
-  return '#16a34a'
 }
 
 export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: Props) {
@@ -247,26 +240,26 @@ export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: 
         <div className="flex flex-wrap gap-3 text-xs text-gray-600">
           <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2">
             <div className="flex flex-wrap items-center gap-3">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Sighted</span>
-              <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full bg-emerald-600 ring-2 ring-white shadow-sm" />
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Sighted</span>
+            <div className="flex items-center gap-2">
+                <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: DEFAULT_SIGHTING_COLOR }} />
                 <span>Total: {sightedCount}</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full bg-black ring-2 ring-white shadow-sm" />
+                <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: SPECIES_COLORS.RBL }} />
                 <span>RBL: {rblCount}</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: '#8b5e3c' }} />
+                <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: SPECIES_COLORS.LTM }} />
                 <span>LTM: {ltmCount}</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: '#f97316' }} />
+                <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: SPECIES_COLORS.DUSKY }} />
                 <span>DUSKY: {duskyCount}</span>
               </div>
               {otherCount > 0 && (
                 <div className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: '#6b7280' }} />
+                  <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: SPECIES_COLORS.OTHER }} />
                   <span>OTHER: {otherCount}</span>
                 </div>
               )}
@@ -276,7 +269,7 @@ export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: 
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Not Sighted</span>
               <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-sm bg-amber-500 ring-2 ring-white shadow-sm" />
+                <span className="h-3 w-3 rounded-sm ring-2 ring-white shadow-sm" style={{ backgroundColor: NOT_SIGHTED_COLOR }} />
                 <span>Total: {notSightedCount}</span>
               </div>
             </div>
@@ -287,7 +280,7 @@ export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: 
           className="h-80 w-full overflow-hidden rounded-2xl"
           markers={reportMapPoints.map((location, index) => ({
             ...location,
-            color: location.outcome === 'SIGHTED' ? getSpeciesColor(location.species) : '#f59e0b',
+            color: location.outcome === 'SIGHTED' ? getSpeciesColor(location.species) : NOT_SIGHTED_COLOR,
             variant: location.outcome === 'SIGHTED' ? 'sighted' : 'not_sighted',
             label: location.label || `My sighting ${index + 1}`,
             popupMeta: location.popupMeta,

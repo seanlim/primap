@@ -7,9 +7,10 @@ import { LogOut, Check, Pencil, MapPin, Calendar, Footprints, ClipboardList, Eye
 import { formatDate } from '@/lib/utils/format-date'
 import { updateProfile } from '@/lib/actions/profile-actions'
 import { signOut } from '@/lib/actions/auth-actions'
+import { SightingLegend } from '@/components/admin/analytics-shared'
 import { EmptyState } from '@/components/ui/empty-state'
 import { MapView } from '@/components/map/map-view'
-import { DEFAULT_SIGHTING_COLOR, NOT_SIGHTED_COLOR, SPECIES_COLORS, getSpeciesColor } from '@/lib/constants/species'
+import { NOT_SIGHTED_COLOR, getSpeciesColor } from '@/lib/constants/species'
 
 interface Props {
   profile: {
@@ -103,12 +104,6 @@ export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: 
   }
 
   const progressPercent = Math.min((stats.reportsSubmitted / stats.requiredWalks) * 100, 100)
-  const sightedCount = reportMapPoints.filter((point) => point.outcome === 'SIGHTED').length
-  const notSightedCount = reportMapPoints.filter((point) => point.outcome === 'NOT_SIGHTED').length
-  const rblCount = reportMapPoints.filter((point) => point.outcome === 'SIGHTED' && point.species === 'RBL').length
-  const ltmCount = reportMapPoints.filter((point) => point.outcome === 'SIGHTED' && point.species === 'LTM').length
-  const duskyCount = reportMapPoints.filter((point) => point.outcome === 'SIGHTED' && point.species === 'DUSKY').length
-  const otherCount = reportMapPoints.filter((point) => point.outcome === 'SIGHTED' && point.species === 'OTHER').length
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -237,44 +232,7 @@ export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: 
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-3 text-xs text-gray-600">
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2">
-            <div className="flex flex-wrap items-center gap-3">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Sighted</span>
-            <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: DEFAULT_SIGHTING_COLOR }} />
-                <span>Total: {sightedCount}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: SPECIES_COLORS.RBL }} />
-                <span>RBL: {rblCount}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: SPECIES_COLORS.LTM }} />
-                <span>LTM: {ltmCount}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: SPECIES_COLORS.DUSKY }} />
-                <span>DUSKY: {duskyCount}</span>
-              </div>
-              {otherCount > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: SPECIES_COLORS.OTHER }} />
-                  <span>OTHER: {otherCount}</span>
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Not Sighted</span>
-              <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-sm ring-2 ring-white shadow-sm" style={{ backgroundColor: NOT_SIGHTED_COLOR }} />
-                <span>Total: {notSightedCount}</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <SightingLegend points={reportMapPoints} />
 
         <MapView
           className="h-80 w-full overflow-hidden rounded-2xl"

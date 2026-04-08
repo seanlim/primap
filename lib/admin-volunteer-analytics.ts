@@ -531,7 +531,13 @@ export async function getAdminVolunteerAnalyticsLanding(
   }
 
   const roundNameById = new Map(base.rounds.map((round) => [round.id, round.name]))
-  const slotsById = new Map(base.slots.map((slot) => [slot.id, slot]))
+  const mapRounds = base.rounds.filter((round) => round.status === 'OPEN').slice(0, 1)
+  const boundedMapRounds = mapRounds.length > 0 ? mapRounds : base.rounds.slice(0, 2)
+  const boundedRoundIds = new Set(boundedMapRounds.map((round) => round.id))
+  const boundedSlots = base.slots.filter((slot) => slot.round_id && boundedRoundIds.has(slot.round_id))
+  const boundedSlotIds = new Set(boundedSlots.map((slot) => slot.id))
+  const boundedObservations = base.observations.filter((observation) => boundedSlotIds.has(observation.slot_id))
+  const slotsById = new Map(boundedSlots.map((slot) => [slot.id, slot]))
 
   return {
     overall: buildMetrics({
@@ -540,7 +546,7 @@ export async function getAdminVolunteerAnalyticsLanding(
       observations: base.observations,
       now,
     }),
-    reportMapPoints: await getReportMapPoints(supabase, base.observations, slotsById, roundNameById),
+    reportMapPoints: await getReportMapPoints(supabase, boundedObservations, slotsById, roundNameById),
   }
 }
 

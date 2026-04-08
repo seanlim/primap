@@ -387,7 +387,7 @@ describe('admin analytics report maps', () => {
     }
   }
 
-  it('includes report map points in the overall landing snapshot', async () => {
+  it('includes report map points from the bounded landing-round scope', async () => {
     const snapshot = await getAdminVolunteerAnalyticsLanding(createAnalyticsSupabase() as never, new Date('2026-03-20T12:00:00+08:00'))
 
     expect(snapshot.reportMapPoints).toEqual([
@@ -398,14 +398,6 @@ describe('admin analytics report maps', () => {
         label: 'RBL',
         popupMeta: ['Hill', '10/03/2026 07:00', 'Round 1'],
         species: 'RBL',
-      },
-      {
-        lat: 1.3099,
-        lng: 103.7801,
-        outcome: 'SIGHTED',
-        label: 'DUSKY',
-        popupMeta: ['Coast', '12/04/2026 08:00', 'Round 2'],
-        species: 'DUSKY',
       },
       {
         lat: 1.333,

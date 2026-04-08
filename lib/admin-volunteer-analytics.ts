@@ -1,5 +1,5 @@
 import { hasWalkEnded } from '@/lib/utils/walk-participation'
-import { formatDate } from '@/lib/utils/format-date'
+import { buildSlotPopupMeta } from '@/lib/utils/report-map'
 
 type QueryResult<T> = { data: T | null; error: { message: string } | null }
 type CountResult = { count: number | null; error: { message: string } | null }
@@ -433,19 +433,15 @@ async function getReportMapPoints(
       sightedPointCounts.set(sighting.observation_id, sequence)
       const speciesLabel = formatSpeciesLabel(sighting.species)
 
-      return {
-        lat: sighting.lat as number,
-        lng: sighting.lng as number,
-        outcome: 'SIGHTED' as const,
-        label: speciesLabel ?? `Sighting ${sequence}`,
-        popupMeta: [
-          slot?.location_name ?? null,
-          slot ? `${formatDate(slot.walk_date, 'compact')} ${slot.start_time.slice(0, 5)}` : null,
-          slot?.round_id ? (roundNameById.get(slot.round_id) ?? null) : null,
-        ].filter(Boolean) as string[],
-        species: sighting.species,
-      }
-    })
+        return {
+          lat: sighting.lat as number,
+          lng: sighting.lng as number,
+          outcome: 'SIGHTED' as const,
+          label: speciesLabel ?? `Sighting ${sequence}`,
+          popupMeta: buildSlotPopupMeta(slot, slot?.round_id ? (roundNameById.get(slot.round_id) ?? null) : null),
+          species: sighting.species,
+        }
+      })
 
   const notSightedPointCounts = new Map<string, number>()
   const notSightedPoints = submittedObservations
@@ -466,11 +462,7 @@ async function getReportMapPoints(
         lng: observation.lng as number,
         outcome: 'NOT_SIGHTED' as const,
         label: `No sighting report ${sequence}`,
-        popupMeta: [
-          slot?.location_name ?? null,
-          slot ? `${formatDate(slot.walk_date, 'compact')} ${slot.start_time.slice(0, 5)}` : null,
-          slot?.round_id ? (roundNameById.get(slot.round_id) ?? null) : null,
-        ].filter(Boolean) as string[],
+        popupMeta: buildSlotPopupMeta(slot, slot?.round_id ? (roundNameById.get(slot.round_id) ?? null) : null),
       }
     })
 

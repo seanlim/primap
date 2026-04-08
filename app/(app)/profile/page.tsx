@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { ProfileClient } from './profile-client'
 import type { WalkRef, HistoryObservation } from '@/lib/types/supabase-helpers'
 import { hasWalkEnded } from '@/lib/utils/walk-participation'
+import { buildSlotPopupMeta } from '@/lib/utils/report-map'
 
 export const dynamic = 'force-dynamic'
 
@@ -153,11 +154,14 @@ export default async function ProfilePage() {
       outcome: 'SIGHTED' as const,
       species: sighting.species,
       label: sighting.species,
-      popupMeta: [
-        slot?.location_name || 'My sighting',
-        slot?.walk_date ? new Date(slot.walk_date).toLocaleDateString('en-SG') : null,
-        slot?.survey_rounds?.name || null,
-      ].filter(Boolean) as string[],
+      popupMeta: buildSlotPopupMeta(
+        {
+          location_name: slot?.location_name || 'My sighting',
+          walk_date: slot?.walk_date,
+          start_time: slot?.start_time,
+        },
+        slot?.survey_rounds?.name || null
+      ),
     }]
   })
 
@@ -170,11 +174,14 @@ export default async function ProfilePage() {
         lng: observation.lng as number,
         outcome: 'NOT_SIGHTED' as const,
         label: slot?.location_name || 'No sighting report',
-        popupMeta: [
-          slot?.location_name || 'No sighting report',
-          slot?.walk_date ? new Date(slot.walk_date).toLocaleDateString('en-SG') : null,
-          slot?.survey_rounds?.name || null,
-        ].filter(Boolean),
+        popupMeta: buildSlotPopupMeta(
+          {
+            location_name: slot?.location_name || 'No sighting report',
+            walk_date: slot?.walk_date,
+            start_time: slot?.start_time,
+          },
+          slot?.survey_rounds?.name || null
+        ),
       }
     })
 

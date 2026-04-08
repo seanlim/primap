@@ -1,23 +1,15 @@
 import type { ComponentType, CSSProperties } from 'react'
 import { MapPinned } from 'lucide-react'
 import { MapView } from '@/components/map/map-view'
+import type { AnalyticsReportMapPoint } from '@/lib/admin-volunteer-analytics'
 import { DEFAULT_SIGHTING_COLOR, NOT_SIGHTED_COLOR, SPECIES_COLORS, getSpeciesColor } from '@/lib/constants/species'
 
 type IconComponent = ComponentType<{ className?: string; style?: CSSProperties }>
 
-export type AdminReportMapPoint = {
-  lat: number
-  lng: number
-  outcome: 'SIGHTED' | 'NOT_SIGHTED'
-  label: string
-  popupMeta: string[]
-  species?: string
-}
-
 export function SightingLegend({
   points,
 }: {
-  points: Array<{ outcome: 'SIGHTED' | 'NOT_SIGHTED'; species?: string }>
+  points: Array<Pick<AnalyticsReportMapPoint, 'outcome' | 'species'>>
 }) {
   const sightedCount = points.filter((point) => point.outcome === 'SIGHTED').length
   const notSightedCount = points.filter((point) => point.outcome === 'NOT_SIGHTED').length
@@ -186,7 +178,7 @@ export function ReportMapCard({
 }: {
   title: string
   description: string
-  reportMapPoints: AdminReportMapPoint[]
+  reportMapPoints: AnalyticsReportMapPoint[]
 }) {
   return (
     <div className="bg-white rounded-2xl p-5 shadow-sm space-y-4">

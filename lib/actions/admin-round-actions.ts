@@ -316,6 +316,11 @@ export async function deleteRound(
 
   if (error) return { error: error.message }
   revalidatePath('/admin/rounds')
+  // Deleting a round removes all of its walks, so the volunteer-facing /walk
+  // listing must be invalidated too — otherwise it shows stale entries until
+  // the next manual refresh. Matches the pattern used by updateRoundStatus
+  // and deleteWalk.
+  revalidatePath('/walk')
   return { success: true }
 }
 

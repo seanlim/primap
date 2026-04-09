@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Plus, Pencil, Search, X, ArrowRight, BarChart3 } from 'lucide-react'
@@ -36,6 +36,12 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
   const [editEndDate, setEditEndDate] = useState('')
   const [deletingRoundId, setDeletingRoundId] = useState<string | null>(null)
   const [forceDeletingRoundId, setForceDeletingRoundId] = useState<string | null>(null)
+  // Tracks an in-flight delete so the user can't double-submit by clicking
+  // confirm twice (or hitting the backdrop / Escape) before the server action
+  // resolves. Mirrors the actionInFlightRef pattern from `users-client.tsx`
+  // (commit ec28321), originally introduced for the same class of bug.
+  const deleteInFlightRef = useRef(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const router = useRouter()
   const { showToast } = useToast()
 
@@ -105,6 +111,10 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
 
   const confirmDeleteRound = async () => {
     if (!deletingRoundId) return
+    if (deleteInFlightRef.current) return
+    deleteInFlightRef.current = true
+    setIsDeleting(true)
+
     const result = await deleteRound(deletingRoundId)
     if (result.error) {
       if (result.error.includes('submitted reports')) {
@@ -112,15 +122,25 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
       }
       showToast(result.error, 'error')
     } else router.refresh()
+
     setDeletingRoundId(null)
+    setIsDeleting(false)
+    deleteInFlightRef.current = false
   }
 
   const confirmForceDeleteRound = async () => {
     if (!forceDeletingRoundId) return
+    if (deleteInFlightRef.current) return
+    deleteInFlightRef.current = true
+    setIsDeleting(true)
+
     const result = await deleteRound(forceDeletingRoundId, { deleteSubmittedReports: true })
     if (result.error) showToast(result.error, 'error')
     else router.refresh()
+
     setForceDeletingRoundId(null)
+    setIsDeleting(false)
+    deleteInFlightRef.current = false
   }
 
   return (
@@ -345,8 +365,12 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
         message="Delete this round and all its walks? Draft reports, draft media, incidents, and volunteer signups will be removed. Submitted reports require a separate confirmation."
         confirmLabel="Delete"
         destructive
+        busy={isDeleting}
         onConfirm={confirmDeleteRound}
-        onCancel={() => setDeletingRoundId(null)}
+        onCancel={() => {
+          if (isDeleting) return
+          setDeletingRoundId(null)
+        }}
       />
       <ConfirmationDialog
         open={!!forceDeletingRoundId}
@@ -354,10 +378,14 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
         message="This will permanently delete the round, its walks, submitted reports, sightings, uploaded report media, incidents, drafts, and volunteer signups."
         confirmLabel="Delete Reports"
         destructive
+        busy={isDeleting}
         requiredConfirmationText="DELETE REPORTS"
         confirmationPrompt="Type DELETE REPORTS to permanently delete the round and its submitted reports."
         onConfirm={confirmForceDeleteRound}
-        onCancel={() => setForceDeletingRoundId(null)}
+        onCancel={() => {
+          if (isDeleting) return
+          setForceDeletingRoundId(null)
+        }}
       />
     </div>
   )

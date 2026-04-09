@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useOptimistic, useTransition } from 'react'
+import { useRef, useState, useOptimistic, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { joinWalk, cancelWalk } from '@/lib/actions/walk-actions'
 import { MapPin, Calendar, Clock, Users } from 'lucide-react'
@@ -40,6 +40,11 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [pendingAction, setPendingAction] = useState<'join' | 'cancel' | null>(null)
+  // Synchronous in-flight gate for the cancel handler. The dialog's busy
+  // prop reflects React state which lags by a render, so a fast double-
+  // click could otherwise fire two cancelWalk requests before the dialog
+  // disabled state propagates.
+  const cancellingRef = useRef(false)
   const router = useRouter()
   const { showToast } = useToast()
 
@@ -80,7 +85,8 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
   }
 
   const confirmCancel = () => {
-    setShowCancelDialog(false)
+    if (cancellingRef.current) return // synchronous double-submit guard
+    cancellingRef.current = true
     setError('')
     setPendingAction('cancel')
     startTransition(async () => {
@@ -89,12 +95,15 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
       if (result.error) {
         setError(result.error)
         setPendingAction(null)
+        setShowCancelDialog(false)
       } else {
         if (result.warning) {
           showToast(result.warning, 'info')
         }
+        setShowCancelDialog(false)
         router.refresh()
       }
+      cancellingRef.current = false
     })
   }
 
@@ -219,8 +228,12 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
         confirmLabel="Yes, Cancel"
         cancelLabel="Keep"
         destructive
+        busy={isCancelling}
         onConfirm={confirmCancel}
-        onCancel={() => setShowCancelDialog(false)}
+        onCancel={() => {
+          if (isCancelling) return
+          setShowCancelDialog(false)
+        }}
       />
     </div>
   )

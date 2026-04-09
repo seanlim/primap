@@ -192,6 +192,18 @@ describe('admin-round-actions', () => {
       expect(revalidatePath).toHaveBeenCalledWith('/admin/rounds')
     })
 
+    // Regression: deleting a round removes all its walks, so the volunteer
+    // /walk listing must be invalidated too. Previously deleteRound only
+    // revalidated /admin/rounds, leaving stale entries on the volunteer page.
+    it('also revalidates /walk so volunteer listings refresh', async () => {
+      setupAdmin()
+
+      const result = await deleteRound('round-1')
+
+      expect(result).toEqual({ success: true })
+      expect(revalidatePath).toHaveBeenCalledWith('/walk')
+    })
+
     it('returns error on DB failure', async () => {
       setupAdmin()
       methods.eq
@@ -201,6 +213,9 @@ describe('admin-round-actions', () => {
       const result = await deleteRound('round-1')
 
       expect(result).toEqual({ error: 'Delete failed' })
+      // Must NOT revalidate when the delete fails — otherwise the cache is
+      // bumped against a no-op DB state.
+      expect(revalidatePath).not.toHaveBeenCalled()
     })
   })
 

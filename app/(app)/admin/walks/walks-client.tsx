@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Plus, Trash2, Pencil, X, Layers, Search, ArrowRight, BarChart3 } from 'lucide-react'
@@ -96,6 +96,12 @@ export function WalksClient({ walks, rounds }: {
   const [bulkLoading, setBulkLoading] = useState(false)
   const [deletingWalkId, setDeletingWalkId] = useState<string | null>(null)
   const [forceDeletingWalkId, setForceDeletingWalkId] = useState<string | null>(null)
+  // Tracks an in-flight delete so the user can't double-submit by clicking
+  // confirm twice (or hitting the backdrop / Escape) before the server action
+  // resolves. Mirrors the actionInFlightRef pattern from `users-client.tsx`
+  // (commit ec28321), originally introduced for the same class of bug.
+  const deleteInFlightRef = useRef(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const router = useRouter()
   const { showToast } = useToast()
@@ -228,6 +234,10 @@ export function WalksClient({ walks, rounds }: {
 
   const confirmDeleteWalk = async () => {
     if (!deletingWalkId) return
+    if (deleteInFlightRef.current) return
+    deleteInFlightRef.current = true
+    setIsDeleting(true)
+
     const result = await deleteWalk(deletingWalkId)
     if ('error' in result) {
       if (result.error?.includes('submitted reports')) {
@@ -235,15 +245,25 @@ export function WalksClient({ walks, rounds }: {
       }
       showToast(result.error || 'An error occurred', 'error')
     } else router.refresh()
+
     setDeletingWalkId(null)
+    setIsDeleting(false)
+    deleteInFlightRef.current = false
   }
 
   const confirmForceDeleteWalk = async () => {
     if (!forceDeletingWalkId) return
+    if (deleteInFlightRef.current) return
+    deleteInFlightRef.current = true
+    setIsDeleting(true)
+
     const result = await deleteWalk(forceDeletingWalkId, { deleteSubmittedReports: true })
     if ('error' in result) showToast(result.error || 'An error occurred', 'error')
     else router.refresh()
+
     setForceDeletingWalkId(null)
+    setIsDeleting(false)
+    deleteInFlightRef.current = false
   }
 
   const toggleDay = (day: number) => {
@@ -669,8 +689,12 @@ export function WalksClient({ walks, rounds }: {
         message="Delete this walk? Draft reports, draft media, incidents, and volunteer signups will be removed. Submitted reports require a separate confirmation."
         confirmLabel="Delete"
         destructive
+        busy={isDeleting}
         onConfirm={confirmDeleteWalk}
-        onCancel={() => setDeletingWalkId(null)}
+        onCancel={() => {
+          if (isDeleting) return
+          setDeletingWalkId(null)
+        }}
       />
       <ConfirmationDialog
         open={!!forceDeletingWalkId}
@@ -678,10 +702,14 @@ export function WalksClient({ walks, rounds }: {
         message="This will permanently delete the walk, submitted reports, sightings, uploaded report media, incidents, drafts, and volunteer signups."
         confirmLabel="Delete Reports"
         destructive
+        busy={isDeleting}
         requiredConfirmationText="DELETE REPORTS"
         confirmationPrompt="Type DELETE REPORTS to permanently delete the walk and its submitted reports."
         onConfirm={confirmForceDeleteWalk}
-        onCancel={() => setForceDeletingWalkId(null)}
+        onCancel={() => {
+          if (isDeleting) return
+          setForceDeletingWalkId(null)
+        }}
       />
     </div>
   )

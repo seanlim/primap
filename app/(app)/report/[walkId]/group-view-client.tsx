@@ -114,7 +114,7 @@ export function GroupViewClient({
 
   const confirmSubmit = async () => {
     if (!myObservation) return
-    setShowSubmitDialog(false)
+    if (submitting) return // guard against double-submit
     setSubmitting(true)
     const result = await submitObservation(myObservation.id, slot.id)
     if (result.error) {
@@ -122,6 +122,7 @@ export function GroupViewClient({
     } else {
       router.refresh()
     }
+    setShowSubmitDialog(false)
     setSubmitting(false)
   }
 
@@ -308,8 +309,12 @@ export function GroupViewClient({
         title="Submit Report"
         message="Submit this report? You won't be able to edit it after submission."
         confirmLabel="Submit"
+        busy={submitting}
         onConfirm={confirmSubmit}
-        onCancel={() => setShowSubmitDialog(false)}
+        onCancel={() => {
+          if (submitting) return
+          setShowSubmitDialog(false)
+        }}
       />
     </div>
   )

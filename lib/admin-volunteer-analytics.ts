@@ -1,6 +1,10 @@
 import { hasWalkEnded } from '@/lib/utils/walk-participation'
 import { buildSlotPopupMeta } from '@/lib/utils/report-map'
 import { toLocalDateString } from '@/lib/utils/format-date'
+import {
+  DEFAULT_HIGH_PARTICIPATION_THRESHOLD,
+  DEFAULT_LATE_CANCEL_HOURS,
+} from '@/lib/constants/settings'
 
 type QueryResult<T> = { data: T | null; error: { message: string } | null }
 type CountResult = { count: number | null; error: { message: string } | null }
@@ -141,6 +145,9 @@ export interface AdminUserActivityMetrics {
   participations: number
   submissions: number
   cancellations: number
+  lateCancellations: number
+  hasLateCancellationIndicator: boolean
+  hasHighParticipationIndicator: boolean
 }
 
 export interface AdminUsersAnalyticsSnapshot {
@@ -483,10 +490,16 @@ function asPromise<T>(query: unknown): Promise<T> {
 
 export async function getAdminUsersAnalytics(
   supabase: SupabaseClientLike,
-  userIds?: string[]
+  userIds?: string[],
+  options?: {
+    lateCancelHours?: number
+    highParticipationThreshold?: number
+  }
 ): Promise<AdminUsersAnalyticsSnapshot> {
   const profileQuery = supabase.from('profiles').select('id')
-  const membershipsQuery = supabase.from('slot_memberships').select('user_id, status')
+  const membershipsQuery = supabase
+    .from('slot_memberships')
+    .select('user_id, status, cancelled_at, walk_slots(walk_date, start_time)')
   const observationsQuery = supabase.from('observations').select('user_id, status')
 
   const scopedProfileQuery = userIds?.length ? profileQuery.in('id', userIds) : profileQuery
@@ -495,7 +508,12 @@ export async function getAdminUsersAnalytics(
 
   const [profilesResult, membershipsResult, observationsResult] = await Promise.all([
     asPromise<QueryResult<Array<{ id: string }>>>(scopedProfileQuery),
-    asPromise<QueryResult<Array<{ user_id: string; status: 'ACTIVE' | 'CANCELLED' }>>>(scopedMembershipQuery),
+    asPromise<QueryResult<Array<{
+      user_id: string
+      status: 'ACTIVE' | 'CANCELLED'
+      cancelled_at?: string | null
+      walk_slots?: { walk_date?: string | null; start_time?: string | null } | null
+    }>>>(scopedMembershipQuery),
     asPromise<QueryResult<Array<{ user_id: string; status: 'DRAFT' | 'SUBMITTED' }>>>(scopedObservationsQuery),
   ])
 
@@ -503,14 +521,31 @@ export async function getAdminUsersAnalytics(
   const userStats = Object.fromEntries(
     Array.from(validUserIds).map((userId) => [
       userId,
-      { participations: 0, submissions: 0, cancellations: 0 },
+      {
+        participations: 0,
+        submissions: 0,
+        cancellations: 0,
+        lateCancellations: 0,
+        hasLateCancellationIndicator: false,
+        hasHighParticipationIndicator: false,
+      },
     ])
   ) as Record<string, AdminUserActivityMetrics>
+  const lateCancelHours = options?.lateCancelHours ?? DEFAULT_LATE_CANCEL_HOURS
+  const highParticipationThreshold =
+    options?.highParticipationThreshold ?? DEFAULT_HIGH_PARTICIPATION_THRESHOLD
 
   for (const membership of membershipsResult.data ?? []) {
     if (!validUserIds.has(membership.user_id)) continue
     if (membership.status === 'ACTIVE') userStats[membership.user_id].participations += 1
-    if (membership.status === 'CANCELLED') userStats[membership.user_id].cancellations += 1
+    if (membership.status === 'CANCELLED') {
+      const stats = userStats[membership.user_id]
+      stats.cancellations += 1
+      if (isLateCancellation(membership, lateCancelHours)) {
+        stats.lateCancellations += 1
+        stats.hasLateCancellationIndicator = true
+      }
+    }
   }
 
   for (const observation of observationsResult.data ?? []) {
@@ -518,7 +553,31 @@ export async function getAdminUsersAnalytics(
     if (observation.status === 'SUBMITTED') userStats[observation.user_id].submissions += 1
   }
 
+  for (const stats of Object.values(userStats)) {
+    stats.hasHighParticipationIndicator = stats.participations >= highParticipationThreshold
+  }
+
   return { userStats }
+}
+
+function isLateCancellation(
+  membership: {
+    cancelled_at?: string | null
+    walk_slots?: { walk_date?: string | null; start_time?: string | null } | null
+  },
+  lateCancelHours: number
+) {
+  const cancelledAt = membership.cancelled_at ? new Date(membership.cancelled_at) : null
+  const slot = membership.walk_slots
+  if (!cancelledAt || Number.isNaN(cancelledAt.getTime()) || !slot?.walk_date || !slot.start_time) {
+    return false
+  }
+
+  const walkStart = new Date(`${slot.walk_date}T${slot.start_time}`)
+  if (Number.isNaN(walkStart.getTime())) return false
+
+  const cutoff = new Date(walkStart.getTime() - lateCancelHours * 60 * 60 * 1000)
+  return cancelledAt >= cutoff
 }
 
 export async function getAdminVolunteerAnalyticsLanding(

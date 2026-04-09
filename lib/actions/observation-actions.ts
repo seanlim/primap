@@ -353,16 +353,21 @@ export async function deleteMedia(mediaId: string) {
   // Pick storage bucket based on which parent the row belongs to
   const bucket: MediaBucket = media.incident_id ? INCIDENT_MEDIA_BUCKET : OBSERVATION_MEDIA_BUCKET
 
-  // Delete from storage (best-effort; DB row removal is the source of truth)
-  await supabase.storage.from(bucket).remove([media.file_path])
-
-  // Delete from database
+  // Delete the DB row FIRST. If RLS denies the delete (e.g. the parent
+  // incident has been resolved), the storage file stays intact and the
+  // gallery still renders correctly. The previous order (storage-first)
+  // could permanently destroy evidence when the DB delete was then rejected.
   const { error } = await supabase
     .from('media')
     .delete()
     .eq('id', mediaId)
 
   if (error) return { error: error.message }
+
+  // DB row is gone — clean up the storage object. If this fails we have an
+  // orphaned file (minor leak, cleanable by a background job) but no
+  // dangling reference and no broken gallery tile.
+  await supabase.storage.from(bucket).remove([media.file_path]).catch(() => {})
 
   return { success: true }
 }

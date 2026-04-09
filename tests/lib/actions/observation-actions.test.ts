@@ -1234,7 +1234,7 @@ describe('observation-actions', () => {
       expect(mockStorage.remove).toHaveBeenCalledWith(['user-1/inc-1/file.jpg'])
     })
 
-    it('returns error on DB delete failure', async () => {
+    it('returns error on DB delete failure and does NOT remove storage object', async () => {
       setupUser()
       methods.single.mockResolvedValueOnce({
         data: {
@@ -1253,6 +1253,30 @@ describe('observation-actions', () => {
       const result = await deleteMedia('media-1')
 
       expect(result).toEqual({ error: 'Delete failed' })
+      // The storage file must NOT be removed when the DB delete fails —
+      // otherwise a resolved-incident RLS denial would destroy evidence
+      // while leaving a dangling media row with a broken gallery tile.
+      expect(mockStorage.remove).not.toHaveBeenCalled()
+    })
+
+    it('still removes storage object after successful DB delete', async () => {
+      setupUser()
+      methods.single.mockResolvedValueOnce({
+        data: {
+          file_path: 'user-1/obs-1/file.jpg',
+          observation_id: 'obs-1',
+          sighting_id: null,
+          incident_id: null,
+        },
+        error: null,
+      })
+
+      const result = await deleteMedia('media-1')
+
+      expect(result).toEqual({ success: true })
+      // DB delete succeeds → storage cleanup fires after.
+      expect(methods.delete).toHaveBeenCalled()
+      expect(mockStorage.remove).toHaveBeenCalledWith(['user-1/obs-1/file.jpg'])
     })
   })
 })

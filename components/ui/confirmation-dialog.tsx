@@ -63,8 +63,10 @@ export function ConfirmationDialog({
       if (e.key !== 'Tab') return
 
       const focusable = [inputRef.current, cancelRef.current, confirmRef.current].filter(
-        (el): el is HTMLElement => el !== null
+        (el): el is HTMLInputElement | HTMLButtonElement => el !== null
       )
+      if (focusable.length === 0) return
+
       const first = focusable[0]
       const last = focusable[focusable.length - 1]
 

@@ -30,7 +30,9 @@ export default async function AdminDashboard() {
     supabase.from('walk_slots').select('id', { count: 'exact', head: true }),
     supabase.from('observations').select('id', { count: 'exact', head: true }).eq('status', 'SUBMITTED'),
     supabase.from('incidents').select('id', { count: 'exact', head: true }).eq('resolved', false),
-    getAdminVolunteerAnalyticsLanding(supabase),
+    getAdminVolunteerAnalyticsLanding(
+      supabase as unknown as Parameters<typeof getAdminVolunteerAnalyticsLanding>[0]
+    ),
   ])
 
   const cards = [

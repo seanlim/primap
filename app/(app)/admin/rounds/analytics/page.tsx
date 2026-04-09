@@ -17,9 +17,12 @@ export default async function AdminRoundsAnalyticsPage({
 }) {
   const params = (await searchParams) ?? {}
   const supabase = await createClient()
-  const analytics = await getAdminRoundsAnalyticsPageSnapshot(supabase, {
-    roundId: params.round ?? null,
-  })
+  const analytics = await getAdminRoundsAnalyticsPageSnapshot(
+    supabase as unknown as Parameters<typeof getAdminRoundsAnalyticsPageSnapshot>[0],
+    {
+      roundId: params.round ?? null,
+    }
+  )
 
   return (
     <div className="space-y-6">

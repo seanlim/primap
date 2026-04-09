@@ -18,10 +18,13 @@ export default async function AdminWalksAnalyticsPage({
 }) {
   const params = (await searchParams) ?? {}
   const supabase = await createClient()
-  const analytics = await getAdminWalksAnalyticsPageSnapshotByRound(supabase, {
-    roundId: params.round ?? null,
-    walkId: params.walk ?? null,
-  })
+  const analytics = await getAdminWalksAnalyticsPageSnapshotByRound(
+    supabase as unknown as Parameters<typeof getAdminWalksAnalyticsPageSnapshotByRound>[0],
+    {
+      roundId: params.round ?? null,
+      walkId: params.walk ?? null,
+    }
+  )
 
   return (
     <div className="space-y-6">

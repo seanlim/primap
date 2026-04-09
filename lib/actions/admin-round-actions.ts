@@ -266,7 +266,7 @@ export async function updateSettings(data: {
     errors.push(`Max media per report must be an integer between ${MAX_MEDIA_PER_REPORT_RANGE.min} and ${MAX_MEDIA_PER_REPORT_RANGE.max}`)
   }
   if (!inRange(data.highParticipationThreshold, HIGH_PARTICIPATION_THRESHOLD_RANGE.min, HIGH_PARTICIPATION_THRESHOLD_RANGE.max)) {
-    errors.push(`High participation threshold must be an integer between ${HIGH_PARTICIPATION_THRESHOLD_RANGE.min} and ${HIGH_PARTICIPATION_THRESHOLD_RANGE.max} submitted reports`)
+    errors.push(`High participation threshold must be an integer between ${HIGH_PARTICIPATION_THRESHOLD_RANGE.min} and ${HIGH_PARTICIPATION_THRESHOLD_RANGE.max} participations`)
   }
   if (errors.length > 0) return { error: errors.join('; ') }
 

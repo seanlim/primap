@@ -81,7 +81,7 @@ export function SettingsClient({ settings }: {
             className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
           <p className="text-xs text-gray-400 mt-1">
-            Submitted reports needed before an admin indicator appears on a volunteer.
+            Participations needed before an admin indicator appears on a volunteer.
           </p>
         </div>
         <div>

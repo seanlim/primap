@@ -393,7 +393,7 @@ describe('admin-round-actions', () => {
         })
 
         expect(result).toEqual({
-          error: expect.stringContaining('High participation threshold must be an integer between 1 and 100 submitted reports'),
+          error: expect.stringContaining('High participation threshold must be an integer between 1 and 100 participations'),
         })
         expect(methods.update).not.toHaveBeenCalled()
       })
@@ -407,7 +407,7 @@ describe('admin-round-actions', () => {
         })
 
         expect(result).toEqual({
-          error: expect.stringContaining('High participation threshold must be an integer between 1 and 100 submitted reports'),
+          error: expect.stringContaining('High participation threshold must be an integer between 1 and 100 participations'),
         })
       })
 
@@ -445,7 +445,7 @@ describe('admin-round-actions', () => {
         expect(result.error).toContain('Required walks per round must be an integer between 1 and 20')
         expect(result.error).toContain('Late cancellation window must be an integer between 1 and 168 hours')
         expect(result.error).toContain('Max media per report must be an integer between 1 and 50')
-        expect(result.error).toContain('High participation threshold must be an integer between 1 and 100 submitted reports')
+        expect(result.error).toContain('High participation threshold must be an integer between 1 and 100 participations')
       })
 
       it('does not call requireAdmin/db when validation fails', async () => {

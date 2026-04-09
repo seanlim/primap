@@ -10,16 +10,16 @@ type QueryResult<T> = { data: T | null; error: { message: string } | null }
 type CountResult = { count: number | null; error: { message: string } | null }
 
 type SupabaseQueryLike = {
-  eq: (...args: any[]) => SupabaseQueryLike
-  order: (...args: any[]) => SupabaseQueryLike
-  limit: (...args: any[]) => SupabaseQueryLike
-  in: (...args: any[]) => SupabaseQueryLike
+  eq: (...args: unknown[]) => SupabaseQueryLike
+  order: (...args: unknown[]) => SupabaseQueryLike
+  limit: (...args: unknown[]) => SupabaseQueryLike
+  in: (...args: unknown[]) => SupabaseQueryLike
   then?: unknown
 }
 
 type SupabaseClientLike = {
   from: (table: string) => {
-    select: (...args: any[]) => SupabaseQueryLike
+    select: (...args: unknown[]) => SupabaseQueryLike
   }
 }
 
@@ -233,19 +233,6 @@ function buildMetrics(input: {
     completedWalks: endedSlotIds.size,
     upcomingWalks: input.slots.length - endedSlotIds.size,
     missingReportWalks,
-  }
-}
-
-function buildAllTimeTotals(input: {
-  activeRegisteredVolunteers: number
-  memberships: AnalyticsMembership[]
-  observations: AnalyticsObservation[]
-}): AnalyticsAllTimeTotals {
-  return {
-    activeRegisteredVolunteers: input.activeRegisteredVolunteers,
-    totalVolunteerSignUps: input.memberships.filter((membership) => membership.status === 'ACTIVE').length,
-    totalVolunteerCancellations: input.memberships.filter((membership) => membership.status === 'CANCELLED').length,
-    totalSubmittedReports: input.observations.filter((observation) => observation.status === 'SUBMITTED').length,
   }
 }
 

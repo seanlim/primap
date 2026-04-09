@@ -15,6 +15,7 @@ interface WalkData {
   roundName: string
   roundStatus: string
   roundStartDate: string
+  roundEndDate: string
   locationName: string
   walkDate: string
   startTime: string
@@ -67,7 +68,7 @@ function generateWalksFromRules(rule: BulkRule): GeneratedWalk[] {
 
 export function WalksClient({ walks, rounds }: {
   walks: WalkData[]
-  rounds: { id: string; name: string }[]
+  rounds: { id: string; name: string; startDate: string; endDate: string }[]
 }) {
   const [showForm, setShowForm] = useState(false)
   const [showBulkForm, setShowBulkForm] = useState(false)
@@ -167,8 +168,15 @@ export function WalksClient({ walks, rounds }: {
   // include it so the dropdown still shows the current round.
   const editingWalk = editingWalkId ? walks.find(w => w.id === editingWalkId) : null
   const effectiveRounds = editingWalk && !rounds.some(r => r.id === editingWalk.roundId)
-    ? [...rounds, { id: editingWalk.roundId, name: `${editingWalk.roundName} (Closed)` }]
+    ? [...rounds, {
+        id: editingWalk.roundId,
+        name: `${editingWalk.roundName} (Closed)`,
+        startDate: editingWalk.roundStartDate,
+        endDate: editingWalk.roundEndDate,
+      }]
     : rounds
+  const selectedRound = effectiveRounds.find(r => r.id === roundId)
+  const selectedBulkRound = rounds.find(r => r.id === bulkRoundId)
 
   const handleCreate = async (e: React.SubmitEvent) => {
     e.preventDefault()
@@ -281,6 +289,10 @@ export function WalksClient({ walks, rounds }: {
 
   const handleGeneratePreview = () => {
     if (!bulkRule.dateFrom || !bulkRule.dateTo) { showToast('Please select a date range', 'error'); return }
+    if (selectedBulkRound && (bulkRule.dateFrom < selectedBulkRound.startDate || bulkRule.dateTo > selectedBulkRound.endDate)) {
+      showToast(`Walk dates must be between ${selectedBulkRound.startDate} and ${selectedBulkRound.endDate}`, 'error')
+      return
+    }
     if (bulkRule.daysOfWeek.length === 0) { showToast('Please select at least one day of the week', 'error'); return }
     const validLocations = bulkRule.locations.filter(l => l.trim())
     if (validLocations.length === 0) { showToast('Please enter at least one location', 'error'); return }
@@ -321,6 +333,8 @@ export function WalksClient({ walks, rounds }: {
         <div>
           <label className="text-xs font-medium text-gray-500 mb-1">Date</label>
           <input type="date" value={walkDate} onChange={e => setWalkDate(e.target.value)}
+            min={selectedRound?.startDate}
+            max={selectedRound?.endDate}
             className="w-full px-3 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required />
         </div>
         <div>
@@ -496,12 +510,16 @@ export function WalksClient({ walks, rounds }: {
                   <label className="text-xs font-medium text-gray-500 mb-1 block">From Date</label>
                   <input type="date" value={bulkRule.dateFrom}
                     onChange={e => setBulkRule(r => ({ ...r, dateFrom: e.target.value }))}
+                    min={selectedBulkRound?.startDate}
+                    max={selectedBulkRound?.endDate}
                     className="w-full px-3 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-500 mb-1 block">To Date</label>
                   <input type="date" value={bulkRule.dateTo}
                     onChange={e => setBulkRule(r => ({ ...r, dateTo: e.target.value }))}
+                    min={selectedBulkRound?.startDate}
+                    max={selectedBulkRound?.endDate}
                     className="w-full px-3 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
               </div>

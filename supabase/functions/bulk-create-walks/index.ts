@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
     // Validate round exists and is DRAFT or OPEN
     const { data: round, error: roundError } = await adminClient
       .from('survey_rounds')
-      .select('id, status')
+      .select('id, status, start_date, end_date')
       .eq('id', roundId)
       .single()
 
@@ -94,6 +94,18 @@ Deno.serve(async (req) => {
     if (!slots || slots.length === 0) {
       return new Response(
         JSON.stringify({ error: 'At least one walk is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const invalidSlot = slots.find(
+      (slot) => slot.walkDate < round.start_date || slot.walkDate > round.end_date
+    )
+    if (invalidSlot) {
+      return new Response(
+        JSON.stringify({
+          error: `Walk date ${invalidSlot.walkDate} must be between the round start date (${round.start_date}) and end date (${round.end_date}).`,
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }

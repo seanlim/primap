@@ -7,6 +7,10 @@ import {
   MAX_MEDIA_PER_REPORT_RANGE,
   REQUIRED_WALKS_PER_ROUND_RANGE,
 } from '@/lib/constants/settings'
+import {
+  OBSERVATION_MEDIA_BUCKET,
+  INCIDENT_MEDIA_BUCKET,
+} from '@/lib/utils/storage'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
 
@@ -95,7 +99,7 @@ async function deleteObservationsForSlots(
 
   if (filePaths.length > 0) {
     const { error: storageError } = await supabase.storage
-      .from('observation-media')
+      .from(OBSERVATION_MEDIA_BUCKET)
       .remove(filePaths)
 
     if (storageError) return { error: storageError.message }
@@ -135,14 +139,49 @@ async function deleteIncidentsForSlots(
 ) {
   if (slotIds.length === 0) return { deletedCount: 0 }
 
-  const { data, error } = await supabase
+  const { data: incidents, error: incidentsError } = await supabase
+    .from('incidents')
+    .select('id')
+    .in('slot_id', slotIds)
+
+  if (incidentsError) return { error: incidentsError.message }
+
+  const incidentIds = (incidents || []).map((incident) => incident.id)
+  if (incidentIds.length === 0) return { deletedCount: 0 }
+
+  const { data: media, error: mediaError } = await supabase
+    .from('media')
+    .select('id, file_path')
+    .in('incident_id', incidentIds)
+
+  if (mediaError) return { error: mediaError.message }
+
+  const filePaths = (media || []).map((mediaRecord) => mediaRecord.file_path)
+  if (filePaths.length > 0) {
+    const { error: storageError } = await supabase.storage
+      .from(INCIDENT_MEDIA_BUCKET)
+      .remove(filePaths)
+
+    if (storageError) return { error: storageError.message }
+  }
+
+  const mediaIds = (media || []).map((mediaRecord) => mediaRecord.id)
+  if (mediaIds.length > 0) {
+    const { error: mediaDeleteError } = await supabase
+      .from('media')
+      .delete()
+      .in('id', mediaIds)
+
+    if (mediaDeleteError) return { error: mediaDeleteError.message }
+  }
+
+  const { error: deleteError } = await supabase
     .from('incidents')
     .delete()
-    .in('slot_id', slotIds)
-    .select('id')
+    .in('id', incidentIds)
 
-  if (error) return { error: error.message }
-  return { deletedCount: data?.length ?? 0 }
+  if (deleteError) return { error: deleteError.message }
+  return { deletedCount: incidentIds.length }
 }
 
 export async function createRound(data: {

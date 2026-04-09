@@ -167,6 +167,8 @@ function getWalkContext(
 ) {
   const round = roundsById.get(asString(walk?.round_id))
   return {
+    roundId: asString(round?.id),
+    walkId: asString(walk?.id),
     roundName: asString(round?.name) || 'Unknown Round',
     walkDate: asString(walk?.walk_date),
     location: asString(walk?.location_name) || 'Unknown Walk',
@@ -188,10 +190,6 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
   const sightingsByObservationId = groupBy(tableData.sightings as SightingRow[], 'observation_id')
   const incidentsBySlotId = groupBy(tableData.incidents as IncidentRow[], 'slot_id')
 
-  const mediaByObservationId = groupBy(
-    (tableData.media as MediaRow[]).filter(row => asString(row.observation_id)),
-    'observation_id'
-  )
   const mediaBySightingId = groupBy(
     (tableData.media as MediaRow[]).filter(row => asString(row.sighting_id)),
     'sighting_id'
@@ -202,8 +200,9 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
   const mediaManifest: ViewExportMediaManifestItem[] = []
 
   for (const media of tableData.media as MediaRow[]) {
-    const observation = observationsById.get(asString(media.observation_id))
     const sighting = sightingsById.get(asString(media.sighting_id))
+    const observation = observationsById.get(asString(media.observation_id))
+      ?? observationsById.get(asString(sighting?.observation_id))
     const walk = walksById.get(asString(observation?.slot_id))
     const userProfile = profilesById.get(asString(observation?.user_id))
     const user = getProfileDisplay(userProfile)
@@ -211,7 +210,9 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
 
     const zipPath = buildReadableMediaPath(
       {
+        roundId: walkContext.roundId,
         roundName: walkContext.roundName,
+        walkId: walkContext.walkId,
         walkDate: walkContext.walkDate,
         locationName: walkContext.location,
         userName: user.name,
@@ -231,7 +232,7 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
       location: walkContext.location,
       observerName: user.name,
       observerEmail: user.email,
-      observationId: asString(media.observation_id),
+      observationId: asString(observation?.id),
       sightingId: asString(media.sighting_id),
       species: asString(sighting?.species),
       count: asNumber(sighting?.count),
@@ -264,10 +265,9 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
       (total, observation) => total + (sightingsByObservationId.get(asString(observation.id))?.length ?? 0),
       0
     )
-    const mediaCount = observations.reduce(
-      (total, observation) => total + (mediaByObservationId.get(asString(observation.id))?.length ?? 0),
-      0
-    )
+    const mediaCount = mediaRows.filter(row =>
+      observations.some(observation => asString(observation.id) === row.observationId)
+    ).length
 
     return {
       ...walkContext,

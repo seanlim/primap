@@ -81,4 +81,34 @@ describe('buildViewExportData', () => {
     )
     expect(result.mediaManifest).toHaveLength(2)
   })
+
+  it('associates sighting-only media with the parent observation and walk', () => {
+    const data = makeTableData({
+      profiles: [
+        { id: 'u1', email: 'volunteer@example.com', full_name: 'Tan Wei Ming' },
+      ],
+      survey_rounds: [
+        { id: 'r1', name: 'Round 1' },
+      ],
+      walk_slots: [
+        { id: 'w1', round_id: 'r1', location_name: 'Pasir Ris Park', walk_date: '2026-03-14' },
+      ],
+      observations: [
+        { id: 'o1', slot_id: 'w1', user_id: 'u1' },
+      ],
+      sightings: [
+        { id: 's1', observation_id: 'o1', species: 'RBL', count: 2 },
+      ],
+      media: [
+        { id: 'md1', observation_id: null, sighting_id: 's1', file_path: 'u1/o1/s1/sighting.jpg', file_name: 'sighting.jpg' },
+      ],
+    })
+
+    const result = buildViewExportData(data)
+
+    expect(result.walkRows[0].mediaCount).toBe(1)
+    expect(result.observationRows[0].mediaCount).toBe(1)
+    expect(result.sightingRows[0].mediaCount).toBe(1)
+    expect(result.observationRows[0].mediaFiles).toContain('/sg-RBL-2/sighting.jpg')
+  })
 })

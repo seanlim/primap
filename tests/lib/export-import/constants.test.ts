@@ -155,9 +155,9 @@ describe('constants', () => {
     })
 
     it('no overlap between required and optional columns', () => {
-      const required = new Set([...LEGACY_REQUIRED_COLUMNS])
+      const required = new Set<string>([...LEGACY_REQUIRED_COLUMNS])
       for (const col of LEGACY_OPTIONAL_COLUMNS) {
-        expect(required.has(col as string)).toBe(false)
+        expect(required.has(col)).toBe(false)
       }
     })
   })

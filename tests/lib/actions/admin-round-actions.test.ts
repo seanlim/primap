@@ -1,4 +1,12 @@
 import { revalidatePath } from 'next/cache'
+import type { Mock } from 'vitest'
+
+interface MockSupabase {
+  auth: { getUser: Mock }
+  from: Mock
+  functions: { invoke: Mock }
+  storage: { from: Mock }
+}
 
 const { mockSupabase, methods } = vi.hoisted(() => {
   const methods = {
@@ -16,7 +24,7 @@ const { mockSupabase, methods } = vi.hoisted(() => {
   for (const key of Object.keys(methods) as (keyof typeof methods)[]) {
     if (key !== 'single') methods[key].mockReturnThis()
   }
-  const mockSupabase: Record<string, unknown> = {
+  const mockSupabase = {
     auth: {
       getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
     },
@@ -24,7 +32,12 @@ const { mockSupabase, methods } = vi.hoisted(() => {
     functions: {
       invoke: vi.fn().mockResolvedValue({ data: null, error: null }),
     },
-  }
+    storage: {
+      from: vi.fn().mockReturnValue({
+        remove: vi.fn().mockResolvedValue({ error: null }),
+      }),
+    },
+  } satisfies MockSupabase
   return { mockSupabase, methods }
 })
 
@@ -46,6 +59,7 @@ import {
 } from '@/lib/actions/admin-round-actions'
 
 function resetChain() {
+  mockSupabase.from.mockReturnValue(methods)
   methods.select.mockReturnThis()
   methods.insert.mockReturnThis()
   methods.update.mockReturnThis()
@@ -178,6 +192,18 @@ describe('admin-round-actions', () => {
       expect(revalidatePath).toHaveBeenCalledWith('/admin/rounds')
     })
 
+    // Regression: deleting a round removes all its walks, so the volunteer
+    // /walk listing must be invalidated too. Previously deleteRound only
+    // revalidated /admin/rounds, leaving stale entries on the volunteer page.
+    it('also revalidates /walk so volunteer listings refresh', async () => {
+      setupAdmin()
+
+      const result = await deleteRound('round-1')
+
+      expect(result).toEqual({ success: true })
+      expect(revalidatePath).toHaveBeenCalledWith('/walk')
+    })
+
     it('returns error on DB failure', async () => {
       setupAdmin()
       methods.eq
@@ -187,6 +213,9 @@ describe('admin-round-actions', () => {
       const result = await deleteRound('round-1')
 
       expect(result).toEqual({ error: 'Delete failed' })
+      // Must NOT revalidate when the delete fails — otherwise the cache is
+      // bumped against a no-op DB state.
+      expect(revalidatePath).not.toHaveBeenCalled()
     })
   })
 
@@ -240,15 +269,256 @@ describe('admin-round-actions', () => {
       expect(revalidatePath).toHaveBeenCalledWith('/walk')
     })
 
+    it('blocks delete when the walk has submitted reports', async () => {
+      setupAdmin()
+      methods.limit.mockResolvedValueOnce({
+        data: [{ id: 'obs-1' }],
+        error: null,
+      })
+
+      const result = await deleteWalk('slot-1')
+
+      expect(result).toEqual({
+        error: 'This walk has submitted reports. Submitted reports must be exported and handled before deleting the walk.',
+      })
+      expect(methods.delete).not.toHaveBeenCalled()
+      expect(revalidatePath).not.toHaveBeenCalled()
+    })
+
+    it('allows submitted report deletion only with explicit override', async () => {
+      setupAdmin()
+      methods.limit.mockResolvedValueOnce({
+        data: [{ id: 'obs-1' }],
+        error: null,
+      })
+
+      const result = await deleteWalk('slot-1', { deleteSubmittedReports: true })
+
+      expect(result).toEqual({ success: true })
+      expect(mockSupabase.from).toHaveBeenCalledWith('incidents')
+      expect(mockSupabase.from).toHaveBeenCalledWith('slot_memberships')
+      expect(mockSupabase.from).toHaveBeenCalledWith('walk_slots')
+      expect(revalidatePath).toHaveBeenCalledWith('/admin/walks')
+      expect(revalidatePath).toHaveBeenCalledWith('/walk')
+    })
+
     it('returns error on DB failure', async () => {
       setupAdmin()
-      methods.eq
-        .mockReturnValueOnce(methods) // requireAdmin's eq
-        .mockReturnValueOnce({ error: { message: 'Delete failed' } }) // action's eq
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'walk_slots') {
+          return {
+            ...methods,
+            delete: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ error: { message: 'Delete failed' } }),
+            }),
+          }
+        }
+        return methods
+      })
 
       const result = await deleteWalk('slot-1')
 
       expect(result).toEqual({ error: 'Delete failed' })
+    })
+
+    // ─── Incident media cleanup (regression for issue #64 × PR #68 intersection) ─
+    //
+    // When an admin deletes a walk that has incidents with attached photos,
+    // the media files must be removed from the `incident-media` storage
+    // bucket and the corresponding `media` rows must be deleted BEFORE the
+    // incident rows are removed (otherwise the FK cascade would orphan the
+    // storage objects).
+
+    describe('deleteIncidentsForSlots media cleanup', () => {
+      function chain(result: { data: unknown; error: unknown }) {
+        const c: Record<string, unknown> = {
+          select: vi.fn(() => c),
+          delete: vi.fn(() => c),
+          in: vi.fn(() => Promise.resolve(result)),
+          eq: vi.fn(() => Promise.resolve(result)),
+        }
+        return c
+      }
+
+      it('fetches incident media, removes it from incident-media bucket, deletes media rows, then deletes incidents', async () => {
+        setupAdmin()
+
+        // Track per-table chains so we can assert on each one independently.
+        const incidentsSelectChain = chain({
+          data: [{ id: 'inc-1' }, { id: 'inc-2' }],
+          error: null,
+        })
+        const mediaSelectChain = chain({
+          data: [
+            { id: 'media-1', file_path: 'user-1/inc-1/a.jpg' },
+            { id: 'media-2', file_path: 'user-1/inc-2/b.jpg' },
+          ],
+          error: null,
+        })
+        const mediaDeleteChain = chain({ data: null, error: null })
+        const incidentsDeleteChain = chain({ data: null, error: null })
+
+        let incidentsFromCallNumber = 0
+        let mediaFromCallNumber = 0
+        const incidentMediaRemove = vi.fn().mockResolvedValue({ error: null })
+        const observationMediaRemove = vi.fn().mockResolvedValue({ error: null })
+
+        mockSupabase.storage.from.mockImplementation((bucket: string) => {
+          if (bucket === 'incident-media') return { remove: incidentMediaRemove }
+          return { remove: observationMediaRemove }
+        })
+
+        mockSupabase.from.mockImplementation((table: string) => {
+          if (table === 'incidents') {
+            incidentsFromCallNumber += 1
+            // 1st call: select to fetch incident IDs
+            // 2nd call: delete the incident rows
+            return incidentsFromCallNumber === 1 ? incidentsSelectChain : incidentsDeleteChain
+          }
+          if (table === 'media') {
+            mediaFromCallNumber += 1
+            // 1st call: select to fetch media rows
+            // 2nd call: delete the media rows by id
+            return mediaFromCallNumber === 1 ? mediaSelectChain : mediaDeleteChain
+          }
+          return methods
+        })
+        // Block the deleteWalk pre-check that would short-circuit on submitted observations
+        methods.limit.mockResolvedValueOnce({ data: [], error: null })
+
+        const result = await deleteWalk('slot-1')
+
+        expect(result).toEqual({ success: true })
+
+        // The incidents table is queried twice: select then delete.
+        expect(incidentsSelectChain.select).toHaveBeenCalledWith('id')
+        expect(incidentsSelectChain.in).toHaveBeenCalledWith('slot_id', ['slot-1'])
+        expect(incidentsDeleteChain.delete).toHaveBeenCalled()
+        expect(incidentsDeleteChain.in).toHaveBeenCalledWith('id', ['inc-1', 'inc-2'])
+
+        // The media table is queried twice: select-by-incident then delete-by-id.
+        expect(mediaSelectChain.select).toHaveBeenCalledWith('id, file_path')
+        expect(mediaSelectChain.in).toHaveBeenCalledWith('incident_id', ['inc-1', 'inc-2'])
+        expect(mediaDeleteChain.delete).toHaveBeenCalled()
+        expect(mediaDeleteChain.in).toHaveBeenCalledWith('id', ['media-1', 'media-2'])
+
+        // Storage cleanup happens against the incident-media bucket (NOT
+        // observation-media), with both file paths.
+        expect(mockSupabase.storage.from).toHaveBeenCalledWith('incident-media')
+        expect(incidentMediaRemove).toHaveBeenCalledTimes(1)
+        expect(incidentMediaRemove).toHaveBeenCalledWith([
+          'user-1/inc-1/a.jpg',
+          'user-1/inc-2/b.jpg',
+        ])
+        // We must NOT have used the wrong bucket for incident files.
+        expect(observationMediaRemove).not.toHaveBeenCalled()
+      })
+
+      it('skips media cleanup when no incidents have attached media', async () => {
+        setupAdmin()
+
+        const incidentsSelectChain = chain({ data: [{ id: 'inc-1' }], error: null })
+        const mediaSelectChain = chain({ data: [], error: null })
+        const incidentsDeleteChain = chain({ data: null, error: null })
+
+        let incidentsFromCallNumber = 0
+        const incidentMediaRemove = vi.fn().mockResolvedValue({ error: null })
+        mockSupabase.storage.from.mockImplementation((bucket: string) => {
+          if (bucket === 'incident-media') return { remove: incidentMediaRemove }
+          return { remove: vi.fn().mockResolvedValue({ error: null }) }
+        })
+
+        mockSupabase.from.mockImplementation((table: string) => {
+          if (table === 'incidents') {
+            incidentsFromCallNumber += 1
+            return incidentsFromCallNumber === 1 ? incidentsSelectChain : incidentsDeleteChain
+          }
+          if (table === 'media') return mediaSelectChain
+          return methods
+        })
+        methods.limit.mockResolvedValueOnce({ data: [], error: null })
+
+        const result = await deleteWalk('slot-1')
+
+        expect(result).toEqual({ success: true })
+        // No storage cleanup attempted when there are no media file paths.
+        expect(incidentMediaRemove).not.toHaveBeenCalled()
+        // The incident row was still deleted.
+        expect(incidentsDeleteChain.delete).toHaveBeenCalled()
+      })
+
+      it('returns early with no-op when no incidents exist for the slot', async () => {
+        setupAdmin()
+
+        const incidentsSelectChain = chain({ data: [], error: null })
+        let incidentsFromCalled = false
+        const incidentMediaRemove = vi.fn().mockResolvedValue({ error: null })
+        mockSupabase.storage.from.mockImplementation((bucket: string) => {
+          if (bucket === 'incident-media') return { remove: incidentMediaRemove }
+          return { remove: vi.fn().mockResolvedValue({ error: null }) }
+        })
+
+        mockSupabase.from.mockImplementation((table: string) => {
+          if (table === 'incidents') {
+            incidentsFromCalled = true
+            return incidentsSelectChain
+          }
+          return methods
+        })
+        methods.limit.mockResolvedValueOnce({ data: [], error: null })
+
+        const result = await deleteWalk('slot-1')
+
+        expect(result).toEqual({ success: true })
+        expect(incidentsFromCalled).toBe(true)
+        expect(incidentMediaRemove).not.toHaveBeenCalled()
+      })
+
+      it('returns error if incident-media storage cleanup fails (does NOT delete incident rows)', async () => {
+        setupAdmin()
+
+        const incidentsSelectChain = chain({
+          data: [{ id: 'inc-1' }],
+          error: null,
+        })
+        const mediaSelectChain = chain({
+          data: [{ id: 'media-1', file_path: 'user-1/inc-1/a.jpg' }],
+          error: null,
+        })
+        const incidentsDeleteChain = chain({ data: null, error: null })
+        const mediaDeleteChain = chain({ data: null, error: null })
+
+        let incidentsFromCallNumber = 0
+        let mediaFromCallNumber = 0
+        const incidentMediaRemove = vi
+          .fn()
+          .mockResolvedValue({ error: { message: 'Storage offline' } })
+
+        mockSupabase.storage.from.mockImplementation((bucket: string) => {
+          if (bucket === 'incident-media') return { remove: incidentMediaRemove }
+          return { remove: vi.fn().mockResolvedValue({ error: null }) }
+        })
+
+        mockSupabase.from.mockImplementation((table: string) => {
+          if (table === 'incidents') {
+            incidentsFromCallNumber += 1
+            return incidentsFromCallNumber === 1 ? incidentsSelectChain : incidentsDeleteChain
+          }
+          if (table === 'media') {
+            mediaFromCallNumber += 1
+            return mediaFromCallNumber === 1 ? mediaSelectChain : mediaDeleteChain
+          }
+          return methods
+        })
+        methods.limit.mockResolvedValueOnce({ data: [], error: null })
+
+        const result = await deleteWalk('slot-1')
+
+        expect(result).toEqual({ error: 'Storage offline' })
+        // The function bailed out before deleting media rows or incident rows.
+        expect(mediaDeleteChain.delete).not.toHaveBeenCalled()
+        expect(incidentsDeleteChain.delete).not.toHaveBeenCalled()
+      })
     })
   })
 

@@ -2,15 +2,17 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 
+type ConfirmationDialogProps = React.ComponentProps<typeof ConfirmationDialog>
+
 const defaultProps = {
   open: true,
   title: 'Delete item?',
   message: 'This action cannot be undone.',
   onConfirm: vi.fn(),
   onCancel: vi.fn(),
-}
+} satisfies ConfirmationDialogProps
 
-function renderDialog(overrides: Partial<typeof defaultProps> = {}) {
+function renderDialog(overrides: Partial<ConfirmationDialogProps> = {}) {
   const props = { ...defaultProps, ...overrides }
   return render(<ConfirmationDialog {...props} />)
 }
@@ -34,7 +36,7 @@ describe('ConfirmationDialog', () => {
   })
 
   it('uses custom confirm/cancel labels', () => {
-    renderDialog({ confirmLabel: 'Yes, delete', cancelLabel: 'No, keep' } as any)
+    renderDialog({ confirmLabel: 'Yes, delete', cancelLabel: 'No, keep' })
     expect(screen.getByText('Yes, delete')).toBeInTheDocument()
     expect(screen.getByText('No, keep')).toBeInTheDocument()
   })
@@ -63,7 +65,7 @@ describe('ConfirmationDialog', () => {
 
   it('does NOT call onCancel on backdrop click when busy', () => {
     const onCancel = vi.fn()
-    renderDialog({ onCancel, busy: true } as any)
+    renderDialog({ onCancel, busy: true })
     const backdrop = document.querySelector('.bg-black\\/50')
     fireEvent.click(backdrop!)
     expect(onCancel).not.toHaveBeenCalled()
@@ -79,21 +81,43 @@ describe('ConfirmationDialog', () => {
 
   it('escape key does NOT call onCancel when busy', () => {
     const onCancel = vi.fn()
-    renderDialog({ onCancel, busy: true } as any)
+    renderDialog({ onCancel, busy: true })
     const dialog = screen.getByRole('dialog')
     fireEvent.keyDown(dialog, { key: 'Escape' })
     expect(onCancel).not.toHaveBeenCalled()
   })
 
   it('destructive variant applies red styling', () => {
-    renderDialog({ destructive: true } as any)
+    renderDialog({ destructive: true })
     const confirmButton = screen.getByText('Confirm')
     expect(confirmButton.className).toContain('bg-red')
   })
 
   it('buttons are disabled when busy', () => {
-    renderDialog({ busy: true } as any)
+    renderDialog({ busy: true })
     expect(screen.getByText('Confirm')).toBeDisabled()
     expect(screen.getByText('Cancel')).toBeDisabled()
+  })
+
+  it('requires matching confirmation text when configured', () => {
+    const onConfirm = vi.fn()
+    renderDialog({
+      onConfirm,
+      confirmLabel: 'Delete Reports',
+      requiredConfirmationText: 'DELETE REPORTS',
+      confirmationPrompt: 'Type DELETE REPORTS to continue.',
+    })
+
+    const confirm = screen.getByText('Delete Reports')
+    expect(confirm).toBeDisabled()
+    expect(screen.getByText('Type DELETE REPORTS to continue.')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: 'DELETE REPORTS' },
+    })
+    expect(confirm).not.toBeDisabled()
+
+    fireEvent.click(confirm)
+    expect(onConfirm).toHaveBeenCalledOnce()
   })
 })

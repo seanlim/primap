@@ -12,7 +12,15 @@ export async function joinWalk(walkId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  const { data: slot, error: slotError } = await supabase
+  interface JoinSlotQueryRow {
+    walk_date: string
+    start_time: string
+    max_volunteers: number
+    survey_rounds: { status?: string } | null
+    slot_memberships: Array<{ user_id: string; status: string }>
+  }
+
+  const { data: slotRaw, error: slotError } = await supabase
     .from('walk_slots')
     .select(`
       walk_date,
@@ -25,10 +33,11 @@ export async function joinWalk(walkId: string) {
     .single()
 
   if (slotError) return { error: slotError.message }
-  if (!slot) return { error: 'Walk slot not found.' }
+  if (!slotRaw) return { error: 'Walk slot not found.' }
 
-  const round = slot.survey_rounds as unknown as { status?: string } | null
-  const memberships = (slot.slot_memberships as unknown as Array<{ user_id: string; status: string }>) || []
+  const slot = slotRaw as unknown as JoinSlotQueryRow
+  const round = slot.survey_rounds
+  const memberships = slot.slot_memberships || []
   const activeMemberships = memberships.filter((membership) => membership.status === 'ACTIVE')
   const alreadyJoined = activeMemberships.some((membership) => membership.user_id === user.id)
   const joinBlock = getJoinBlockInfo({
@@ -128,17 +137,23 @@ export async function cancelWalk(walkId: string) {
     const cancellingName = cancellingProfile?.full_name || cancellingProfile?.email || 'A volunteer'
 
     // 3. Get other active members
-    const { data: otherMembers } = await supabase
+    interface MembershipRow {
+      user_id: string
+      profiles: { email: string } | null
+    }
+
+    const { data: otherMembersRaw } = await supabase
       .from('slot_memberships')
       .select('user_id, profiles:user_id(email)')
       .eq('slot_id', walkId)
       .eq('status', 'ACTIVE')
       .neq('user_id', user.id)
 
-    if (slot && otherMembers && otherMembers.length > 0) {
+    const otherMembers = (otherMembersRaw || []) as unknown as MembershipRow[]
+    if (slot && otherMembers.length > 0) {
       const recipients = otherMembers
-        .map(m => (m.profiles as unknown as { email: string })?.email)
-        .filter(Boolean)
+        .map(m => m.profiles?.email)
+        .filter((e): e is string => Boolean(e))
 
       if (recipients.length > 0) {
         await sendWalkCancellationEmail(

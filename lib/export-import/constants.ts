@@ -24,7 +24,9 @@ export const TABLE_COLUMNS: Record<TableName, string[]> = {
   app_settings: ['id', 'required_walks_per_round', 'late_cancel_hours', 'created_at', 'updated_at'],
 }
 
-export const STORAGE_BUCKET = 'observation-media'
+// Re-exported from lib/utils/storage to keep all bucket references in sync.
+// The export-import code only handles observations/sightings (not incidents).
+export { OBSERVATION_MEDIA_BUCKET as STORAGE_BUCKET } from '@/lib/utils/storage'
 export const EXPORT_XLSX_FILENAME = 'primap-data.xlsx'
 export const MEDIA_DIR = 'media'
 

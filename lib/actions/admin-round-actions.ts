@@ -7,6 +7,12 @@ import {
   MAX_MEDIA_PER_REPORT_RANGE,
   REQUIRED_WALKS_PER_ROUND_RANGE,
 } from '@/lib/constants/settings'
+import {
+  OBSERVATION_MEDIA_BUCKET,
+  INCIDENT_MEDIA_BUCKET,
+} from '@/lib/utils/storage'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@/lib/types/database'
 
 async function requireAdmin() {
   const supabase = await createClient()
@@ -21,6 +27,161 @@ async function requireAdmin() {
 
   if (profile?.role !== 'ADMIN') throw new Error('Not authorized')
   return { supabase, userId: user.id }
+}
+
+async function hasSubmittedObservationsForSlots(
+  supabase: SupabaseClient<Database>,
+  slotIds: string[]
+) {
+  if (slotIds.length === 0) return { hasSubmitted: false }
+
+  const { data, error } = await supabase
+    .from('observations')
+    .select('id')
+    .in('slot_id', slotIds)
+    .eq('status', 'SUBMITTED')
+    .limit(1)
+
+  if (error) return { error: error.message }
+  return { hasSubmitted: (data?.length ?? 0) > 0 }
+}
+
+type ObservationDeleteStatus = 'DRAFT' | 'SUBMITTED'
+
+async function deleteObservationsForSlots(
+  supabase: SupabaseClient<Database>,
+  slotIds: string[],
+  statuses?: ObservationDeleteStatus[]
+) {
+  if (slotIds.length === 0) return { deletedCount: 0 }
+
+  let observationsQuery = supabase
+    .from('observations')
+    .select('id')
+    .in('slot_id', slotIds)
+
+  if (statuses && statuses.length > 0) {
+    observationsQuery = observationsQuery.in('status', statuses)
+  }
+
+  const { data: observations, error: observationsError } = await observationsQuery
+  if (observationsError) return { error: observationsError.message }
+
+  const observationIds = (observations || []).map((observation) => observation.id)
+  if (observationIds.length === 0) return { deletedCount: 0 }
+
+  const { data: sightings, error: sightingsError } = await supabase
+    .from('sightings')
+    .select('id')
+    .in('observation_id', observationIds)
+
+  if (sightingsError) return { error: sightingsError.message }
+
+  const sightingIds = (sightings || []).map((sighting) => sighting.id)
+  const [{ data: observationMedia, error: observationMediaError }, { data: sightingMedia, error: sightingMediaError }] = await Promise.all([
+    supabase
+      .from('media')
+      .select('id, file_path')
+      .in('observation_id', observationIds),
+    sightingIds.length > 0
+      ? supabase
+          .from('media')
+          .select('id, file_path')
+          .in('sighting_id', sightingIds)
+      : Promise.resolve({ data: [], error: null }),
+  ])
+
+  if (observationMediaError) return { error: observationMediaError.message }
+  if (sightingMediaError) return { error: sightingMediaError.message }
+
+  const media = [...(observationMedia || []), ...(sightingMedia || [])]
+  const filePaths = media.map((mediaRecord) => mediaRecord.file_path)
+
+  if (filePaths.length > 0) {
+    const { error: storageError } = await supabase.storage
+      .from(OBSERVATION_MEDIA_BUCKET)
+      .remove(filePaths)
+
+    if (storageError) return { error: storageError.message }
+  }
+
+  const mediaIds = media.map((mediaRecord) => mediaRecord.id)
+  if (mediaIds.length > 0) {
+    const { error: mediaDeleteError } = await supabase
+      .from('media')
+      .delete()
+      .in('id', mediaIds)
+
+    if (mediaDeleteError) return { error: mediaDeleteError.message }
+  }
+
+  if (sightingIds.length > 0) {
+    const { error: sightingDeleteError } = await supabase
+      .from('sightings')
+      .delete()
+      .in('id', sightingIds)
+
+    if (sightingDeleteError) return { error: sightingDeleteError.message }
+  }
+
+  const { error: deleteError } = await supabase
+    .from('observations')
+    .delete()
+    .in('id', observationIds)
+
+  if (deleteError) return { error: deleteError.message }
+  return { deletedCount: observationIds.length }
+}
+
+async function deleteIncidentsForSlots(
+  supabase: SupabaseClient<Database>,
+  slotIds: string[]
+) {
+  if (slotIds.length === 0) return { deletedCount: 0 }
+
+  const { data: incidents, error: incidentsError } = await supabase
+    .from('incidents')
+    .select('id')
+    .in('slot_id', slotIds)
+
+  if (incidentsError) return { error: incidentsError.message }
+
+  const incidentIds = (incidents || []).map((incident) => incident.id)
+  if (incidentIds.length === 0) return { deletedCount: 0 }
+
+  const { data: media, error: mediaError } = await supabase
+    .from('media')
+    .select('id, file_path')
+    .in('incident_id', incidentIds)
+
+  if (mediaError) return { error: mediaError.message }
+
+  const filePaths = (media || []).map((mediaRecord) => mediaRecord.file_path)
+  if (filePaths.length > 0) {
+    const { error: storageError } = await supabase.storage
+      .from(INCIDENT_MEDIA_BUCKET)
+      .remove(filePaths)
+
+    if (storageError) return { error: storageError.message }
+  }
+
+  const mediaIds = (media || []).map((mediaRecord) => mediaRecord.id)
+  if (mediaIds.length > 0) {
+    const { error: mediaDeleteError } = await supabase
+      .from('media')
+      .delete()
+      .in('id', mediaIds)
+
+    if (mediaDeleteError) return { error: mediaDeleteError.message }
+  }
+
+  const { error: deleteError } = await supabase
+    .from('incidents')
+    .delete()
+    .in('id', incidentIds)
+
+  if (deleteError) return { error: deleteError.message }
+  return { deletedCount: incidentIds.length }
 }
 
 export async function createRound(data: {
@@ -102,8 +263,51 @@ export async function updateRoundStatus(roundId: string, status: 'DRAFT' | 'OPEN
   return { success: true }
 }
 
-export async function deleteRound(roundId: string) {
+export async function deleteRound(
+  roundId: string,
+  options?: { deleteSubmittedReports?: boolean }
+) {
   const { supabase } = await requireAdmin()
+
+  const { data: slots, error: slotsError } = await supabase
+    .from('walk_slots')
+    .select('id')
+    .eq('round_id', roundId)
+
+  if (slotsError) return { error: slotsError.message }
+
+  const slotIds = (slots || []).map((slot) => slot.id)
+  const submittedCheck = await hasSubmittedObservationsForSlots(supabase, slotIds)
+  if (submittedCheck.error) return { error: submittedCheck.error }
+  if (submittedCheck.hasSubmitted && !options?.deleteSubmittedReports) {
+    return { error: 'This round has submitted reports. Submitted reports must be exported and handled before deleting the round.' }
+  }
+
+  const observationCleanup = await deleteObservationsForSlots(
+    supabase,
+    slotIds,
+    options?.deleteSubmittedReports ? undefined : ['DRAFT']
+  )
+  if (observationCleanup.error) return { error: observationCleanup.error }
+
+  const incidentCleanup = await deleteIncidentsForSlots(supabase, slotIds)
+  if (incidentCleanup.error) return { error: incidentCleanup.error }
+
+  if (slotIds.length > 0) {
+    const { error: membershipError } = await supabase
+      .from('slot_memberships')
+      .delete()
+      .in('slot_id', slotIds)
+
+    if (membershipError) return { error: membershipError.message }
+
+    const { error: slotsDeleteError } = await supabase
+      .from('walk_slots')
+      .delete()
+      .in('id', slotIds)
+
+    if (slotsDeleteError) return { error: slotsDeleteError.message }
+  }
 
   const { error } = await supabase
     .from('survey_rounds')
@@ -112,6 +316,11 @@ export async function deleteRound(roundId: string) {
 
   if (error) return { error: error.message }
   revalidatePath('/admin/rounds')
+  // Deleting a round removes all of its walks, so the volunteer-facing /walk
+  // listing must be invalidated too — otherwise it shows stale entries until
+  // the next manual refresh. Matches the pattern used by updateRoundStatus
+  // and deleteWalk.
+  revalidatePath('/walk')
   return { success: true }
 }
 
@@ -202,8 +411,34 @@ export async function updateWalk(walkId: string, data: {
   return { success: true }
 }
 
-export async function deleteWalk(walkId: string) {
+export async function deleteWalk(
+  walkId: string,
+  options?: { deleteSubmittedReports?: boolean }
+) {
   const { supabase } = await requireAdmin()
+
+  const submittedCheck = await hasSubmittedObservationsForSlots(supabase, [walkId])
+  if (submittedCheck.error) return { error: submittedCheck.error }
+  if (submittedCheck.hasSubmitted && !options?.deleteSubmittedReports) {
+    return { error: 'This walk has submitted reports. Submitted reports must be exported and handled before deleting the walk.' }
+  }
+
+  const observationCleanup = await deleteObservationsForSlots(
+    supabase,
+    [walkId],
+    options?.deleteSubmittedReports ? undefined : ['DRAFT']
+  )
+  if (observationCleanup.error) return { error: observationCleanup.error }
+
+  const incidentCleanup = await deleteIncidentsForSlots(supabase, [walkId])
+  if (incidentCleanup.error) return { error: incidentCleanup.error }
+
+  const { error: membershipError } = await supabase
+    .from('slot_memberships')
+    .delete()
+    .eq('slot_id', walkId)
+
+  if (membershipError) return { error: membershipError.message }
 
   const { error } = await supabase
     .from('walk_slots')

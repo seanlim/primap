@@ -768,7 +768,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
   }
 
   const confirmSubmit = async () => {
-    setShowSubmitDialog(false)
+    if (submitting) return // guard against double-submit
     setSaving(true)
     setSubmitting(true)
     setError('')
@@ -781,6 +781,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
     const otherWithoutName = sightings.find(s => s.species === 'OTHER' && !s.speciesOther.trim())
     if (otherWithoutName) {
       setError('Species name is required when "Other" is selected.')
+      setShowSubmitDialog(false)
       setSaving(false)
       setSubmitting(false)
       return
@@ -800,6 +801,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
 
     if (saveResult.error) {
       setError(saveResult.error)
+      setShowSubmitDialog(false)
       setSaving(false)
       setSubmitting(false)
       return
@@ -808,6 +810,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
     const obsId = saveResult.observationId || observationId
     if (!obsId) {
       setError('Failed to save observation')
+      setShowSubmitDialog(false)
       setSaving(false)
       setSubmitting(false)
       return
@@ -816,6 +819,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
     const submitResult = await submitObservation(obsId, slot.id)
     if (submitResult.error) {
       setError(submitResult.error)
+      setShowSubmitDialog(false)
     } else {
       // Only time we delete the draft — observation is finalized
       await deleteDraft(slot.id)
@@ -1139,8 +1143,12 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
             : "You haven't added any sightings. Submit? You won't be able to edit it after submission."
         }
         confirmLabel="Submit"
+        busy={submitting}
         onConfirm={confirmSubmit}
-        onCancel={() => setShowSubmitDialog(false)}
+        onCancel={() => {
+          if (submitting) return
+          setShowSubmitDialog(false)
+        }}
       />
 
     </div>

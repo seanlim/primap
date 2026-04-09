@@ -116,6 +116,50 @@ describe('WalkDetailClient', () => {
     expect(screen.queryByRole('button', { name: 'Cancel Participation' })).not.toBeInTheDocument()
   })
 
+  // Regression: clicking "Yes, Cancel" twice in rapid succession used to fire
+  // two concurrent cancelWalk requests. Two-layered defense:
+  //   1. UI: dialog's busy prop disables both confirm/cancel buttons mid-flight.
+  //   2. Logic: a synchronous cancellingRef gate in confirmCancel prevents
+  //      the underlying server action from firing twice even if the button's
+  //      disabled state is bypassed (e.g., keyboard event, browser quirk).
+  it('disables the cancel-confirm button while a cancellation is in flight', async () => {
+    // Reset mock state — other tests in this file share mockCancelWalk and
+    // there's no beforeEach(clearAllMocks) at the top level.
+    mockCancelWalk.mockClear()
+
+    const deferred = createDeferred<{ success: true }>()
+    mockCancelWalk.mockReturnValueOnce(deferred.promise)
+
+    renderWalkDetail({
+      isJoined: true,
+      members: [{
+        userId: 'user-1',
+        fullName: 'June',
+        email: 'june@example.com',
+        joinedAt: '2099-04-01T08:00:00.000Z',
+      }],
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel Participation' }))
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Yes, Cancel' }))
+      await Promise.resolve()
+    })
+
+    // Both confirm and cancel buttons inside the dialog are disabled while
+    // the cancel request is mid-flight, blocking double-clicks at the UI layer.
+    expect(screen.getByRole('button', { name: 'Yes, Cancel' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Keep' })).toBeDisabled()
+    // The first click correctly fired exactly one cancelWalk call.
+    expect(mockCancelWalk).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      deferred.resolve({ success: true })
+      await Promise.resolve()
+    })
+  })
+
   it('shows clearer blocked join status and explanation', () => {
     renderWalkDetail({
       walk: {

@@ -20,6 +20,31 @@ interface GroupedReport {
   submittedCount: number
 }
 
+/**
+ * Raw shape of the embedded observations query below. Defined explicitly so
+ * the row mapping doesn't need per-row `as unknown as { ... }` casts.
+ */
+interface ObservationQueryRow {
+  id: string
+  slot_id: string
+  submitted_at: string | null
+  created_at: string
+  profiles: { full_name: string | null; email: string } | null
+  walk_slots: {
+    location_name: string
+    walk_date: string
+    start_time: string
+    max_volunteers: number
+    slot_memberships: { count: number }[]
+    survey_rounds: {
+      id: string
+      name: string
+      status: string
+      start_date: string
+    } | null
+  } | null
+}
+
 function matchesDateFilter(report: GroupedReport, dateFilter: string) {
   return !dateFilter || report.walkDate === dateFilter
 }
@@ -66,7 +91,7 @@ export default async function AdminReportsPage({
 
   const supabase = await createClient()
 
-  const { data: observations } = await supabase
+  const { data: observationsRaw } = await supabase
     .from('observations')
     .select(`
       id,
@@ -86,25 +111,14 @@ export default async function AdminReportsPage({
     .eq('status', 'SUBMITTED')
     .order('submitted_at', { ascending: false })
 
+  const observations = (observationsRaw || []) as unknown as ObservationQueryRow[]
   const grouped = new Map<string, GroupedReport>()
 
-  for (const obs of observations || []) {
-    const slot = obs.walk_slots as unknown as {
-      location_name: string
-      walk_date: string
-      start_time: string
-      max_volunteers: number
-      slot_memberships: Array<{ count: number }>
-      survey_rounds: {
-        id: string
-        name: string
-        status: string
-        start_date: string
-      } | null
-    } | null
+  for (const obs of observations) {
+    const slot = obs.walk_slots
     if (!slot) continue
 
-    const reporter = obs.profiles as unknown as { full_name: string | null; email: string } | null
+    const reporter = obs.profiles
     const reporterName = reporter?.full_name || reporter?.email || 'Unknown'
     const timestamp = obs.submitted_at || obs.created_at
 

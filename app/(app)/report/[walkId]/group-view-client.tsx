@@ -1,17 +1,17 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronDown, ChevronUp, MapPin, Eye, AlertTriangle, Loader2, ImageOff, ArrowLeft } from 'lucide-react'
+import { ChevronDown, ChevronUp, MapPin, Eye, AlertTriangle, ArrowLeft } from 'lucide-react'
 import { submitObservation } from '@/lib/actions/observation-actions'
-import { reportIncident } from '@/lib/actions/incident-actions'
-import { getSignedMediaUrl } from '@/lib/utils/storage'
-import { cacheGet, cacheSet } from '@/lib/offline/db'
 import { formatDate } from '@/lib/utils/format-date'
 import { useToast } from '@/components/ui/toast'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { Breadcrumb } from '@/components/ui/breadcrumb'
+import { MediaGallery } from '@/components/report/media-gallery'
+import { INCIDENT_TYPE_LABELS, type IncidentType } from '@/lib/constants/incident-types'
+import { IncidentModal } from './incident-modal'
 
 interface SightingData {
   id: string
@@ -51,7 +51,15 @@ interface Props {
   }
   observations: ObservationData[]
   members: { userId: string; fullName: string | null; email: string }[]
-  incidents: { id: string; type: string; description: string; reportedBy: string; createdAt: string; resolved: boolean }[]
+  incidents: {
+    id: string
+    type: string
+    description: string
+    reportedBy: string
+    createdAt: string
+    resolved: boolean
+    media: { id: string; file_path: string; file_name: string; media_type: string }[]
+  }[]
   currentUserId: string
   backHref?: string
   backLabel?: string
@@ -65,13 +73,6 @@ const SPECIES_LABELS: Record<string, string> = {
   OTHER: 'Other',
 }
 
-const INCIDENT_TYPES = [
-  { value: 'INJURED_ANIMAL', label: 'Injured Animal' },
-  { value: 'DEAD_ANIMAL', label: 'Dead Animal' },
-  { value: 'HUMAN_WILDLIFE_CONFLICT', label: 'Human-Wildlife Conflict' },
-  { value: 'HABITAT_DAMAGE', label: 'Habitat Damage' },
-  { value: 'OTHER', label: 'Other' },
-] as const
 
 export function GroupViewClient({
   slot,
@@ -81,7 +82,10 @@ export function GroupViewClient({
   currentUserId,
   backHref = '/report',
   backLabel = 'Back to Reports',
-  canReportIncident = true,
+  // Default fail-closed: callers must explicitly grant the permission. Both
+  // current call sites pass `viewData.isParticipant`; this default protects
+  // against future call sites that might forget.
+  canReportIncident = false,
 }: Props) {
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set())
   const [showIncidentModal, setShowIncidentModal] = useState(false)
@@ -110,7 +114,7 @@ export function GroupViewClient({
 
   const confirmSubmit = async () => {
     if (!myObservation) return
-    setShowSubmitDialog(false)
+    if (submitting) return // guard against double-submit
     setSubmitting(true)
     const result = await submitObservation(myObservation.id, slot.id)
     if (result.error) {
@@ -118,6 +122,7 @@ export function GroupViewClient({
     } else {
       router.refresh()
     }
+    setShowSubmitDialog(false)
     setSubmitting(false)
   }
 
@@ -260,14 +265,15 @@ export function GroupViewClient({
             <div key={inc.id} className="bg-red-50 border border-red-200 rounded-xl p-4">
               <div className="flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
-                <div>
+                <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-red-800">
-                    {INCIDENT_TYPES.find(t => t.value === inc.type)?.label || inc.type}
+                    {INCIDENT_TYPE_LABELS[inc.type as IncidentType] || inc.type}
                   </p>
                   <p className="text-sm text-red-700 mt-1">{inc.description}</p>
                   <p className="text-xs text-red-400 mt-2">
                     Reported by {inc.reportedBy} &middot; {formatDate(inc.createdAt)}
                   </p>
+                  <MediaGallery media={inc.media} bucket="incident-media" />
                 </div>
               </div>
             </div>
@@ -303,100 +309,13 @@ export function GroupViewClient({
         title="Submit Report"
         message="Submit this report? You won't be able to edit it after submission."
         confirmLabel="Submit"
+        busy={submitting}
         onConfirm={confirmSubmit}
-        onCancel={() => setShowSubmitDialog(false)}
+        onCancel={() => {
+          if (submitting) return
+          setShowSubmitDialog(false)
+        }}
       />
-    </div>
-  )
-}
-
-function MediaGallery({ media }: { media: { id: string; file_path: string; file_name: string; media_type: string }[] }) {
-  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({})
-  const blobUrlsRef = useRef<string[]>([])
-
-  useEffect(() => {
-    let cancelled = false
-    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000
-
-    async function resolveUrls() {
-      const urls: Record<string, string> = {}
-      for (const item of media) {
-        // Check IndexedDB blob cache first (works offline)
-        const cacheKey = `media-blob:${item.file_path}`
-        try {
-          const cachedBlob = await cacheGet(cacheKey) as Blob | null
-          if (cancelled) return
-          if (cachedBlob && cachedBlob instanceof Blob) {
-            const blobUrl = URL.createObjectURL(cachedBlob)
-            blobUrlsRef.current.push(blobUrl)
-            urls[item.id] = blobUrl
-            continue
-          }
-        } catch { /* cache miss */ }
-
-        // Skip network when offline
-        if (!navigator.onLine) {
-          urls[item.id] = 'error'
-          continue
-        }
-
-        // Network: get signed URL, cache blob in background
-        try {
-          const signedUrl = await getSignedMediaUrl(item.file_path)
-          if (cancelled) return
-          urls[item.id] = signedUrl
-          fetch(signedUrl, { mode: 'cors' }).then(async res => {
-            if (res.ok) {
-              const blob = await res.blob()
-              await cacheSet(cacheKey, blob, SEVEN_DAYS)
-            }
-          }).catch(() => {})
-        } catch {
-          urls[item.id] = 'error'
-        }
-      }
-      if (!cancelled) setSignedUrls(urls)
-    }
-    if (media.length > 0) resolveUrls()
-    return () => {
-      cancelled = true
-      blobUrlsRef.current.forEach(URL.revokeObjectURL)
-      blobUrlsRef.current = []
-    }
-  }, [media])
-
-  if (media.length === 0) return null
-
-  return (
-    <div className="grid grid-cols-3 gap-2 mt-2">
-      {media.map(item => (
-        <div key={item.id} className="aspect-square rounded-lg overflow-hidden bg-gray-100">
-          {signedUrls[item.id] && signedUrls[item.id] !== 'error' ? (
-            item.media_type === 'VIDEO' ? (
-              <video
-                src={signedUrls[item.id]}
-                className="w-full h-full object-cover"
-                controls
-              />
-            ) : (
-              <img
-                src={signedUrls[item.id]}
-                alt={item.file_name}
-                className="w-full h-full object-cover"
-              />
-            )
-          ) : signedUrls[item.id] === 'error' ? (
-            <div className="w-full h-full flex flex-col items-center justify-center gap-1">
-              <ImageOff className="w-5 h-5 text-gray-300" />
-              <span className="text-[10px] text-gray-400">Unavailable</span>
-            </div>
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
-            </div>
-          )}
-        </div>
-      ))}
     </div>
   )
 }
@@ -473,90 +392,3 @@ function ObservationDetails({ observation }: { observation: ObservationData }) {
   )
 }
 
-function IncidentModal({
-  walkId,
-  onClose,
-  onSubmitted,
-}: {
-  walkId: string
-  onClose: () => void
-  onSubmitted: () => void
-}) {
-  const [type, setType] = useState<string>('')
-  const [description, setDescription] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!type || !description) return
-    setLoading(true)
-    setError('')
-
-    const result = await reportIncident({
-      walkId,
-      incidentType: type as 'INJURED_ANIMAL' | 'DEAD_ANIMAL' | 'HUMAN_WILDLIFE_CONFLICT' | 'HABITAT_DAMAGE' | 'OTHER',
-      description,
-    })
-
-    if (result.error) {
-      setError(result.error)
-      setLoading(false)
-    } else {
-      onSubmitted()
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-md p-6 max-h-[80vh] overflow-y-auto">
-        <h2 className="text-lg font-bold text-gray-900 mb-4">Report Incident</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Incident Type</label>
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-sm bg-white"
-              required
-            >
-              <option value="">Select type...</option>
-              {INCIDENT_TYPES.map(t => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={4}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-sm resize-none"
-              placeholder="Describe the incident..."
-              required
-            />
-          </div>
-          {error && <p className="text-sm text-red-500">{error}</p>}
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 py-3 px-4 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium transition-colors text-sm"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 bg-red-600 text-white py-3 px-4 rounded-xl hover:bg-red-700 disabled:opacity-50 font-medium transition-colors text-sm"
-            >
-              {loading ? 'Submitting...' : 'Report'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}

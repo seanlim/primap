@@ -2,48 +2,41 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sendIncidentReportedEmail } from '@/lib/email'
+import { INCIDENT_TYPE_LABELS, type IncidentType } from '@/lib/constants/incident-types'
 
 interface ReportIncidentInput {
   walkId: string
-  incidentType: 'INJURED_ANIMAL' | 'DEAD_ANIMAL' | 'HUMAN_WILDLIFE_CONFLICT' | 'HABITAT_DAMAGE' | 'OTHER'
+  incidentType: IncidentType
   description: string
   lat?: number
   lng?: number
 }
 
-export async function reportIncident(input: ReportIncidentInput) {
+export async function reportIncident(
+  input: ReportIncidentInput
+): Promise<{ success: true; incidentId: string } | { error: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
-  
-  const membershipQuery = supabase
+
+  // Fail-closed: only active slot participants may report incidents.
+  // Use .maybeSingle() so a missing row (non-participant) is `data: null`,
+  // not an error. Any error or missing row → reject.
+  const { data: membership, error: membershipError } = await supabase
     .from('slot_memberships')
     .select('id')
     .eq('slot_id', input.walkId)
     .eq('user_id', user.id)
     .eq('status', 'ACTIVE')
+    .maybeSingle()
 
-  const membershipResult = typeof (membershipQuery as unknown as { maybeSingle?: unknown }).maybeSingle === 'function'
-    ? await (membershipQuery as unknown as { maybeSingle: () => Promise<{ data: unknown; error?: { message: string } }> }).maybeSingle()
-    : await membershipQuery
-
-  if (membershipResult.error) return { error: membershipResult.error.message }
-
-  // Some legacy/unit-test query mocks resolve without a `data` payload.
-  // In production Supabase responses, `data` is present and enforcement remains active.
-  const hasMembershipData = membershipResult.data !== undefined
-
-  const memberships = Array.isArray(membershipResult.data)
-    ? membershipResult.data
-    : membershipResult.data
-      ? [membershipResult.data]
-      : []
-
-  if (hasMembershipData && memberships.length === 0) {
+  if (membershipError) return { error: membershipError.message }
+  if (!membership) {
     return { error: 'Only walk participants can report incidents for this walk' }
   }
 
-  const { error } = await supabase
+  const { data: inserted, error } = await supabase
     .from('incidents')
     .insert({
       slot_id: input.walkId,
@@ -53,11 +46,58 @@ export async function reportIncident(input: ReportIncidentInput) {
       lat: input.lat,
       lng: input.lng,
     })
+    .select('id')
+    .single()
 
   if (error) return { error: error.message }
+  if (!inserted?.id) return { error: 'Failed to create incident' }
+
+  const incidentId = inserted.id as string
+
+  // Notify admins (best-effort: never fail the user's submission on email errors)
+  try {
+    const [reporterResult, walkResult, adminsResult] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('id', user.id)
+        .single(),
+      supabase
+        .from('walk_slots')
+        .select('location_name, walk_date')
+        .eq('id', input.walkId)
+        .single(),
+      supabase
+        .from('profiles')
+        .select('email')
+        .eq('role', 'ADMIN')
+        .eq('status', 'ACTIVE'),
+    ])
+
+    const reporterName =
+      reporterResult.data?.full_name ||
+      reporterResult.data?.email ||
+      'A volunteer'
+    const walkLocation = walkResult.data?.location_name || 'Unknown location'
+    const walkDate = walkResult.data?.walk_date || ''
+    const adminEmails = (adminsResult.data || [])
+      .map(a => a.email)
+      .filter((e): e is string => Boolean(e))
+
+    if (adminEmails.length > 0) {
+      await sendIncidentReportedEmail(adminEmails, {
+        typeLabel: INCIDENT_TYPE_LABELS[input.incidentType] ?? input.incidentType,
+        description: input.description,
+        reporterName,
+        walkLocation,
+        walkDate,
+      })
+    }
+  } catch (notifyError) {
+    console.error('Failed to send incident notification email:', notifyError)
+  }
 
   revalidatePath(`/report/${input.walkId}`)
-  revalidatePath(`/admin/reports/${input.walkId}`)
-  revalidatePath('/admin/reports')
-  return { success: true }
+  revalidatePath('/admin/incidents')
+  return { success: true, incidentId }
 }

@@ -4,16 +4,19 @@ import { useState, useRef, useEffect } from 'react'
 import { Camera, X, Loader2, ImageOff } from 'lucide-react'
 import { deleteMedia } from '@/lib/actions/observation-actions'
 import { extractExifData } from '@/lib/utils/exif'
-import { getSignedMediaUrl } from '@/lib/utils/storage'
+import {
+  OBSERVATION_MEDIA_BUCKET,
+  INCIDENT_MEDIA_BUCKET,
+  type MediaBucket,
+} from '@/lib/utils/storage'
 import {
   saveMediaToQueue,
   getMediaByClientParent,
   removeMediaFromQueue,
   addToOutbox,
-  cacheGet,
-  cacheSet,
 } from '@/lib/offline/db'
 import { type QueuedMedia } from '@/lib/types/observation'
+import { useMediaUrls } from './use-media-urls'
 
 export interface MediaItem {
   id: string
@@ -23,7 +26,7 @@ export interface MediaItem {
 }
 
 interface MediaUploaderProps {
-  parentType: 'observation' | 'sighting'
+  parentType: 'observation' | 'sighting' | 'incident'
   parentId: string | null
   existingMedia: MediaItem[]
   maxFiles?: number
@@ -33,6 +36,12 @@ interface MediaUploaderProps {
   offline?: boolean
   clientParentId?: string
   syncKey?: number
+  /**
+   * Fired whenever the in-flight upload count changes. Useful for parents
+   * that need to block navigation/dismissal while files are still uploading
+   * (e.g., the IncidentModal phase 2 step).
+   */
+  onUploadingChange?: (uploadingCount: number) => void
 }
 
 export function MediaUploader({
@@ -46,7 +55,11 @@ export function MediaUploader({
   offline = false,
   syncKey = 0,
   clientParentId,
+  onUploadingChange,
 }: MediaUploaderProps) {
+  // Pick the storage bucket based on parent type. Incidents live in
+  // INCIDENT_MEDIA_BUCKET; observations and sightings share OBSERVATION_MEDIA_BUCKET.
+  const bucket: MediaBucket = parentType === 'incident' ? INCIDENT_MEDIA_BUCKET : OBSERVATION_MEDIA_BUCKET
   const [media, setMedia] = useState<MediaItem[]>(existingMedia)
   const [error, setError] = useState<string | null>(null)
 
@@ -55,74 +68,20 @@ export function MediaUploader({
     setMedia(existingMedia)
   }, [existingMedia])
   const [uploading, setUploading] = useState<Set<string>>(new Set())
-  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({})
   const [localMedia, setLocalMedia] = useState<QueuedMedia[]>([])
   const [blobUrls, setBlobUrls] = useState<Record<string, string>>({})
   const inputRef = useRef<HTMLInputElement>(null)
   const blobUrlsRef = useRef<Record<string, string>>({})
 
-  // Resolve URLs for server media: check IndexedDB blob cache first, then fetch + cache
-  const mediaBlobUrlsRef = useRef<Record<string, string>>({})
+  // Resolve URLs for server media via the shared hook (cache → signed URL,
+  // race-safe blob cleanup, offline-aware).
+  const signedUrls = useMediaUrls(media, bucket)
+
+  // Notify parent when upload count changes (used by IncidentModal to block
+  // dismissal while files are still uploading).
   useEffect(() => {
-    let cancelled = false
-    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000
-
-    async function resolveUrls() {
-      const newUrls: Record<string, string> = {}
-      for (const item of media) {
-        if (signedUrls[item.id]) continue
-
-        // Check IndexedDB blob cache first (works offline)
-        const cacheKey = `media-blob:${item.file_path}`
-        try {
-          const cachedBlob = await cacheGet(cacheKey) as Blob | null
-          if (cancelled) return
-          if (cachedBlob && cachedBlob instanceof Blob) {
-            const blobUrl = URL.createObjectURL(cachedBlob)
-            mediaBlobUrlsRef.current[item.id] = blobUrl
-            newUrls[item.id] = blobUrl
-            continue
-          }
-        } catch {
-          // Cache miss or error, fall through to network
-        }
-
-        // Skip network requests when offline — avoids timeout delays
-        if (!navigator.onLine) {
-          newUrls[item.id] = 'error'
-          continue
-        }
-
-        // Network: get signed URL, fetch image, cache blob
-        try {
-          const signedUrl = await getSignedMediaUrl(item.file_path)
-          if (cancelled) return
-          newUrls[item.id] = signedUrl
-
-          // Cache the image blob in background (don't block display)
-          fetch(signedUrl, { mode: 'cors' }).then(async res => {
-            if (res.ok) {
-              const blob = await res.blob()
-              await cacheSet(cacheKey, blob, SEVEN_DAYS)
-            }
-          }).catch(() => {})
-        } catch {
-          // Signed URL fetch failed — mark as error so we don't show infinite spinner
-          newUrls[item.id] = 'error'
-        }
-      }
-      if (Object.keys(newUrls).length > 0 && !cancelled) {
-        setSignedUrls(prev => ({ ...prev, ...newUrls }))
-      }
-    }
-    resolveUrls()
-    return () => {
-      cancelled = true
-      // Revoke blob URLs created from cache
-      Object.values(mediaBlobUrlsRef.current).forEach(URL.revokeObjectURL)
-      mediaBlobUrlsRef.current = {}
-    }
-  }, [media]) // eslint-disable-line react-hooks/exhaustive-deps
+    onUploadingChange?.(uploading.size)
+  }, [uploading, onUploadingChange])
 
   // Load locally queued media from IndexedDB
   useEffect(() => {
@@ -183,6 +142,13 @@ export function MediaUploader({
         }
 
         if (offline || !parentId) {
+          // Incidents do not have an offline path — they require an online
+          // server action to be created, so there is never a queued state.
+          if (parentType === 'incident') {
+            setError('Cannot upload incident media while offline')
+            setTimeout(() => setError(null), 5000)
+            break
+          }
           // Offline path: save blob to IndexedDB
           const queuedItem: QueuedMedia = {
             id: tempId,
@@ -235,27 +201,33 @@ export function MediaUploader({
               throw new Error(result.error || 'Upload failed')
             }
           } catch {
-            // Online upload failed — fall back to offline queue
-            const queuedItem: QueuedMedia = {
-              id: tempId,
-              clientParentId: effectiveParentId,
-              parentType,
-              resolvedParentId: parentId,
-              blob: file,
-              fileName: file.name,
-              fileSize: file.size,
-              mediaType: file.type.startsWith('video/') ? 'VIDEO' : 'PHOTO',
-              exifLat: exifData.lat ?? null,
-              exifLng: exifData.lng ?? null,
-              exifDatetime: exifData.datetime ?? null,
-              createdAt: Date.now(),
+            // Incidents have no offline fallback — surface the error to the user.
+            if (parentType === 'incident') {
+              setError('Failed to upload incident media — please try again')
+              setTimeout(() => setError(null), 5000)
+            } else {
+              // Online upload failed — fall back to offline queue
+              const queuedItem: QueuedMedia = {
+                id: tempId,
+                clientParentId: effectiveParentId,
+                parentType,
+                resolvedParentId: parentId,
+                blob: file,
+                fileName: file.name,
+                fileSize: file.size,
+                mediaType: file.type.startsWith('video/') ? 'VIDEO' : 'PHOTO',
+                exifLat: exifData.lat ?? null,
+                exifLng: exifData.lng ?? null,
+                exifDatetime: exifData.datetime ?? null,
+                createdAt: Date.now(),
+              }
+              await saveMediaToQueue(queuedItem)
+              await addToOutbox('UPLOAD_MEDIA', { mediaQueueId: tempId }, effectiveParentId)
+              setLocalMedia(prev => [...prev, queuedItem])
+              const blobUrl = URL.createObjectURL(file)
+              blobUrlsRef.current[tempId] = blobUrl
+              setBlobUrls(prev => ({ ...prev, [tempId]: blobUrl }))
             }
-            await saveMediaToQueue(queuedItem)
-            await addToOutbox('UPLOAD_MEDIA', { mediaQueueId: tempId }, effectiveParentId)
-            setLocalMedia(prev => [...prev, queuedItem])
-            const blobUrl = URL.createObjectURL(file)
-            blobUrlsRef.current[tempId] = blobUrl
-            setBlobUrls(prev => ({ ...prev, [tempId]: blobUrl }))
           } finally {
             setUploading(prev => {
               const next = new Set(prev)
@@ -276,12 +248,13 @@ export function MediaUploader({
   const handleDelete = async (mediaId: string) => {
     const result = await deleteMedia(mediaId)
     if (result.success) {
+      // useMediaUrls re-resolves on `media` change, so the deleted item drops
+      // out of signedUrls automatically — no need to maintain a parallel map.
       setMedia(prev => prev.filter(m => m.id !== mediaId))
-      setSignedUrls(prev => {
-        const next = { ...prev }
-        delete next[mediaId]
-        return next
-      })
+    } else if (result.error) {
+      // Surface delete failures (e.g., RLS denied because parent is resolved)
+      setError(result.error)
+      setTimeout(() => setError(null), 5000)
     }
   }
 
@@ -331,12 +304,16 @@ export function MediaUploader({
                   <video
                     src={signedUrls[item.id]}
                     className="w-full h-full object-cover"
+                    preload="metadata"
                   />
                 ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={signedUrls[item.id]}
                     alt={item.file_name}
                     className="w-full h-full object-cover"
+                    loading="lazy"
+                    decoding="async"
                   />
                 )
               ) : signedUrls[item.id] === 'error' ? (
@@ -368,12 +345,16 @@ export function MediaUploader({
                   <video
                     src={blobUrls[item.id]}
                     className="w-full h-full object-cover"
+                    preload="metadata"
                   />
                 ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={blobUrls[item.id]}
                     alt={item.fileName}
                     className="w-full h-full object-cover"
+                    loading="lazy"
+                    decoding="async"
                   />
                 )
               ) : (

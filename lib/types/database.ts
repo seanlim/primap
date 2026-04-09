@@ -108,6 +108,7 @@ export type Database = {
           file_path: string
           file_size: number | null
           id: string
+          incident_id: string | null
           media_type: Database["public"]["Enums"]["media_type"]
           observation_id: string | null
           sighting_id: string | null
@@ -121,6 +122,7 @@ export type Database = {
           file_path: string
           file_size?: number | null
           id?: string
+          incident_id?: string | null
           media_type?: Database["public"]["Enums"]["media_type"]
           observation_id?: string | null
           sighting_id?: string | null
@@ -134,11 +136,19 @@ export type Database = {
           file_path?: string
           file_size?: number | null
           id?: string
+          incident_id?: string | null
           media_type?: Database["public"]["Enums"]["media_type"]
           observation_id?: string | null
           sighting_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "media_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "media_observation_id_fkey"
             columns: ["observation_id"]
@@ -603,3 +613,28 @@ export const Constants = {
     },
   },
 } as const
+
+// Convenience type aliases used throughout the app. These are pure type
+// re-exports with no runtime cost — keep them in sync with the generated
+// `Database` type above. Removing them in the past has caused widespread
+// import breakage; preserve them as the canonical short names.
+export type Profile = Tables<"profiles">
+export type AppSettings = Tables<"app_settings">
+export type SurveyRound = Tables<"survey_rounds">
+export type WalkSlot = Tables<"walk_slots">
+export type SlotMembership = Tables<"slot_memberships">
+export type Observation = Tables<"observations">
+export type Sighting = Tables<"sightings">
+export type Media = Tables<"media">
+export type Incident = Tables<"incidents">
+export type UserRole = Enums<"user_role">
+export type UserStatus = Enums<"user_status">
+export type MediaType = Enums<"media_type">
+export type IncidentType = Enums<"incident_type">
+export type ObservationOutcome = Enums<"observation_outcome">
+export type ObservationStatus = Enums<"observation_status">
+export type RoundStatus = Enums<"round_status">
+export type MembershipStatus = Enums<"membership_status">
+export type WalkCompletion = Enums<"walk_completion">
+export type SpeciesType = Enums<"species_type">
+

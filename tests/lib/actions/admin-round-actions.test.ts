@@ -24,6 +24,11 @@ const { mockSupabase, methods } = vi.hoisted(() => {
     functions: {
       invoke: vi.fn().mockResolvedValue({ data: null, error: null }),
     },
+    storage: {
+      from: vi.fn().mockReturnValue({
+        remove: vi.fn().mockResolvedValue({ error: null }),
+      }),
+    },
   }
   return { mockSupabase, methods }
 })
@@ -46,6 +51,7 @@ import {
 } from '@/lib/actions/admin-round-actions'
 
 function resetChain() {
+  mockSupabase.from.mockReturnValue(methods)
   methods.select.mockReturnThis()
   methods.insert.mockReturnThis()
   methods.update.mockReturnThis()
@@ -240,11 +246,52 @@ describe('admin-round-actions', () => {
       expect(revalidatePath).toHaveBeenCalledWith('/walk')
     })
 
+    it('blocks delete when the walk has submitted reports', async () => {
+      setupAdmin()
+      methods.limit.mockResolvedValueOnce({
+        data: [{ id: 'obs-1' }],
+        error: null,
+      })
+
+      const result = await deleteWalk('slot-1')
+
+      expect(result).toEqual({
+        error: 'This walk has submitted reports. Submitted reports must be exported and handled before deleting the walk.',
+      })
+      expect(methods.delete).not.toHaveBeenCalled()
+      expect(revalidatePath).not.toHaveBeenCalled()
+    })
+
+    it('allows submitted report deletion only with explicit override', async () => {
+      setupAdmin()
+      methods.limit.mockResolvedValueOnce({
+        data: [{ id: 'obs-1' }],
+        error: null,
+      })
+
+      const result = await deleteWalk('slot-1', { deleteSubmittedReports: true })
+
+      expect(result).toEqual({ success: true })
+      expect(mockSupabase.from).toHaveBeenCalledWith('incidents')
+      expect(mockSupabase.from).toHaveBeenCalledWith('slot_memberships')
+      expect(mockSupabase.from).toHaveBeenCalledWith('walk_slots')
+      expect(revalidatePath).toHaveBeenCalledWith('/admin/walks')
+      expect(revalidatePath).toHaveBeenCalledWith('/walk')
+    })
+
     it('returns error on DB failure', async () => {
       setupAdmin()
-      methods.eq
-        .mockReturnValueOnce(methods) // requireAdmin's eq
-        .mockReturnValueOnce({ error: { message: 'Delete failed' } }) // action's eq
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'walk_slots') {
+          return {
+            ...methods,
+            delete: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ error: { message: 'Delete failed' } }),
+            }),
+          }
+        }
+        return methods
+      })
 
       const result = await deleteWalk('slot-1')
 

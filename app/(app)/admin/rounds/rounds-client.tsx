@@ -35,6 +35,7 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
   const [editStartDate, setEditStartDate] = useState('')
   const [editEndDate, setEditEndDate] = useState('')
   const [deletingRoundId, setDeletingRoundId] = useState<string | null>(null)
+  const [forceDeletingRoundId, setForceDeletingRoundId] = useState<string | null>(null)
   const router = useRouter()
   const { showToast } = useToast()
 
@@ -105,9 +106,21 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
   const confirmDeleteRound = async () => {
     if (!deletingRoundId) return
     const result = await deleteRound(deletingRoundId)
+    if (result.error) {
+      if (result.error.includes('submitted reports')) {
+        setForceDeletingRoundId(deletingRoundId)
+      }
+      showToast(result.error, 'error')
+    } else router.refresh()
+    setDeletingRoundId(null)
+  }
+
+  const confirmForceDeleteRound = async () => {
+    if (!forceDeletingRoundId) return
+    const result = await deleteRound(forceDeletingRoundId, { deleteSubmittedReports: true })
     if (result.error) showToast(result.error, 'error')
     else router.refresh()
-    setDeletingRoundId(null)
+    setForceDeletingRoundId(null)
   }
 
   return (
@@ -329,11 +342,22 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
       <ConfirmationDialog
         open={!!deletingRoundId}
         title="Delete Round"
-        message="Delete this round and all its walks? This cannot be undone."
+        message="Delete this round and all its walks? Draft reports, draft media, incidents, and volunteer signups will be removed. Submitted reports require a separate confirmation."
         confirmLabel="Delete"
         destructive
         onConfirm={confirmDeleteRound}
         onCancel={() => setDeletingRoundId(null)}
+      />
+      <ConfirmationDialog
+        open={!!forceDeletingRoundId}
+        title="Delete Submitted Reports?"
+        message="This will permanently delete the round, its walks, submitted reports, sightings, uploaded report media, incidents, drafts, and volunteer signups."
+        confirmLabel="Delete Reports"
+        destructive
+        requiredConfirmationText="DELETE REPORTS"
+        confirmationPrompt="Type DELETE REPORTS to permanently delete the round and its submitted reports."
+        onConfirm={confirmForceDeleteRound}
+        onCancel={() => setForceDeletingRoundId(null)}
       />
     </div>
   )

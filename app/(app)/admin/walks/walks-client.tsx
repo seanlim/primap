@@ -95,6 +95,7 @@ export function WalksClient({ walks, rounds }: {
   const [bulkStep, setBulkStep] = useState<'rules' | 'preview'>('rules')
   const [bulkLoading, setBulkLoading] = useState(false)
   const [deletingWalkId, setDeletingWalkId] = useState<string | null>(null)
+  const [forceDeletingWalkId, setForceDeletingWalkId] = useState<string | null>(null)
 
   const router = useRouter()
   const { showToast } = useToast()
@@ -228,9 +229,21 @@ export function WalksClient({ walks, rounds }: {
   const confirmDeleteWalk = async () => {
     if (!deletingWalkId) return
     const result = await deleteWalk(deletingWalkId)
+    if ('error' in result) {
+      if (result.error?.includes('submitted reports')) {
+        setForceDeletingWalkId(deletingWalkId)
+      }
+      showToast(result.error || 'An error occurred', 'error')
+    } else router.refresh()
+    setDeletingWalkId(null)
+  }
+
+  const confirmForceDeleteWalk = async () => {
+    if (!forceDeletingWalkId) return
+    const result = await deleteWalk(forceDeletingWalkId, { deleteSubmittedReports: true })
     if ('error' in result) showToast(result.error || 'An error occurred', 'error')
     else router.refresh()
-    setDeletingWalkId(null)
+    setForceDeletingWalkId(null)
   }
 
   const toggleDay = (day: number) => {
@@ -653,11 +666,22 @@ export function WalksClient({ walks, rounds }: {
       <ConfirmationDialog
         open={!!deletingWalkId}
         title="Delete Walk"
-        message="Delete this walk? This cannot be undone."
+        message="Delete this walk? Draft reports, draft media, incidents, and volunteer signups will be removed. Submitted reports require a separate confirmation."
         confirmLabel="Delete"
         destructive
         onConfirm={confirmDeleteWalk}
         onCancel={() => setDeletingWalkId(null)}
+      />
+      <ConfirmationDialog
+        open={!!forceDeletingWalkId}
+        title="Delete Submitted Reports?"
+        message="This will permanently delete the walk, submitted reports, sightings, uploaded report media, incidents, drafts, and volunteer signups."
+        confirmLabel="Delete Reports"
+        destructive
+        requiredConfirmationText="DELETE REPORTS"
+        confirmationPrompt="Type DELETE REPORTS to permanently delete the walk and its submitted reports."
+        onConfirm={confirmForceDeleteWalk}
+        onCancel={() => setForceDeletingWalkId(null)}
       />
     </div>
   )

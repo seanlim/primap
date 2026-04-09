@@ -1,47 +1,15 @@
-import type { ComponentType } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, CheckCircle, Gauge, Footprints, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getAdminRoundsAnalyticsPageSnapshot } from '@/lib/admin-volunteer-analytics'
 import DonutMetricCard from '../../../../../components/ui/DonutMetricCard'
+import { ReportMapCard, SummaryCard } from '@/components/admin/analytics-shared'
 
 export const dynamic = 'force-dynamic'
 
 function formatPercent(value: number) {
   return `${Math.round(value * 100)}%`
 }
-
-function SummaryCard({
-  title,
-  value,
-  icon: Icon,
-  accentColor,
-  iconBgColor,
-  iconColor,
-}: {
-  title: string
-  value: number
-  icon: ComponentType<{ className?: string }>
-  accentColor: string
-  iconBgColor: string
-  iconColor: string
-}) {
-  return (
-    <div
-      className="rounded-2xl border-l-4 bg-white p-4 shadow-sm"
-      style={{ borderLeftColor: accentColor }}
-    >
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg" style={{ backgroundColor: iconBgColor }}>
-          <Icon className="h-5 w-5" style={{ color: iconColor }} />
-        </div>
-        <p className="text-sm font-semibold text-gray-900">{title}</p>
-      </div>
-      <p className="mt-4 text-2xl font-bold text-gray-900">{value}</p>
-    </div>
-  )
-}
-
 export default async function AdminRoundsAnalyticsPage({
   searchParams,
 }: {
@@ -114,6 +82,16 @@ export default async function AdminRoundsAnalyticsPage({
                   </span>
                 </div>
               </div>
+
+              <ReportMapCard
+                title="Sighting Map"
+                description={
+                  analytics.reportMapPoints.length === 0
+                    ? 'No report coordinates have been submitted for this round yet.'
+                    : `${analytics.reportMapPoints.length} report coordinate${analytics.reportMapPoints.length === 1 ? '' : 's'} plotted for this round.`
+                }
+                reportMapPoints={analytics.reportMapPoints}
+              />
 
               <div className="grid grid-cols-2 gap-4">
                 <DonutMetricCard

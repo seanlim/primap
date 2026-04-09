@@ -1,19 +1,21 @@
 import { hasWalkEnded } from '@/lib/utils/walk-participation'
+import { buildSlotPopupMeta } from '@/lib/utils/report-map'
+import { toLocalDateString } from '@/lib/utils/format-date'
 
 type QueryResult<T> = { data: T | null; error: { message: string } | null }
 type CountResult = { count: number | null; error: { message: string } | null }
 
 type SupabaseQueryLike = {
-  eq: (...args: unknown[]) => SupabaseQueryLike
-  order: (...args: unknown[]) => SupabaseQueryLike
-  limit: (...args: unknown[]) => SupabaseQueryLike
-  in: (...args: unknown[]) => SupabaseQueryLike
+  eq: (...args: any[]) => SupabaseQueryLike
+  order: (...args: any[]) => SupabaseQueryLike
+  limit: (...args: any[]) => SupabaseQueryLike
+  in: (...args: any[]) => SupabaseQueryLike
   then?: unknown
 }
 
 type SupabaseClientLike = {
   from: (table: string) => {
-    select: (...args: unknown[]) => SupabaseQueryLike
+    select: (...args: any[]) => SupabaseQueryLike
   }
 }
 
@@ -27,7 +29,7 @@ export interface AnalyticsRound {
 
 export interface AnalyticsWalkSlot {
   id: string
-  round_id: string
+  round_id?: string
   walk_date: string
   start_time: string
   end_time: string
@@ -42,8 +44,35 @@ export interface AnalyticsMembership {
 }
 
 export interface AnalyticsObservation {
+  id?: string
   slot_id: string
   status: 'DRAFT' | 'SUBMITTED'
+  outcome?: 'SIGHTED' | 'NOT_SIGHTED'
+  lat?: number | null
+  lng?: number | null
+}
+
+export interface AnalyticsReportMapPoint {
+  lat: number
+  lng: number
+  outcome: 'SIGHTED' | 'NOT_SIGHTED'
+  label: string
+  popupMeta: string[]
+  species?: string
+}
+
+function formatSpeciesLabel(species?: string) {
+  if (species === 'RBL') return 'RBL'
+  if (species === 'LTM') return 'LTM'
+  if (species === 'DUSKY') return 'DUSKY'
+  if (species === 'OTHER') return 'Other'
+  return null
+}
+
+function isDateInRound(round: AnalyticsRound, now: Date) {
+  const today = toLocalDateString(now)
+
+  return round.start_date <= today && today <= round.end_date
 }
 
 export interface AnalyticsAllTimeTotals {
@@ -71,13 +100,16 @@ export interface AnalyticsOverviewMetrics {
 }
 
 export interface VolunteerAnalyticsLandingSnapshot {
-  overall: AnalyticsOverviewMetrics | null
+  targetRound: AnalyticsRound | null
+  currentRound: AnalyticsOverviewMetrics | null
+  reportMapPoints: AnalyticsReportMapPoint[]
 }
 
 export interface AdminRoundsAnalyticsPageSnapshot {
   availableRounds: AnalyticsRound[]
   targetRound: AnalyticsRound | null
   overview: AnalyticsOverviewMetrics | null
+  reportMapPoints: AnalyticsReportMapPoint[]
 }
 
 export interface AdminWalksAnalyticsPageSnapshot {
@@ -102,6 +134,7 @@ export interface AdminWalksAnalyticsPageSnapshot {
     totalVolunteerCapacity: number
     cancellations: number
   } | null
+  reportMapPoints: AnalyticsReportMapPoint[]
 }
 
 export interface AdminUserActivityMetrics {
@@ -249,25 +282,25 @@ export function buildVolunteerAnalyticsSnapshot(input: {
 
 async function getAnalyticsBaseData(supabase: SupabaseClientLike) {
   const [roundsResult, slotsResult, membershipsResult, observationsResult, activeVolunteersCountResult] = await Promise.all([
-    supabase
+    asPromise<QueryResult<AnalyticsRound[]>>(supabase
       .from('survey_rounds')
       .select('id, name, start_date, end_date, status')
-      .order('start_date', { ascending: false }) as Promise<QueryResult<AnalyticsRound[]>>,
-    supabase
+      .order('start_date', { ascending: false })),
+    asPromise<QueryResult<AnalyticsWalkSlot[]>>(supabase
       .from('walk_slots')
       .select('id, round_id, walk_date, start_time, end_time, location_name, max_volunteers')
-      .order('walk_date', { ascending: true }) as Promise<QueryResult<AnalyticsWalkSlot[]>>,
-    supabase
+      .order('walk_date', { ascending: true })),
+    asPromise<QueryResult<AnalyticsMembership[]>>(supabase
       .from('slot_memberships')
-      .select('slot_id, user_id, status') as Promise<QueryResult<AnalyticsMembership[]>>,
-    supabase
+      .select('slot_id, user_id, status')),
+    asPromise<QueryResult<AnalyticsObservation[]>>(supabase
       .from('observations')
-      .select('slot_id, status') as Promise<QueryResult<AnalyticsObservation[]>>,
-    supabase
+      .select('id, slot_id, status, outcome, lat, lng')),
+    asPromise<CountResult>(supabase
       .from('profiles')
       .select('id', { count: 'exact', head: true })
       .eq('role', 'VOLUNTEER')
-      .eq('status', 'ACTIVE') as Promise<CountResult>,
+      .eq('status', 'ACTIVE')),
   ])
 
   return {
@@ -293,6 +326,7 @@ export async function getAdminWalksAnalyticsPageSnapshotByRound(
       targetWalk: null,
       targetWalkRoundName: null,
       overview: null,
+      reportMapPoints: [],
     }
   }
 
@@ -320,6 +354,7 @@ export async function getAdminWalksAnalyticsPageSnapshotByRound(
       targetWalk: null,
       targetWalkRoundName: targetRound.name,
       overview: null,
+      reportMapPoints: [],
     }
   }
 
@@ -333,6 +368,12 @@ export async function getAdminWalksAnalyticsPageSnapshotByRound(
   })
 
   const roundNameById = new Map(base.rounds.map((round) => [round.id, round.name]))
+  const reportMapPoints = await getReportMapPoints(
+    supabase,
+    targetObservations,
+    new Map([[targetWalk.id, targetWalk]]),
+    roundNameById
+  )
 
   return {
     availableRounds: base.rounds,
@@ -346,13 +387,13 @@ export async function getAdminWalksAnalyticsPageSnapshotByRound(
       .map((slot) => ({
         id: slot.id,
         label: `${slot.location_name} · ${slot.walk_date} · ${slot.start_time.slice(0, 5)}`,
-        roundId: slot.round_id,
-        roundName: roundNameById.get(slot.round_id) ?? 'Unknown Round',
+        roundId: slot.round_id ?? '',
+        roundName: slot.round_id ? (roundNameById.get(slot.round_id) ?? 'Unknown Round') : 'Unknown Round',
         walkDate: slot.walk_date,
         startTime: slot.start_time,
       })),
     targetWalk,
-    targetWalkRoundName: roundNameById.get(targetWalk.round_id) ?? null,
+    targetWalkRoundName: targetWalk.round_id ? (roundNameById.get(targetWalk.round_id) ?? null) : null,
     overview: {
       reportCompletionRate: metrics.reportCompletionRate,
       completionRateSubmittedReports: metrics.completionRateSubmittedReports,
@@ -362,7 +403,82 @@ export async function getAdminWalksAnalyticsPageSnapshotByRound(
       totalVolunteerCapacity: metrics.totalVolunteerCapacity,
       cancellations: metrics.walkCancellations,
     },
+    reportMapPoints,
   }
+}
+
+async function getReportMapPoints(
+  supabase: SupabaseClientLike,
+  observations: AnalyticsObservation[],
+  slotsById: Map<string, AnalyticsWalkSlot>,
+  roundNameById: Map<string, string>
+): Promise<AnalyticsReportMapPoint[]> {
+  const submittedObservations = observations.filter((observation) => observation.status === 'SUBMITTED')
+  const observationIds = submittedObservations
+    .map((observation) => observation.id)
+    .filter((observationId): observationId is string => Boolean(observationId))
+
+  const sightingsResult: QueryResult<Array<{ observation_id: string; lat: number | null; lng: number | null; species: string }>> = observationIds.length > 0
+    ? await (supabase
+        .from('sightings')
+        .select('observation_id, lat, lng, species')
+        .in('observation_id', observationIds) as unknown as Promise<QueryResult<Array<{ observation_id: string; lat: number | null; lng: number | null; species: string }>>>)
+    : { data: [], error: null }
+
+  const observationById = new Map(
+    submittedObservations
+      .filter((observation) => observation.id)
+      .map((observation) => [observation.id as string, observation])
+  )
+
+  const sightedPointCounts = new Map<string, number>()
+  const sightedPoints = (sightingsResult.data ?? [])
+    .filter((sighting) => sighting.lat !== null && sighting.lng !== null)
+    .map((sighting) => {
+      const observation = observationById.get(sighting.observation_id)
+      const slot = observation ? slotsById.get(observation.slot_id) : null
+      const sequence = (sightedPointCounts.get(sighting.observation_id) ?? 0) + 1
+      sightedPointCounts.set(sighting.observation_id, sequence)
+      const speciesLabel = formatSpeciesLabel(sighting.species)
+
+        return {
+          lat: sighting.lat as number,
+          lng: sighting.lng as number,
+          outcome: 'SIGHTED' as const,
+          label: speciesLabel ?? `Sighting ${sequence}`,
+          popupMeta: buildSlotPopupMeta(slot, slot?.round_id ? (roundNameById.get(slot.round_id) ?? null) : null),
+          species: sighting.species,
+        }
+      })
+
+  const notSightedPointCounts = new Map<string, number>()
+  const notSightedPoints = submittedObservations
+    .filter((observation) =>
+      observation.outcome === 'NOT_SIGHTED' &&
+      observation.lat !== null &&
+      observation.lat !== undefined &&
+      observation.lng !== null &&
+      observation.lng !== undefined
+    )
+    .map((observation) => {
+      const slot = slotsById.get(observation.slot_id)
+      const sequence = (notSightedPointCounts.get(observation.slot_id) ?? 0) + 1
+      notSightedPointCounts.set(observation.slot_id, sequence)
+
+      return {
+        lat: observation.lat as number,
+        lng: observation.lng as number,
+        outcome: 'NOT_SIGHTED' as const,
+        label: `No sighting report ${sequence}`,
+        popupMeta: buildSlotPopupMeta(slot, slot?.round_id ? (roundNameById.get(slot.round_id) ?? null) : null),
+      }
+    })
+
+  return [...sightedPoints, ...notSightedPoints]
+}
+
+function asPromise<T>(query: unknown): Promise<T> {
+  return query as Promise<T>
 }
 
 export async function getAdminUsersAnalytics(
@@ -378,9 +494,9 @@ export async function getAdminUsersAnalytics(
   const scopedObservationsQuery = userIds?.length ? observationsQuery.in('user_id', userIds) : observationsQuery
 
   const [profilesResult, membershipsResult, observationsResult] = await Promise.all([
-    scopedProfileQuery as Promise<QueryResult<Array<{ id: string }>>>,
-    scopedMembershipQuery as Promise<QueryResult<Array<{ user_id: string; status: 'ACTIVE' | 'CANCELLED' }>>>,
-    scopedObservationsQuery as Promise<QueryResult<Array<{ user_id: string; status: 'DRAFT' | 'SUBMITTED' }>>>,
+    asPromise<QueryResult<Array<{ id: string }>>>(scopedProfileQuery),
+    asPromise<QueryResult<Array<{ user_id: string; status: 'ACTIVE' | 'CANCELLED' }>>>(scopedMembershipQuery),
+    asPromise<QueryResult<Array<{ user_id: string; status: 'DRAFT' | 'SUBMITTED' }>>>(scopedObservationsQuery),
   ])
 
   const validUserIds = new Set((profilesResult.data ?? []).map((profile) => profile.id))
@@ -412,16 +528,31 @@ export async function getAdminVolunteerAnalyticsLanding(
   const base = await getAnalyticsBaseData(supabase)
 
   if (base.rounds.length === 0) {
-    return { overall: null }
+    return { targetRound: null, currentRound: null, reportMapPoints: [] }
   }
 
+  const targetRound = base.rounds.find((round) => isDateInRound(round, now)) ?? null
+
+  if (!targetRound) {
+    return { targetRound: null, currentRound: null, reportMapPoints: [] }
+  }
+
+  const roundNameById = new Map(base.rounds.map((round) => [round.id, round.name]))
+  const roundSlots = base.slots.filter((slot) => slot.round_id === targetRound.id)
+  const roundSlotIds = new Set(roundSlots.map((slot) => slot.id))
+  const roundMemberships = base.memberships.filter((membership) => roundSlotIds.has(membership.slot_id))
+  const roundObservations = base.observations.filter((observation) => roundSlotIds.has(observation.slot_id))
+  const slotsById = new Map(roundSlots.map((slot) => [slot.id, slot]))
+
   return {
-    overall: buildMetrics({
-      slots: base.slots,
-      memberships: base.memberships,
-      observations: base.observations,
+    targetRound,
+    currentRound: buildMetrics({
+      slots: roundSlots,
+      memberships: roundMemberships,
+      observations: roundObservations,
       now,
     }),
+    reportMapPoints: await getReportMapPoints(supabase, roundObservations, slotsById, roundNameById),
   }
 }
 
@@ -436,6 +567,7 @@ export async function getAdminRoundsAnalyticsPageSnapshot(
       availableRounds: [],
       targetRound: null,
       overview: null,
+      reportMapPoints: [],
     }
   }
 
@@ -445,6 +577,8 @@ export async function getAdminRoundsAnalyticsPageSnapshot(
     base.rounds[0]
 
   const roundSlots = base.slots.filter((slot) => slot.round_id === targetRound.id)
+  const roundSlotsById = new Map(roundSlots.map((slot) => [slot.id, slot]))
+  const roundNameById = new Map(base.rounds.map((round) => [round.id, round.name]))
   const roundSlotIds = new Set(roundSlots.map((slot) => slot.id))
   const roundMemberships = base.memberships.filter((membership) => roundSlotIds.has(membership.slot_id))
   const roundObservations = base.observations.filter((observation) => roundSlotIds.has(observation.slot_id))
@@ -458,5 +592,6 @@ export async function getAdminRoundsAnalyticsPageSnapshot(
       observations: roundObservations,
       now: options?.now ?? new Date(),
     }),
+    reportMapPoints: await getReportMapPoints(supabase, roundObservations, roundSlotsById, roundNameById),
   }
 }

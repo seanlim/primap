@@ -7,7 +7,10 @@ import { LogOut, Check, Pencil, MapPin, Calendar, Footprints, ClipboardList, Eye
 import { formatDate } from '@/lib/utils/format-date'
 import { updateProfile } from '@/lib/actions/profile-actions'
 import { signOut } from '@/lib/actions/auth-actions'
+import { SightingLegend } from '@/components/admin/analytics-shared'
 import { EmptyState } from '@/components/ui/empty-state'
+import { MapView } from '@/components/map/map-view'
+import { NOT_SIGHTED_COLOR, getSpeciesColor } from '@/lib/constants/species'
 
 interface Props {
   profile: {
@@ -25,6 +28,14 @@ interface Props {
     draftsPending: number
     requiredWalks: number
   }
+  reportMapPoints: {
+    lat: number
+    lng: number
+    outcome: 'SIGHTED' | 'NOT_SIGHTED'
+    species?: string
+    label?: string
+    popupMeta?: string[]
+  }[]
   walkHistory: {
     membershipId: string
     slotId: string
@@ -74,7 +85,7 @@ function ProgressRing({ percent, size = 80, stroke = 6 }: { percent: number; siz
   )
 }
 
-export function ProfileClient({ profile, stats, walkHistory }: Props) {
+export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: Props) {
   const [editingName, setEditingName] = useState(false)
   const [name, setName] = useState(profile.fullName || '')
   const [saving, setSaving] = useState(false)
@@ -204,6 +215,35 @@ export function ProfileClient({ profile, stats, walkHistory }: Props) {
             <p className="text-sm font-medium text-green-700">Round requirement completed!</p>
           </div>
         )}
+      </div>
+
+      <div className="bg-white rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50">
+            <MapPin className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">My Sighting Map</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              {reportMapPoints.length === 0
+                ? 'No submitted report coordinates yet.'
+                : `${reportMapPoints.length} report coordinate${reportMapPoints.length === 1 ? '' : 's'} plotted from your submitted reports.`}
+            </p>
+          </div>
+        </div>
+
+        <SightingLegend points={reportMapPoints} />
+
+        <MapView
+          className="h-80 w-full overflow-hidden rounded-2xl"
+          markers={reportMapPoints.map((location, index) => ({
+            ...location,
+            color: location.outcome === 'SIGHTED' ? getSpeciesColor(location.species) : NOT_SIGHTED_COLOR,
+            variant: location.outcome === 'SIGHTED' ? 'sighted' : 'not_sighted',
+            label: location.label || `My sighting ${index + 1}`,
+            popupMeta: location.popupMeta,
+          }))}
+        />
       </div>
 
       {/* Walk History Timeline */}

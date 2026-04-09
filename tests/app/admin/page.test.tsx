@@ -14,6 +14,12 @@ vi.mock('@/lib/admin-volunteer-analytics', () => ({
   getAdminVolunteerAnalyticsLanding: (...args: unknown[]) => mockLanding(...args),
 }))
 
+vi.mock('@/components/map/map-view', () => ({
+  MapView: ({ markers }: { markers?: Array<{ label?: string }> }) => (
+    <div data-testid="map-view">Markers: {markers?.length ?? 0}</div>
+  ),
+}))
+
 import AdminDashboard from '../../../app/(app)/admin/page'
 
 function makeAwaitableChain(resolvedValue: unknown) {
@@ -45,7 +51,14 @@ describe('AdminDashboard', () => {
     let index = 0
     mockSupabase.from.mockImplementation(() => makeAwaitableChain(results[index++]))
     mockLanding.mockResolvedValue({
-      overall: {
+      targetRound: {
+        id: 'round-1',
+        name: 'Round 1',
+        start_date: '2026-03-01',
+        end_date: '2026-08-31',
+        status: 'OPEN',
+      },
+      currentRound: {
         reportCompletionRate: 0.5,
         completionRateSubmittedReports: 6,
         completionRateExpectedReports: 12,
@@ -58,6 +71,7 @@ describe('AdminDashboard', () => {
         participatingVolunteers: 7,
         walkCancellations: 2,
       },
+      reportMapPoints: [],
     })
 
     render(await AdminDashboard())
@@ -69,6 +83,9 @@ describe('AdminDashboard', () => {
     expect(screen.getByText('total reports required')).toBeInTheDocument()
     expect(screen.getByText('sign-ups')).toBeInTheDocument()
     expect(screen.getByText('total available capacity')).toBeInTheDocument()
+    expect(screen.getByText('Sighting Map')).toBeInTheDocument()
+    expect(screen.getByText('Round 1')).toBeInTheDocument()
+    expect(screen.getByTestId('map-view')).toHaveTextContent('Markers: 0')
     expect(screen.getByRole('link', { name: /Users/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Rounds/i })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /^Volunteer Analytics$/i })).not.toBeInTheDocument()

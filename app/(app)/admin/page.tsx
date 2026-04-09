@@ -2,7 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Users, Calendar, AlertTriangle, Settings, ClipboardList, CheckCircle, Gauge, ArrowRight, Footprints, Database } from 'lucide-react'
 import { getAdminVolunteerAnalyticsLanding } from '@/lib/admin-volunteer-analytics'
+import { formatDate } from '@/lib/utils/format-date'
 import DonutMetricCard from '../../../components/ui/DonutMetricCard'
+import { ReportMapCard } from '@/components/admin/analytics-shared'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,22 +43,54 @@ export default async function AdminDashboard() {
     { label: 'Settings', value: '', sub: '', href: '/admin/settings', icon: Settings, color: 'bg-gray-50 text-gray-600', reserveValueSpace: true, accentColor: '#9ca3af' },
   ]
 
-  const overall = analytics.overall
+  const currentRound = analytics.currentRound
+  const targetRound = analytics.targetRound
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-5 animate-fade-in">
       <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
 
-      {overall ? (
+      {targetRound ? (
+        <div className="overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm">
+          <div className="bg-gradient-to-r from-emerald-50 via-white to-teal-50 px-5 py-3.5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Current Round</p>
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <h2 className="text-lg font-semibold text-gray-900">{targetRound.name}</h2>
+                  <span className="border-l border-emerald-200 pl-4 text-sm font-medium text-gray-500">
+                    {formatDate(targetRound.start_date, 'compact')} to {formatDate(targetRound.end_date, 'compact')}
+                  </span>
+                </div>
+              </div>
+              <div className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                {targetRound.status}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <ReportMapCard
+        title="Sighting Map"
+        description={
+          analytics.reportMapPoints.length === 0
+            ? 'No report coordinates have been submitted for the current round yet.'
+            : `${analytics.reportMapPoints.length} report coordinate${analytics.reportMapPoints.length === 1 ? '' : 's'} plotted for ${targetRound?.name ?? 'the current round'}.`
+        }
+        reportMapPoints={analytics.reportMapPoints}
+      />
+
+      {currentRound ? (
         <div className="grid grid-cols-2 gap-4">
           <DonutMetricCard
             title="Completion Rate"
-            value={formatPercent(overall.reportCompletionRate)}
-            numerator={overall.completionRateSubmittedReports}
-            denominator={overall.completionRateExpectedReports}
+            value={formatPercent(currentRound.reportCompletionRate)}
+            numerator={currentRound.completionRateSubmittedReports}
+            denominator={currentRound.completionRateExpectedReports}
             numeratorLabel="completed reports"
             denominatorLabel="total reports required"
-            progress={overall.reportCompletionRate}
+            progress={currentRound.reportCompletionRate}
             icon={CheckCircle}
             ringColor="#166534"
             trackColor="#bbf7d0"
@@ -66,12 +100,12 @@ export default async function AdminDashboard() {
           />
           <DonutMetricCard
             title="Sign-up Rate"
-            value={formatPercent(overall.capacityFillRate)}
-            numerator={overall.walkSignUps}
-            denominator={overall.totalVolunteerCapacity}
+            value={formatPercent(currentRound.capacityFillRate)}
+            numerator={currentRound.walkSignUps}
+            denominator={currentRound.totalVolunteerCapacity}
             numeratorLabel="sign-ups"
             denominatorLabel="total available capacity"
-            progress={overall.capacityFillRate}
+            progress={currentRound.capacityFillRate}
             icon={Gauge}
             ringColor="#ea580c"
             trackColor="#fed7aa"

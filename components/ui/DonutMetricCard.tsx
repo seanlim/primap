@@ -40,10 +40,10 @@ export default function DonutMetricCard({
       style={{ borderLeftColor: accentColor }}
     >
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg" style={{ backgroundColor: iconBgColor }}>
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: iconBgColor }}>
           <Icon className="h-5 w-5" style={{ color: iconColor }} />
         </div>
-        <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500">{title}</h2>
       </div>
 
       <div className="mt-4 flex items-start gap-3" style={{flexWrap: "wrap"}}>

@@ -62,7 +62,7 @@ export default async function AdminWalksAnalyticsPage({
               </div>
 
               <ReportMapCard
-                title="Sighting Map This Walk"
+                title="Sighting Map"
                 description={
                   analytics.reportMapPoints.length === 0
                     ? 'No report coordinates have been submitted for this walk yet.'

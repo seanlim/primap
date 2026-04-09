@@ -84,7 +84,7 @@ export default async function AdminRoundsAnalyticsPage({
               </div>
 
               <ReportMapCard
-                title="Sighting Map This Round"
+                title="Sighting Map"
                 description={
                   analytics.reportMapPoints.length === 0
                     ? 'No report coordinates have been submitted for this round yet.'

@@ -61,6 +61,7 @@ export async function GET() {
       headers: {
         'Content-Type': 'application/zip',
         'Content-Disposition': `attachment; filename="primap-view-export-${date}.zip"`,
+        'X-Export-Warning-Count': String(mediaWarnings.length),
       },
     })
   } catch (err) {

@@ -136,6 +136,8 @@ describe('GET /api/admin/export-view', () => {
     mockDownloadMediaFile.mockResolvedValue({ data: null, error: 'Missing file' })
 
     const response = await GET()
+    expect(response.headers.get('X-Export-Warning-Count')).toBe('1')
+
     const zip = await JSZip.loadAsync(await response.arrayBuffer())
     expect(zip.file('export-warnings.txt')).not.toBeNull()
   })

@@ -46,7 +46,12 @@ export function DataClient() {
   const [legacyErrors, setLegacyErrors] = useState<ValidationError[]>([])
   const legacyFileRef = useRef<HTMLInputElement>(null)
 
-  const downloadExport = async (endpoint: string, fallbackFilename: string, successMessage: string) => {
+  const downloadExport = async (
+    endpoint: string,
+    fallbackFilename: string,
+    successMessage: string,
+    warningMessage?: (warningCount: number) => string
+  ) => {
     try {
       const res = await fetch(endpoint)
       if (!res.ok) {
@@ -65,7 +70,15 @@ export function DataClient() {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(objectUrl)
-      showToast(successMessage, 'success')
+      const warningCount = Number(res.headers.get('X-Export-Warning-Count') ?? 0)
+      if (warningCount > 0) {
+        showToast(
+          warningMessage?.(warningCount) ?? `${successMessage}, but ${warningCount} media file(s) were skipped`,
+          'info'
+        )
+      } else {
+        showToast(successMessage, 'success')
+      }
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Export failed', 'error')
     }
@@ -90,7 +103,8 @@ export function DataClient() {
       await downloadExport(
         '/api/admin/export-view',
         `primap-view-export-${new Date().toISOString().slice(0, 10)}.zip`,
-        'View export downloaded successfully'
+        'View export downloaded successfully',
+        warningCount => `View export downloaded with ${warningCount} media warning(s). See export-warnings.txt inside the zip.`
       )
     } finally {
       setIsExportingView(false)

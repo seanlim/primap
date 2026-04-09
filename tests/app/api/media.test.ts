@@ -99,14 +99,16 @@ function setupMediaUploadMocks(opts: {
     }),
   }
 
+  // Track if countChain has been used already
+  let countChainUsed = false
   mockSupabase.from.mockImplementation((table: string) => {
     if (table === 'app_settings') return settingsChain
     // Differentiate the two 'media' calls: count has .select().eq(), insert has .insert()
     // We return countChain first, then insertChain
-    return countChain._used ? insertChain : (() => { countChain._used = true; return countChain })()
+    if (countChainUsed) return insertChain
+    countChainUsed = true
+    return countChain
   })
-  // Track if countChain has been used already
-  ;(countChain as Record<string, unknown>)._used = false
 
   if (opts.uploadError) {
     mockStorage.upload.mockResolvedValue({ error: opts.uploadError })
@@ -524,6 +526,150 @@ describe('POST /api/media', () => {
 
       expect(mockSupabase.storage.from).toHaveBeenCalledWith('observation-media')
       expect(mockStorage.upload).toHaveBeenCalled()
+    })
+  })
+
+  // ─── Incident parentType (new) ────────────────────────────────────────
+  // The route handler must polymorphically pick:
+  //   • column      → 'incident_id'
+  //   • bucket      → 'incident-media'
+  //   • insert key  → incident_id
+  // Storage cleanup on insert failure must also use the incident-media bucket.
+
+  describe('incident parentType', () => {
+    it('queries incident_id column for incident parentType', async () => {
+      setupUser()
+      const { countChain } = setupMediaUploadMocks({
+        count: 10,
+      })
+
+      await POST(makeRequest(makeFormData({ parentType: 'incident', parentId: 'inc-1' })))
+
+      expect(countChain.eq).toHaveBeenCalledWith('incident_id', 'inc-1')
+    })
+
+    it('returns 422 when incident already has max media files', async () => {
+      setupUser()
+      setupMediaUploadMocks({
+        settings: { max_media_per_report: 10 },
+        count: 10,
+      })
+
+      const response = await POST(makeRequest(makeFormData({ parentType: 'incident' })))
+      const body = await response.json()
+
+      expect(response.status).toBe(422)
+      expect(body.error).toBe('Maximum of 10 media files allowed per report')
+    })
+
+    it('uploads incident media to the incident-media storage bucket', async () => {
+      setupUser()
+      setupMediaUploadMocks({
+        count: 0,
+        insertData: { id: 'media-1' },
+      })
+
+      await POST(makeRequest(makeFormData({ parentType: 'incident' })))
+
+      expect(mockSupabase.storage.from).toHaveBeenCalledWith('incident-media')
+      // sanity: it must NOT have used observation-media for this request
+      expect(mockSupabase.storage.from).not.toHaveBeenCalledWith('observation-media')
+      expect(mockStorage.upload).toHaveBeenCalled()
+    })
+
+    it('maps incident parentType to incident_id field in insert', async () => {
+      setupUser()
+      const { insertChain } = setupMediaUploadMocks({
+        count: 0,
+        insertData: { id: 'media-1' },
+      })
+
+      await POST(makeRequest(makeFormData({ parentType: 'incident', parentId: 'inc-1' })))
+
+      expect(insertChain.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ incident_id: 'inc-1' })
+      )
+      // Must NOT include the other parent FKs
+      const insertCall = insertChain.insert.mock.calls[0]?.[0] as Record<string, unknown>
+      expect(insertCall.observation_id).toBeUndefined()
+      expect(insertCall.sighting_id).toBeUndefined()
+    })
+
+    it('cleans up storage on insert failure using the incident-media bucket', async () => {
+      setupUser()
+      setupMediaUploadMocks({
+        count: 0,
+        insertError: { message: 'Maximum of 10 media files allowed per report' },
+      })
+
+      await POST(makeRequest(makeFormData({ parentType: 'incident' })))
+
+      // The storage.from() factory is called for both upload and remove —
+      // both must select 'incident-media'.
+      const fromCalls = (mockSupabase.storage.from as unknown as { mock: { calls: string[][] } }).mock.calls
+      expect(fromCalls.every(c => c[0] === 'incident-media')).toBe(true)
+      expect(mockStorage.remove).toHaveBeenCalledTimes(1)
+    })
+
+    it('returns 200 on successful incident media insert', async () => {
+      setupUser()
+      const mediaData = { id: 'media-1', file_path: 'user-1/inc-1/abc.jpg', file_name: 'test.jpg' }
+      setupMediaUploadMocks({
+        count: 0,
+        insertData: mediaData,
+      })
+
+      const response = await POST(makeRequest(makeFormData({ parentType: 'incident' })))
+      const body = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(body.success).toBe(true)
+      expect(body.media).toEqual(mediaData)
+    })
+  })
+
+  // ─── Invalid parentType ───────────────────────────────────────────────
+
+  describe('invalid parentType', () => {
+    it('returns 400 for unknown parentType strings', async () => {
+      setupUser()
+      const formData = new FormData()
+      formData.append('file', new File(['data'], 'test.jpg', { type: 'image/jpeg' }))
+      formData.append('parentType', 'walk') // not one of observation/sighting/incident
+      formData.append('parentId', 'parent-1')
+
+      const response = await POST(makeRequest(formData))
+      const body = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(body.error).toBe('Invalid parentType')
+    })
+
+    it('returns 400 for empty parentType', async () => {
+      setupUser()
+      const formData = new FormData()
+      formData.append('file', new File(['data'], 'test.jpg', { type: 'image/jpeg' }))
+      formData.append('parentType', '')
+      formData.append('parentId', 'parent-1')
+
+      const response = await POST(makeRequest(formData))
+      const body = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(body.error).toBe('Invalid parentType')
+    })
+
+    it('returns 400 when parentType is missing entirely', async () => {
+      setupUser()
+      const formData = new FormData()
+      formData.append('file', new File(['data'], 'test.jpg', { type: 'image/jpeg' }))
+      formData.append('parentId', 'parent-1')
+
+      const response = await POST(makeRequest(formData))
+      const body = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(body.error).toBe('Invalid parentType')
     })
   })
 

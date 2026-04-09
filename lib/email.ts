@@ -9,6 +9,19 @@ function getResend(): Resend {
 
 const FROM_EMAIL = () => process.env.RESEND_FROM_EMAIL || 'Primap <no-reply@primap.org>';
 
+// Escape user-controlled strings before interpolating into HTML email bodies.
+// All values that originate from user input (names, descriptions, free-text
+// fields) MUST go through this helper to prevent XSS in admin/volunteer inboxes.
+function escapeHtml(value: string | null | undefined): string {
+  if (value == null) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Helper to wrap content in a basic HTML template
 function wrapHtml(content: string) {
   return `
@@ -52,7 +65,7 @@ async function sendEmail(to: string, subject: string, html: string) {
 const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://primap.org';
 
 export async function sendAccountApprovedEmail(email: string, fullName: string | null) {
-  const name = fullName || 'Volunteer';
+  const name = escapeHtml(fullName || 'Volunteer');
   await sendEmail(email, 'Primap Account Approved', wrapHtml(`
     <p>Hi ${name},</p>
     <p>Your volunteer account for Primap has been approved!</p>
@@ -62,7 +75,7 @@ export async function sendAccountApprovedEmail(email: string, fullName: string |
 }
 
 export async function sendAccountRejectedEmail(email: string, fullName: string | null) {
-  const name = fullName || 'Volunteer';
+  const name = escapeHtml(fullName || 'Volunteer');
   await sendEmail(email, 'Primap Account Update', wrapHtml(`
     <p>Hi ${name},</p>
     <p>We regret to inform you that your volunteer account application for Primap was not approved at this time.</p>
@@ -71,7 +84,7 @@ export async function sendAccountRejectedEmail(email: string, fullName: string |
 }
 
 export async function sendAccountDisabledEmail(email: string, fullName: string | null) {
-  const name = fullName || 'Volunteer';
+  const name = escapeHtml(fullName || 'Volunteer');
   await sendEmail(email, 'Primap Account Disabled', wrapHtml(`
     <p>Hi ${name},</p>
     <p>Your Primap account has been disabled by an administrator.</p>
@@ -80,7 +93,7 @@ export async function sendAccountDisabledEmail(email: string, fullName: string |
 }
 
 export async function sendAccountEnabledEmail(email: string, fullName: string | null) {
-  const name = fullName || 'Volunteer';
+  const name = escapeHtml(fullName || 'Volunteer');
   await sendEmail(email, 'Primap Account Re-enabled', wrapHtml(`
     <p>Hi ${name},</p>
     <p>Your Primap account has been re-enabled. You can now log in and access the platform again.</p>
@@ -89,7 +102,7 @@ export async function sendAccountEnabledEmail(email: string, fullName: string | 
 }
 
 export async function sendRolePromotedEmail(email: string, fullName: string | null) {
-  const name = fullName || 'User';
+  const name = escapeHtml(fullName || 'User');
   await sendEmail(email, 'Primap: You Have Been Promoted to Admin', wrapHtml(`
     <p>Hi ${name},</p>
     <p>You have been promoted to an <strong>administrator</strong> on Primap.</p>
@@ -99,7 +112,7 @@ export async function sendRolePromotedEmail(email: string, fullName: string | nu
 }
 
 export async function sendRoleDemotedEmail(email: string, fullName: string | null) {
-  const name = fullName || 'User';
+  const name = escapeHtml(fullName || 'User');
   await sendEmail(email, 'Primap: Your Role Has Been Updated', wrapHtml(`
     <p>Hi ${name},</p>
     <p>Your role on Primap has been changed from administrator to <strong>volunteer</strong>.</p>
@@ -118,11 +131,11 @@ export async function sendWalkCancellationEmail(
   const html = wrapHtml(`
     <p>A volunteer has cancelled their participation in an upcoming walk you are also joined in.</p>
     <div style="background-color: #f9fafb; padding: 15px; border-radius: 5px; margin: 15px 0;">
-      <p><strong>Date:</strong> ${slotInfo.date}</p>
-      <p><strong>Time:</strong> ${slotInfo.time}</p>
-      <p><strong>Location:</strong> ${slotInfo.location}</p>
+      <p><strong>Date:</strong> ${escapeHtml(slotInfo.date)}</p>
+      <p><strong>Time:</strong> ${escapeHtml(slotInfo.time)}</p>
+      <p><strong>Location:</strong> ${escapeHtml(slotInfo.location)}</p>
     </div>
-    <p><strong>Cancelled by:</strong> ${cancelledBy}</p>
+    <p><strong>Cancelled by:</strong> ${escapeHtml(cancelledBy)}</p>
     <p>You are still signed up for this walk. If you also need to cancel, please do so as soon as possible.</p>
   `);
 
@@ -132,19 +145,56 @@ export async function sendWalkCancellationEmail(
   ));
 }
 
+export async function sendIncidentReportedEmail(
+  adminEmails: string[],
+  details: {
+    typeLabel: string
+    description: string
+    reporterName: string
+    walkLocation: string
+    walkDate: string
+  }
+) {
+  if (adminEmails.length === 0) return
+
+  // Note: this template intentionally does NOT report attachment counts.
+  // Notifications fire at incident creation time (before media upload), so
+  // any count reported here would always be zero. Admins can click the CTA
+  // to view the live incident with whatever media has been attached so far.
+  const html = wrapHtml(`
+    <p>Hi Admin,</p>
+    <p>A new incident has been reported by a volunteer and may require follow-up.</p>
+    <div style="background-color: #fef2f2; padding: 15px; border-radius: 5px; margin: 15px 0; border: 1px solid #fecaca;">
+      <p><strong>Type:</strong> ${escapeHtml(details.typeLabel)}</p>
+      <p><strong>Location:</strong> ${escapeHtml(details.walkLocation)}</p>
+      <p><strong>Walk date:</strong> ${escapeHtml(details.walkDate)}</p>
+      <p><strong>Reported by:</strong> ${escapeHtml(details.reporterName)}</p>
+    </div>
+    <p><strong>Description:</strong></p>
+    <p>${escapeHtml(details.description)}</p>
+    <a href="${APP_URL()}/admin/incidents" class="button">Review Incident</a>
+  `)
+
+  // Send individually to preserve recipient privacy. Use allSettled so a single
+  // failed send does not reject the entire batch.
+  await Promise.allSettled(adminEmails.map(email =>
+    sendEmail(email, 'New Incident Reported - Primap', html)
+  ))
+}
+
 export async function sendWalkReminderEmail(
   email: string,
   name: string | null,
   slotInfo: { date: string; time: string; location: string }
 ) {
-  const displayName = name || 'Volunteer';
+  const displayName = escapeHtml(name || 'Volunteer');
   await sendEmail(email, 'Reminder: Upcoming Survey Walk', wrapHtml(`
     <p>Hi ${displayName},</p>
     <p>This is a reminder for your upcoming survey walk tomorrow.</p>
     <div style="background-color: #f0fdf4; padding: 15px; border-radius: 5px; margin: 15px 0; border: 1px solid #bbf7d0;">
-      <p><strong>Date:</strong> ${slotInfo.date}</p>
-      <p><strong>Time:</strong> ${slotInfo.time}</p>
-      <p><strong>Location:</strong> ${slotInfo.location}</p>
+      <p><strong>Date:</strong> ${escapeHtml(slotInfo.date)}</p>
+      <p><strong>Time:</strong> ${escapeHtml(slotInfo.time)}</p>
+      <p><strong>Location:</strong> ${escapeHtml(slotInfo.location)}</p>
     </div>
     <p>Please remember to bring your equipment and arrive on time.</p>
     <p>If you cannot make it, please cancel your walk as soon as possible to allow others to join.</p>

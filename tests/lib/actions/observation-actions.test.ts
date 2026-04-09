@@ -42,7 +42,6 @@ vi.mock('@/lib/supabase/server', () => ({
 import {
   saveDraft,
   submitObservation,
-  uploadMedia,
   deleteMedia,
 } from '@/lib/actions/observation-actions'
 
@@ -1155,189 +1154,6 @@ describe('observation-actions', () => {
     })
   })
 
-  // ─── uploadMedia ─────────────────────────────────────────────────────
-
-  describe('uploadMedia', () => {
-    function makeFormData(
-      name = 'test.jpg',
-      type = 'image/jpeg',
-      content = 'file-data'
-    ) {
-      const formData = new FormData()
-      formData.append('file', new File([content], name, { type }))
-      return formData
-    }
-
-    it('returns error when not authenticated', async () => {
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
-
-      const result = await uploadMedia(
-        makeFormData(),
-        'observation',
-        'parent-1'
-      )
-
-      expect(result).toEqual({ error: 'Not authenticated' })
-    })
-
-    it('returns error when no file in FormData', async () => {
-      setupUser()
-      const emptyForm = new FormData()
-
-      const result = await uploadMedia(emptyForm, 'observation', 'parent-1')
-
-      expect(result).toEqual({ error: 'No file provided' })
-    })
-
-    it('returns error on storage upload failure', async () => {
-      setupUser()
-      mockStorage.upload.mockResolvedValueOnce({
-        error: { message: 'Upload failed' },
-      })
-
-      const result = await uploadMedia(
-        makeFormData(),
-        'observation',
-        'parent-1'
-      )
-
-      expect(result).toEqual({ error: 'Upload failed' })
-    })
-
-    it('returns error on DB insert failure', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: null,
-        error: { message: 'Insert failed' },
-      })
-
-      const result = await uploadMedia(
-        makeFormData(),
-        'observation',
-        'parent-1'
-      )
-
-      expect(result).toEqual({ error: 'Insert failed' })
-    })
-
-    it('succeeds with observation parentType', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: { id: 'media-1', file_path: 'path/to/file.jpg' },
-        error: null,
-      })
-
-      const result = await uploadMedia(
-        makeFormData(),
-        'observation',
-        'obs-1'
-      )
-
-      expect(result).toEqual({
-        success: true,
-        media: { id: 'media-1', file_path: 'path/to/file.jpg' },
-      })
-      expect(methods.insert).toHaveBeenCalledWith(
-        expect.objectContaining({ observation_id: 'obs-1' })
-      )
-    })
-
-    it('succeeds with sighting parentType', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: { id: 'media-1' },
-        error: null,
-      })
-
-      const result = await uploadMedia(
-        makeFormData(),
-        'sighting',
-        'sight-1'
-      )
-
-      expect(result).toEqual(expect.objectContaining({ success: true }))
-      expect(methods.insert).toHaveBeenCalledWith(
-        expect.objectContaining({ sighting_id: 'sight-1' })
-      )
-    })
-
-    it('sets mediaType to VIDEO for video file', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: { id: 'media-1' },
-        error: null,
-      })
-
-      await uploadMedia(
-        makeFormData('clip.mp4', 'video/mp4'),
-        'observation',
-        'obs-1'
-      )
-
-      expect(methods.insert).toHaveBeenCalledWith(
-        expect.objectContaining({ media_type: 'VIDEO' })
-      )
-    })
-
-    it('sets mediaType to PHOTO for image file', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: { id: 'media-1' },
-        error: null,
-      })
-
-      await uploadMedia(
-        makeFormData('photo.jpg', 'image/jpeg'),
-        'observation',
-        'obs-1'
-      )
-
-      expect(methods.insert).toHaveBeenCalledWith(
-        expect.objectContaining({ media_type: 'PHOTO' })
-      )
-    })
-
-    it('includes exifData when provided', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: { id: 'media-1' },
-        error: null,
-      })
-
-      await uploadMedia(makeFormData(), 'observation', 'obs-1', {
-        lat: 1.35,
-        lng: 103.82,
-        datetime: '2026-04-15T08:00:00',
-      })
-
-      expect(methods.insert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          exif_lat: 1.35,
-          exif_lng: 103.82,
-          exif_datetime: '2026-04-15T08:00:00',
-        })
-      )
-    })
-
-    it('sets exif fields to null when no exifData', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: { id: 'media-1' },
-        error: null,
-      })
-
-      await uploadMedia(makeFormData(), 'observation', 'obs-1')
-
-      expect(methods.insert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          exif_lat: null,
-          exif_lng: null,
-          exif_datetime: null,
-        })
-      )
-    })
-  })
-
   // ─── deleteMedia ─────────────────────────────────────────────────────
 
   describe('deleteMedia', () => {
@@ -1358,30 +1174,75 @@ describe('observation-actions', () => {
       expect(result).toEqual({ error: 'Media not found' })
     })
 
-    it('deletes media from storage and database', async () => {
+    it('deletes observation media from observation-media bucket', async () => {
       setupUser()
       methods.single.mockResolvedValueOnce({
-        data: { file_path: 'user-1/obs-1/file.jpg' },
+        data: {
+          file_path: 'user-1/obs-1/file.jpg',
+          observation_id: 'obs-1',
+          sighting_id: null,
+          incident_id: null,
+        },
         error: null,
       })
 
       const result = await deleteMedia('media-1')
 
       expect(result).toEqual({ success: true })
-      expect(mockSupabase.storage.from).toHaveBeenCalledWith(
-        'observation-media'
-      )
-      expect(mockStorage.remove).toHaveBeenCalledWith([
-        'user-1/obs-1/file.jpg',
-      ])
+      expect(mockSupabase.storage.from).toHaveBeenCalledWith('observation-media')
+      expect(mockStorage.remove).toHaveBeenCalledWith(['user-1/obs-1/file.jpg'])
       expect(mockSupabase.from).toHaveBeenCalledWith('media')
       expect(methods.delete).toHaveBeenCalled()
+    })
+
+    it('deletes sighting media from observation-media bucket', async () => {
+      setupUser()
+      methods.single.mockResolvedValueOnce({
+        data: {
+          file_path: 'user-1/sight-1/file.jpg',
+          observation_id: null,
+          sighting_id: 'sight-1',
+          incident_id: null,
+        },
+        error: null,
+      })
+
+      const result = await deleteMedia('media-1')
+
+      expect(result).toEqual({ success: true })
+      expect(mockSupabase.storage.from).toHaveBeenCalledWith('observation-media')
+      expect(mockSupabase.storage.from).not.toHaveBeenCalledWith('incident-media')
+    })
+
+    it('deletes incident media from incident-media bucket', async () => {
+      setupUser()
+      methods.single.mockResolvedValueOnce({
+        data: {
+          file_path: 'user-1/inc-1/file.jpg',
+          observation_id: null,
+          sighting_id: null,
+          incident_id: 'inc-1',
+        },
+        error: null,
+      })
+
+      const result = await deleteMedia('media-1')
+
+      expect(result).toEqual({ success: true })
+      expect(mockSupabase.storage.from).toHaveBeenCalledWith('incident-media')
+      expect(mockSupabase.storage.from).not.toHaveBeenCalledWith('observation-media')
+      expect(mockStorage.remove).toHaveBeenCalledWith(['user-1/inc-1/file.jpg'])
     })
 
     it('returns error on DB delete failure', async () => {
       setupUser()
       methods.single.mockResolvedValueOnce({
-        data: { file_path: 'user-1/obs-1/file.jpg' },
+        data: {
+          file_path: 'user-1/obs-1/file.jpg',
+          observation_id: 'obs-1',
+          sighting_id: null,
+          incident_id: null,
+        },
         error: null,
       })
       // select().eq().single() uses 1 eq, delete().eq() uses 1 eq

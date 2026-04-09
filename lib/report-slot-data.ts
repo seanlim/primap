@@ -37,6 +37,13 @@ interface SlotData {
   roundName: string
 }
 
+interface IncidentMediaItem {
+  id: string
+  file_path: string
+  file_name: string
+  media_type: string
+}
+
 interface IncidentData {
   id: string
   type: string
@@ -44,6 +51,7 @@ interface IncidentData {
   reportedBy: string
   createdAt: string
   resolved: boolean
+  media: IncidentMediaItem[]
 }
 
 interface MemberData {
@@ -89,7 +97,18 @@ export async function getSlotReportViewData(
       .eq('status', 'ACTIVE'),
     supabase
       .from('incidents')
-      .select('*, profiles:reported_by(full_name, email)')
+      // Narrow to exactly the columns the volunteer/admin views need.
+      // Notably excludes `resolved_notes` (admin-only) and lat/lng/updated_at
+      // (unused by these views) so we don't ship them over the wire.
+      .select(`
+        id,
+        incident_type,
+        description,
+        resolved,
+        created_at,
+        profiles:reported_by(full_name, email),
+        media:media!media_incident_id_fkey(id, file_path, file_name, media_type)
+      `)
       .eq('slot_id', slotId)
       .order('created_at', { ascending: false }),
   ])
@@ -151,6 +170,12 @@ export async function getSlotReportViewData(
       reportedBy: inc.profiles.full_name || inc.profiles.email,
       createdAt: inc.created_at,
       resolved: inc.resolved,
+      media: (inc.media || []).map(m => ({
+        id: m.id,
+        file_path: m.file_path,
+        file_name: m.file_name,
+        media_type: m.media_type,
+      })),
     })),
     isParticipant,
     hasSubmittedOwnObservation,

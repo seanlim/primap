@@ -5,6 +5,13 @@ import { IncidentsClient } from './incidents-client'
 
 export const dynamic = 'force-dynamic'
 
+interface IncidentMediaItem {
+  id: string
+  file_path: string
+  file_name: string
+  media_type: string
+}
+
 interface IncidentItem {
   id: string
   type: string
@@ -15,6 +22,37 @@ interface IncidentItem {
   locationName: string
   walkDate: string
   createdAt: string
+  media: IncidentMediaItem[]
+}
+
+/**
+ * Raw shape returned by the incidents query below. Defined explicitly so the
+ * mapping below doesn't need per-row `as unknown as { ... }` casts — the
+ * single cast at the data boundary is the trade-off Supabase asks of us when
+ * we use embedded relationships.
+ */
+interface IncidentQueryRow {
+  id: string
+  incident_type: string
+  description: string
+  resolved: boolean
+  resolved_notes: string | null
+  created_at: string
+  profiles: { full_name: string | null; email: string } | null
+  media: IncidentMediaItem[] | null
+  walk_slots: {
+    id: string
+    location_name: string
+    walk_date: string
+    max_volunteers: number
+    slot_memberships: { count: number }[]
+    survey_rounds: {
+      id: string
+      name: string
+      status: string
+      start_date: string
+    } | null
+  } | null
 }
 
 interface IncidentWalkGroup {
@@ -77,11 +115,17 @@ export default async function AdminIncidentsPage({
 
   const supabase = await createClient()
 
-  const { data: incidents } = await supabase
+  const { data: incidentsRaw } = await supabase
     .from('incidents')
     .select(`
-      *,
+      id,
+      incident_type,
+      description,
+      resolved,
+      resolved_notes,
+      created_at,
       profiles:reported_by(full_name, email),
+      media:media!media_incident_id_fkey(id, file_path, file_name, media_type),
       walk_slots(
         id,
         location_name,
@@ -93,23 +137,18 @@ export default async function AdminIncidentsPage({
     `)
     .order('created_at', { ascending: false })
 
-  const incidentRows = (incidents || [])
-    .map((inc) => {
-      const walk = inc.walk_slots as unknown as {
-        id: string
-        location_name: string
-        walk_date: string
-        max_volunteers: number
-        slot_memberships: Array<{ count: number }>
-        survey_rounds: {
-          id: string
-          name: string
-          status: string
-          start_date: string
-        } | null
-      } | null
+  const incidents = (incidentsRaw || []) as unknown as IncidentQueryRow[]
 
-      const reporter = inc.profiles as unknown as { full_name: string | null; email: string } | null
+  const incidentRows = incidents
+    .map((inc) => {
+      const walk = inc.walk_slots
+      const reporter = inc.profiles
+      const media = (inc.media || []).map(m => ({
+        id: m.id,
+        file_path: m.file_path,
+        file_name: m.file_name,
+        media_type: m.media_type,
+      }))
 
       return {
         id: inc.id,
@@ -121,6 +160,7 @@ export default async function AdminIncidentsPage({
         locationName: walk?.location_name || '',
         walkDate: walk?.walk_date || '',
         createdAt: inc.created_at,
+        media,
         walkId: walk?.id || null,
         roundId: walk?.survey_rounds?.id || null,
         roundName: walk?.survey_rounds?.name || null,
@@ -155,6 +195,7 @@ export default async function AdminIncidentsPage({
           locationName: incident.locationName,
           walkDate: incident.walkDate,
           createdAt: incident.createdAt,
+          media: incident.media,
         }
 
         if (existingWalk) {
@@ -190,6 +231,7 @@ export default async function AdminIncidentsPage({
               locationName: incident.locationName,
               walkDate: incident.walkDate,
               createdAt: incident.createdAt,
+              media: incident.media,
             }],
           }],
         ]),
@@ -209,11 +251,13 @@ export default async function AdminIncidentsPage({
       walks: Array.from(round.walks.values())
         .map((walk) => ({
           ...walk,
+          // Newest incident first within a walk.
           incidents: [...walk.incidents].sort(
             (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
           ),
         }))
-        .sort((a, b) => new Date(a.walkDate).getTime() - new Date(b.walkDate).getTime()),
+        // Most recent walk first within a round (matches incident sort).
+        .sort((a, b) => new Date(b.walkDate).getTime() - new Date(a.walkDate).getTime()),
     }))
     .sort((a, b) => {
       const leftTime = a.roundStartDate ? new Date(`${a.roundStartDate}T00:00:00`).getTime() : Number.MAX_SAFE_INTEGER

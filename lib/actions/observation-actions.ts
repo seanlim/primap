@@ -4,6 +4,11 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
+import {
+  OBSERVATION_MEDIA_BUCKET,
+  INCIDENT_MEDIA_BUCKET,
+  type MediaBucket,
+} from '@/lib/utils/storage'
 
 interface SightingInput {
   id?: string
@@ -42,7 +47,7 @@ async function cleanupSightingMedia(
 
   if (mediaRecords && mediaRecords.length > 0) {
     await supabase.storage
-      .from('observation-media')
+      .from(OBSERVATION_MEDIA_BUCKET)
       .remove(mediaRecords.map(m => m.file_path))
   }
 }
@@ -95,7 +100,7 @@ export async function deleteDraftObservationsForSlot(
 
   if (filePaths.length > 0) {
     const { error: storageError } = await supabase.storage
-      .from('observation-media')
+      .from(OBSERVATION_MEDIA_BUCKET)
       .remove(filePaths)
 
     if (storageError) return { error: storageError.message }
@@ -290,7 +295,7 @@ export async function submitObservation(observationId: string, walkId: string) {
 
     if (obsMedia && obsMedia.length > 0) {
       const { error: storageError } = await supabase.storage
-        .from('observation-media')
+        .from(OBSERVATION_MEDIA_BUCKET)
         .remove(obsMedia.map(m => m.file_path))
       if (storageError) return { error: 'Failed to clean up observation media files: ' + storageError.message }
       const { error: mediaDeleteError } = await supabase
@@ -324,68 +329,32 @@ export async function submitObservation(observationId: string, walkId: string) {
   return { success: true }
 }
 
-export async function uploadMedia(
-  file: FormData,
-  parentType: 'observation' | 'sighting',
-  parentId: string,
-  exifData?: { lat?: number | null; lng?: number | null; datetime?: string | null }
-) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-
-  const uploadedFile = file.get('file') as File
-  if (!uploadedFile) return { error: 'No file provided' }
-
-  const fileExt = uploadedFile.name.split('.').pop()
-  const filePath = `${user.id}/${parentId}/${crypto.randomUUID()}.${fileExt}`
-
-  const { error: uploadError } = await supabase.storage
-    .from('observation-media')
-    .upload(filePath, uploadedFile)
-
-  if (uploadError) return { error: uploadError.message }
-
-  const mediaType = uploadedFile.type.startsWith('video/') ? 'VIDEO' : 'PHOTO'
-
-  const { data, error: insertError } = await supabase
-    .from('media')
-    .insert({
-      ...(parentType === 'observation'
-        ? { observation_id: parentId }
-        : { sighting_id: parentId }),
-      file_path: filePath,
-      file_name: uploadedFile.name,
-      media_type: mediaType,
-      file_size: uploadedFile.size,
-      exif_lat: exifData?.lat ?? null,
-      exif_lng: exifData?.lng ?? null,
-      exif_datetime: exifData?.datetime ?? null,
-    })
-    .select()
-    .single()
-
-  if (insertError) return { error: insertError.message }
-
-  return { success: true, media: data }
-}
+// NOTE: Media uploads in production go through the `/api/media` route
+// (app/api/media/route.ts), NOT through a server action. The route correctly
+// handles bucket selection, RLS, the enforce_max_media_per_report trigger,
+// and storage cleanup on insert failure. A standalone uploadMedia server
+// action used to live here but was unused outside its own tests, so it was
+// removed in favor of the canonical route handler.
 
 export async function deleteMedia(mediaId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  // Get the media record to find file path
+  // Get the media record to find file path and parent type (to choose bucket)
   const { data: media } = await supabase
     .from('media')
-    .select('file_path')
+    .select('file_path, observation_id, sighting_id, incident_id')
     .eq('id', mediaId)
     .single()
 
   if (!media) return { error: 'Media not found' }
 
-  // Delete from storage
-  await supabase.storage.from('observation-media').remove([media.file_path])
+  // Pick storage bucket based on which parent the row belongs to
+  const bucket: MediaBucket = media.incident_id ? INCIDENT_MEDIA_BUCKET : OBSERVATION_MEDIA_BUCKET
+
+  // Delete from storage (best-effort; DB row removal is the source of truth)
+  await supabase.storage.from(bucket).remove([media.file_path])
 
   // Delete from database
   const { error } = await supabase

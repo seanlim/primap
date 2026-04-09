@@ -6,13 +6,14 @@ import { AlertTriangle, CheckCircle } from 'lucide-react'
 import { resolveIncident } from '@/lib/actions/admin-round-actions'
 import { formatDate } from '@/lib/utils/format-date'
 import { useToast } from '@/components/ui/toast'
+import { MediaGallery } from '@/components/report/media-gallery'
+import { INCIDENT_TYPE_LABELS, type IncidentType } from '@/lib/constants/incident-types'
 
-const TYPE_LABELS: Record<string, string> = {
-  INJURED_ANIMAL: 'Injured Animal',
-  DEAD_ANIMAL: 'Dead Animal',
-  HUMAN_WILDLIFE_CONFLICT: 'Human-Wildlife Conflict',
-  HABITAT_DAMAGE: 'Habitat Damage',
-  OTHER: 'Other',
+interface IncidentMediaItem {
+  id: string
+  file_path: string
+  file_name: string
+  media_type: string
 }
 
 interface IncidentData {
@@ -25,6 +26,7 @@ interface IncidentData {
   locationName: string
   walkDate: string
   createdAt: string
+  media: IncidentMediaItem[]
 }
 
 interface IncidentWalkGroup {
@@ -104,12 +106,13 @@ export function IncidentsClient({
                         ) : (
                           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
                         )}
-                        <div className="flex-1">
-                          <p className="font-medium text-gray-900">{TYPE_LABELS[inc.type] || inc.type}</p>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-gray-900">{INCIDENT_TYPE_LABELS[inc.type as IncidentType] || inc.type}</p>
                           <p className="mt-1 text-sm text-gray-700">{inc.description}</p>
                           <p className="mt-2 text-xs text-gray-400">
                             by {inc.reportedBy} · {new Date(inc.createdAt).toLocaleString('en-SG')}
                           </p>
+                          <MediaGallery media={inc.media} bucket="incident-media" />
                           {inc.resolved && inc.resolvedNotes && (
                             <p className="mt-1 text-xs text-green-600">Resolution: {inc.resolvedNotes}</p>
                           )}

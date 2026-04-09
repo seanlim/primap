@@ -40,8 +40,10 @@ function makeChain(index: number, resolvedValue: unknown) {
 
   self.select = fluent('select')
   self.eq = fluent('eq')
+  self.limit = fluent('limit')
   self.order = fluent('order')
   self.range = vi.fn().mockResolvedValue(resolvedValue)
+  self.single = vi.fn().mockResolvedValue(resolvedValue)
 
   // Make awaitable for count queries that return the chain directly (no .range)
   self.then = vi.fn((resolve: (v: unknown) => void) => {
@@ -63,6 +65,13 @@ function setupMock() {
     { count: 20, error: null },
     { count: 20, error: null },
   ]
+  const settingsResult = {
+    data: {
+      late_cancel_hours: 24,
+      high_participation_threshold: 2,
+    },
+    error: null,
+  }
   const membershipResult = {
     data: [
       { slot_id: 'slot-1', user_id: 'user-1', status: 'ACTIVE' },
@@ -94,10 +103,11 @@ function setupMock() {
     let result: unknown
     if (idx === 0) result = usersResult
     else if (idx === 1) result = totalCountResult
-    else if (idx >= 2 && idx <= 5) result = statusCountResults[idx - 2] ?? { count: 0, error: null }
-    else if (idx === 6) result = profilesResult
-    else if (idx === 7) result = membershipResult
-    else if (idx === 8) result = observationResult
+    else if (idx === 2) result = settingsResult
+    else if (idx >= 3 && idx <= 6) result = statusCountResults[idx - 3] ?? { count: 0, error: null }
+    else if (idx === 7) result = profilesResult
+    else if (idx === 8) result = membershipResult
+    else if (idx === 9) result = observationResult
     else result = { data: [], error: null }
 
     const chain = makeChain(idx, result)
@@ -191,10 +201,10 @@ describe('AdminUsersPage', () => {
     setupMock()
     await AdminUsersPage({ searchParams: Promise.resolve({ status: 'ACTIVE' }) })
 
-    // Chains 2-5 are the per-status count queries
+    // Chains 3-6 are the per-status count queries; chain 2 fetches settings.
     const statuses = ['PENDING', 'ACTIVE', 'REJECTED', 'DISABLED']
     for (let i = 0; i < statuses.length; i++) {
-      const calls = eqCalls.filter((c) => c.chain === i + 2 && c.args[0] === 'status')
+      const calls = eqCalls.filter((c) => c.chain === i + 3 && c.args[0] === 'status')
       expect(calls).toHaveLength(1)
       expect(calls[0].args[1]).toBe(statuses[i])
     }

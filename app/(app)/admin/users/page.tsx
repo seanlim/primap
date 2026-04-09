@@ -2,6 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import { UsersClient } from './users-client'
 import type { UserStatus } from '@/lib/auth/access-policy'
 import { getAdminUsersAnalytics } from '@/lib/admin-volunteer-analytics'
+import {
+  DEFAULT_HIGH_PARTICIPATION_THRESHOLD,
+  DEFAULT_LATE_CANCEL_HOURS,
+} from '@/lib/constants/settings'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,7 +32,7 @@ export default async function AdminUsersPage({
 
   const supabase = await createClient()
 
-  const [{ data: users }, { count: totalCount }, ...statusResults] = await Promise.all([
+  const [{ data: users }, { count: totalCount }, { data: settings }, ...statusResults] = await Promise.all([
     (() => {
       let q = supabase.from('profiles').select('*').order('created_at', { ascending: false })
       if (statusFilter) q = q.eq('status', statusFilter)
@@ -41,6 +45,11 @@ export default async function AdminUsersPage({
       if (roleFilter) q = q.eq('role', roleFilter)
       return q
     })(),
+    supabase
+      .from('app_settings')
+      .select('late_cancel_hours, high_participation_threshold')
+      .limit(1)
+      .single(),
     ...ALL_STATUSES.map(s =>
       supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('status', s)
     ),
@@ -59,7 +68,14 @@ export default async function AdminUsersPage({
     createdAt: u.created_at,
   }))
 
-  const analytics = await getAdminUsersAnalytics(supabase, userRows.map((user) => user.id))
+  const analytics = await getAdminUsersAnalytics(
+    supabase as unknown as Parameters<typeof getAdminUsersAnalytics>[0],
+    userRows.map((user) => user.id),
+    {
+      lateCancelHours: settings?.late_cancel_hours ?? DEFAULT_LATE_CANCEL_HOURS,
+      highParticipationThreshold: settings?.high_participation_threshold ?? DEFAULT_HIGH_PARTICIPATION_THRESHOLD,
+    }
+  )
 
   return (
     <UsersClient

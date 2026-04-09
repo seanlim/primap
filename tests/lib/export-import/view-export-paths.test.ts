@@ -61,4 +61,19 @@ describe('view-export-paths', () => {
 
     expect(path).toBe('media/Very Long Round Name Tha/2026-03-14 - Extremely Long Location/Volunteer Name With A Su/sg-RBL-2/very-long-file-name-that-keeps-going-and-goi.jpg')
   })
+
+  it('adds stable ids to truncated entity folders to avoid silent merges', () => {
+    const path = buildReadableMediaPath({
+      roundId: 'round-alpha-123456',
+      roundName: 'Very Long Round Name That Keeps Going',
+      walkId: 'walk-alpha-abcdef',
+      walkDate: '2026-03-14',
+      locationName: 'Extremely Long Location Name That Keeps Going',
+      userId: 'user-alpha-999999',
+      userName: 'Volunteer Name With A Surprisingly Long Display Value',
+      fileName: 'photo.jpg',
+    }, new Set())
+
+    expect(path).toBe('media/Very Long Round ~123456/2026-03-14 - Extremely Long ~abcdef/Volunteer Name W ~999999/obs/photo.jpg')
+  })
 })

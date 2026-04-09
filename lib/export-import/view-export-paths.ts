@@ -1,5 +1,7 @@
 export interface ViewExportMediaPathInput {
+  roundId?: string | null
   roundName?: string | null
+  walkId?: string | null
   walkDate?: string | null
   locationName?: string | null
   userName?: string | null
@@ -28,9 +30,18 @@ export function sanitizePathSegment(value: string | null | undefined, fallback: 
   return sanitized || fallback
 }
 
-function truncateSegment(value: string, maxLength: number): string {
+function shortStableId(value: string | null | undefined): string {
+  const sanitized = sanitizePathSegment(value, '')
+  return sanitized ? sanitized.slice(-6) : ''
+}
+
+function truncateSegment(value: string, maxLength: number, disambiguator?: string | null): string {
   if (value.length <= maxLength) return value
-  return value.slice(0, maxLength).trim().replace(/[. ]+$/g, '')
+
+  const suffixId = shortStableId(disambiguator)
+  const suffix = suffixId ? ` ~${suffixId}` : ''
+  const prefixMax = Math.max(1, maxLength - suffix.length)
+  return `${value.slice(0, prefixMax).trim().replace(/[. ]+$/g, '')}${suffix}`
 }
 
 function shortenFileName(fileName: string, maxLength: number): string {
@@ -47,10 +58,18 @@ function shortenFileName(fileName: string, maxLength: number): string {
   return `${truncateSegment(base, baseMax)}${ext}`
 }
 
-export function buildWalkFolderName(walkDate?: string | null, locationName?: string | null): string {
+export function buildRoundFolderName(roundName?: string | null, roundId?: string | null): string {
+  return truncateSegment(
+    sanitizePathSegment(roundName, 'Unknown Round'),
+    ROUND_MAX,
+    roundId
+  )
+}
+
+export function buildWalkFolderName(walkDate?: string | null, locationName?: string | null, walkId?: string | null): string {
   const date = sanitizePathSegment(walkDate, 'Unknown Date')
   const location = sanitizePathSegment(locationName, 'Unknown Walk')
-  return truncateSegment(`${date} - ${location}`, WALK_MAX)
+  return truncateSegment(`${date} - ${location}`, WALK_MAX, walkId)
 }
 
 export function buildUserFolderName(input: Pick<ViewExportMediaPathInput, 'userName' | 'userFallback' | 'userId'>): string {
@@ -59,7 +78,8 @@ export function buildUserFolderName(input: Pick<ViewExportMediaPathInput, 'userN
       input.userName || input.userFallback || input.userId,
       'Unknown User'
     ),
-    USER_MAX
+    USER_MAX,
+    input.userId
   )
 }
 
@@ -105,8 +125,8 @@ export function buildReadableMediaPath(
   input: ViewExportMediaPathInput,
   usedPaths: Set<string>
 ): string {
-  const round = truncateSegment(sanitizePathSegment(input.roundName, 'Unknown Round'), ROUND_MAX)
-  const walk = buildWalkFolderName(input.walkDate, input.locationName)
+  const round = buildRoundFolderName(input.roundName, input.roundId)
+  const walk = buildWalkFolderName(input.walkDate, input.locationName, input.walkId)
   const user = buildUserFolderName(input)
   const leaf = buildMediaLeafFolderName(input)
   const fileName = shortenFileName(sanitizePathSegment(input.fileName, 'unnamed-file'), FILE_MAX)

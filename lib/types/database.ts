@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          high_participation_threshold: number
           late_cancel_hours: number
           max_media_per_report: number
           required_walks_per_round: number
@@ -26,6 +27,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          high_participation_threshold?: number
           late_cancel_hours?: number
           max_media_per_report?: number
           required_walks_per_round?: number
@@ -34,6 +36,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          high_participation_threshold?: number
           late_cancel_hours?: number
           max_media_per_report?: number
           required_walks_per_round?: number

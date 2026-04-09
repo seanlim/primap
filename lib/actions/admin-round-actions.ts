@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import {
+  HIGH_PARTICIPATION_THRESHOLD_RANGE,
   LATE_CANCEL_HOURS_RANGE,
   MAX_MEDIA_PER_REPORT_RANGE,
   REQUIRED_WALKS_PER_ROUND_RANGE,
@@ -249,6 +250,7 @@ export async function bulkCreateWalks(data: {
 export async function updateSettings(data: {
   requiredWalksPerRound: number
   lateCancelHours: number
+  highParticipationThreshold: number
   maxMediaPerReport: number
 }) {
   const errors: string[] = []
@@ -262,6 +264,9 @@ export async function updateSettings(data: {
   }
   if (!inRange(data.maxMediaPerReport, MAX_MEDIA_PER_REPORT_RANGE.min, MAX_MEDIA_PER_REPORT_RANGE.max)) {
     errors.push(`Max media per report must be an integer between ${MAX_MEDIA_PER_REPORT_RANGE.min} and ${MAX_MEDIA_PER_REPORT_RANGE.max}`)
+  }
+  if (!inRange(data.highParticipationThreshold, HIGH_PARTICIPATION_THRESHOLD_RANGE.min, HIGH_PARTICIPATION_THRESHOLD_RANGE.max)) {
+    errors.push(`High participation threshold must be an integer between ${HIGH_PARTICIPATION_THRESHOLD_RANGE.min} and ${HIGH_PARTICIPATION_THRESHOLD_RANGE.max} submitted reports`)
   }
   if (errors.length > 0) return { error: errors.join('; ') }
 
@@ -280,6 +285,7 @@ export async function updateSettings(data: {
     .update({
       required_walks_per_round: data.requiredWalksPerRound,
       late_cancel_hours: data.lateCancelHours,
+      high_participation_threshold: data.highParticipationThreshold,
       max_media_per_report: data.maxMediaPerReport,
     })
     .eq('id', existing.id)

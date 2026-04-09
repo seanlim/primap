@@ -21,7 +21,7 @@ export const TABLE_COLUMNS: Record<TableName, string[]> = {
   sightings: ['id', 'observation_id', 'species', 'count', 'lat', 'lng', 'observed_at', 'notes', 'created_at'],
   media: ['id', 'observation_id', 'sighting_id', 'file_path', 'file_name', 'file_size', 'media_type', 'exif_lat', 'exif_lng', 'exif_datetime', 'created_at'],
   incidents: ['id', 'slot_id', 'reported_by', 'incident_type', 'description', 'lat', 'lng', 'resolved', 'resolved_notes', 'created_at', 'updated_at'],
-  app_settings: ['id', 'required_walks_per_round', 'late_cancel_hours', 'created_at', 'updated_at'],
+  app_settings: ['id', 'required_walks_per_round', 'late_cancel_hours', 'high_participation_threshold', 'max_media_per_report', 'created_at', 'updated_at'],
 }
 
 export const STORAGE_BUCKET = 'observation-media'

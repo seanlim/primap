@@ -8,10 +8,16 @@ import { updateSettings } from '@/lib/actions/admin-round-actions'
 import { useToast } from '@/components/ui/toast'
 
 export function SettingsClient({ settings }: {
-  settings: { requiredWalksPerRound: number; lateCancelHours: number; maxMediaPerReport: number }
+  settings: {
+    requiredWalksPerRound: number
+    lateCancelHours: number
+    highParticipationThreshold: number
+    maxMediaPerReport: number
+  }
 }) {
   const [requiredWalks, setRequiredWalks] = useState(settings.requiredWalksPerRound.toString())
   const [lateCancelHours, setLateCancelHours] = useState(settings.lateCancelHours.toString())
+  const [highParticipationThreshold, setHighParticipationThreshold] = useState(settings.highParticipationThreshold.toString())
   const [maxMedia, setMaxMedia] = useState(settings.maxMediaPerReport.toString())
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -24,6 +30,7 @@ export function SettingsClient({ settings }: {
     const result = await updateSettings({
       requiredWalksPerRound: parseInt(requiredWalks),
       lateCancelHours: parseInt(lateCancelHours),
+      highParticipationThreshold: parseInt(highParticipationThreshold),
       maxMediaPerReport: parseInt(maxMedia),
     })
     if (result.error) showToast(result.error, 'error')
@@ -59,6 +66,22 @@ export function SettingsClient({ settings }: {
           />
           <p className="text-xs text-gray-400 mt-1">
             Number of walks each volunteer must complete per survey round.
+          </p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            High Participation Threshold
+          </label>
+          <input
+            type="number"
+            min="1"
+            max="100"
+            value={highParticipationThreshold}
+            onChange={e => setHighParticipationThreshold(e.target.value)}
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Submitted reports needed before an admin indicator appears on a volunteer.
           </p>
         </div>
         <div>

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { SettingsClient } from './settings-client'
 import {
+  DEFAULT_HIGH_PARTICIPATION_THRESHOLD,
   DEFAULT_LATE_CANCEL_HOURS,
   DEFAULT_MAX_MEDIA_PER_REPORT,
   DEFAULT_REQUIRED_WALKS_PER_ROUND,
@@ -22,6 +23,7 @@ export default async function AdminSettingsPage() {
       settings={{
         requiredWalksPerRound: settings?.required_walks_per_round ?? DEFAULT_REQUIRED_WALKS_PER_ROUND,
         lateCancelHours: settings?.late_cancel_hours ?? DEFAULT_LATE_CANCEL_HOURS,
+        highParticipationThreshold: settings?.high_participation_threshold ?? DEFAULT_HIGH_PARTICIPATION_THRESHOLD,
         maxMediaPerReport: settings?.max_media_per_report ?? DEFAULT_MAX_MEDIA_PER_REPORT,
       }}
     />

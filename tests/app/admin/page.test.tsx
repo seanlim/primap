@@ -51,7 +51,14 @@ describe('AdminDashboard', () => {
     let index = 0
     mockSupabase.from.mockImplementation(() => makeAwaitableChain(results[index++]))
     mockLanding.mockResolvedValue({
-      overall: {
+      targetRound: {
+        id: 'round-1',
+        name: 'Round 1',
+        start_date: '2026-03-01',
+        end_date: '2026-08-31',
+        status: 'OPEN',
+      },
+      currentRound: {
         reportCompletionRate: 0.5,
         completionRateSubmittedReports: 6,
         completionRateExpectedReports: 12,
@@ -76,7 +83,8 @@ describe('AdminDashboard', () => {
     expect(screen.getByText('total reports required')).toBeInTheDocument()
     expect(screen.getByText('sign-ups')).toBeInTheDocument()
     expect(screen.getByText('total available capacity')).toBeInTheDocument()
-    expect(screen.getByText('Overall Sighting Map')).toBeInTheDocument()
+    expect(screen.getByText('Sighting Map')).toBeInTheDocument()
+    expect(screen.getByText('Round 1')).toBeInTheDocument()
     expect(screen.getByTestId('map-view')).toHaveTextContent('Markers: 0')
     expect(screen.getByRole('link', { name: /Users/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Rounds/i })).toBeInTheDocument()

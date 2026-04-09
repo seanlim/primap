@@ -387,9 +387,19 @@ describe('admin analytics report maps', () => {
     }
   }
 
-  it('includes report map points from the bounded landing-round scope', async () => {
+  it('scopes the landing snapshot to the current round', async () => {
     const snapshot = await getAdminVolunteerAnalyticsLanding(createAnalyticsSupabase() as never, new Date('2026-03-20T12:00:00+08:00'))
 
+    expect(snapshot.targetRound).toMatchObject({
+      id: 'round-1',
+      name: 'Round 1',
+      status: 'OPEN',
+    })
+    expect(snapshot.currentRound).toMatchObject({
+      totalWalks: 1,
+      submittedReports: 2,
+      walkSignUps: 0,
+    })
     expect(snapshot.reportMapPoints).toEqual([
       {
         lat: 1.3521,
@@ -405,6 +415,30 @@ describe('admin analytics report maps', () => {
         outcome: 'NOT_SIGHTED',
         label: 'No sighting report 1',
         popupMeta: ['Hill', '10 Mar 2026 07:00', 'Round 1'],
+      },
+    ])
+  })
+
+  it('uses the round whose date range contains today even when another round is open', async () => {
+    const snapshot = await getAdminVolunteerAnalyticsLanding(createAnalyticsSupabase() as never, new Date('2026-04-15T12:00:00+08:00'))
+
+    expect(snapshot.targetRound).toMatchObject({
+      id: 'round-2',
+      name: 'Round 2',
+      status: 'DRAFT',
+    })
+    expect(snapshot.currentRound).toMatchObject({
+      totalWalks: 1,
+      submittedReports: 1,
+    })
+    expect(snapshot.reportMapPoints).toEqual([
+      {
+        lat: 1.3099,
+        lng: 103.7801,
+        outcome: 'SIGHTED',
+        label: 'DUSKY',
+        popupMeta: ['Coast', '12 Apr 2026 08:00', 'Round 2'],
+        species: 'DUSKY',
       },
     ])
   })

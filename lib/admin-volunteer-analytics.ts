@@ -1,5 +1,6 @@
 import { hasWalkEnded } from '@/lib/utils/walk-participation'
 import { buildSlotPopupMeta } from '@/lib/utils/report-map'
+import { toLocalDateString } from '@/lib/utils/format-date'
 
 type QueryResult<T> = { data: T | null; error: { message: string } | null }
 type CountResult = { count: number | null; error: { message: string } | null }
@@ -68,6 +69,12 @@ function formatSpeciesLabel(species?: string) {
   return null
 }
 
+function isDateInRound(round: AnalyticsRound, now: Date) {
+  const today = toLocalDateString(now)
+
+  return round.start_date <= today && today <= round.end_date
+}
+
 export interface AnalyticsAllTimeTotals {
   activeRegisteredVolunteers: number
   totalVolunteerSignUps: number
@@ -93,7 +100,8 @@ export interface AnalyticsOverviewMetrics {
 }
 
 export interface VolunteerAnalyticsLandingSnapshot {
-  overall: AnalyticsOverviewMetrics | null
+  targetRound: AnalyticsRound | null
+  currentRound: AnalyticsOverviewMetrics | null
   reportMapPoints: AnalyticsReportMapPoint[]
 }
 
@@ -520,26 +528,31 @@ export async function getAdminVolunteerAnalyticsLanding(
   const base = await getAnalyticsBaseData(supabase)
 
   if (base.rounds.length === 0) {
-    return { overall: null, reportMapPoints: [] }
+    return { targetRound: null, currentRound: null, reportMapPoints: [] }
+  }
+
+  const targetRound = base.rounds.find((round) => isDateInRound(round, now)) ?? null
+
+  if (!targetRound) {
+    return { targetRound: null, currentRound: null, reportMapPoints: [] }
   }
 
   const roundNameById = new Map(base.rounds.map((round) => [round.id, round.name]))
-  const mapRounds = base.rounds.filter((round) => round.status === 'OPEN').slice(0, 1)
-  const boundedMapRounds = mapRounds.length > 0 ? mapRounds : base.rounds.slice(0, 2)
-  const boundedRoundIds = new Set(boundedMapRounds.map((round) => round.id))
-  const boundedSlots = base.slots.filter((slot) => slot.round_id && boundedRoundIds.has(slot.round_id))
-  const boundedSlotIds = new Set(boundedSlots.map((slot) => slot.id))
-  const boundedObservations = base.observations.filter((observation) => boundedSlotIds.has(observation.slot_id))
-  const slotsById = new Map(boundedSlots.map((slot) => [slot.id, slot]))
+  const roundSlots = base.slots.filter((slot) => slot.round_id === targetRound.id)
+  const roundSlotIds = new Set(roundSlots.map((slot) => slot.id))
+  const roundMemberships = base.memberships.filter((membership) => roundSlotIds.has(membership.slot_id))
+  const roundObservations = base.observations.filter((observation) => roundSlotIds.has(observation.slot_id))
+  const slotsById = new Map(roundSlots.map((slot) => [slot.id, slot]))
 
   return {
-    overall: buildMetrics({
-      slots: base.slots,
-      memberships: base.memberships,
-      observations: base.observations,
+    targetRound,
+    currentRound: buildMetrics({
+      slots: roundSlots,
+      memberships: roundMemberships,
+      observations: roundObservations,
       now,
     }),
-    reportMapPoints: await getReportMapPoints(supabase, boundedObservations, slotsById, roundNameById),
+    reportMapPoints: await getReportMapPoints(supabase, roundObservations, slotsById, roundNameById),
   }
 }
 

@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { ProfileClient } from './profile-client'
 import type { WalkRef, HistoryObservation } from '@/lib/types/supabase-helpers'
-import { hasWalkEnded } from '@/lib/utils/walk-participation'
+import { getWalkStartDateTime, hasWalkEnded } from '@/lib/utils/walk-participation'
 import { buildSlotPopupMeta } from '@/lib/utils/report-map'
 
 export const dynamic = 'force-dynamic'
@@ -75,7 +75,7 @@ export default async function ProfilePage() {
 
   const activeWalkHistory = activeMemberships || []
   const activeSlotIds = activeWalkHistory
-    .map((membership) => (membership.walk_slots as unknown as WalkRef)?.id)
+    .map((membership) => (membership.walk_slots as WalkRef | undefined)?.id)
     .filter(Boolean)
 
   const { count: draftsPending } = activeSlotIds.length > 0
@@ -90,21 +90,21 @@ export default async function ProfilePage() {
   const walkHistoryItems = [
     ...activeWalkHistory.map((membership) => ({
       membershipId: membership.id,
-      slot: membership.walk_slots as unknown as WalkRef,
+      slot: membership.walk_slots as WalkRef,
       historyType: 'active' as const,
     })),
     ...(submittedObservationHistory || [])
       .filter((observation) => !activeSlotIds.includes(observation.slot_id))
       .map((observation) => ({
         membershipId: observation.id,
-        slot: observation.walk_slots as unknown as WalkRef,
+        slot: observation.walk_slots as WalkRef,
         historyType: 'submitted' as const,
       })),
   ]
     .filter((item) => item.slot && (item.historyType === 'active' || hasWalkEnded(item.slot.walk_date, item.slot.end_time)))
     .sort((a, b) => {
-      const aTime = new Date(`${a.slot.walk_date}T${a.slot.start_time}`).getTime()
-      const bTime = new Date(`${b.slot.walk_date}T${b.slot.start_time}`).getTime()
+      const aTime = getWalkStartDateTime(a.slot.walk_date, a.slot.start_time).getTime()
+      const bTime = getWalkStartDateTime(b.slot.walk_date, b.slot.start_time).getTime()
       return bTime - aTime
     })
     .slice(0, 20)
@@ -126,6 +126,9 @@ export default async function ProfilePage() {
   )
 
   const submittedObservationIds = (submittedObservationHistory || []).map((observation) => observation.id)
+  const submittedObservationById = new Map(
+    (submittedObservationHistory || []).map((observation) => [observation.id, observation])
+  )
   const { data: submittedSightings } = submittedObservationIds.length > 0
     ? await supabase
         .from('sightings')
@@ -143,10 +146,8 @@ export default async function ProfilePage() {
 
     if (sighting.lat === null || sighting.lng === null) return []
 
-    const observation = (submittedObservationHistory || []).find(
-      (item) => item.id === sighting.observation_id
-    )
-    const slot = observation?.walk_slots as unknown as WalkRef | undefined
+    const observation = submittedObservationById.get(sighting.observation_id)
+    const slot = observation?.walk_slots as WalkRef | undefined
 
     return [{
       lat: sighting.lat,
@@ -168,7 +169,7 @@ export default async function ProfilePage() {
   const notSightedPoints = (submittedObservationHistory || [])
     .filter((observation) => observation.outcome === 'NOT_SIGHTED' && observation.lat !== null && observation.lng !== null)
     .map((observation) => {
-      const slot = observation.walk_slots as unknown as WalkRef | undefined
+      const slot = observation.walk_slots as WalkRef | undefined
       return {
         lat: observation.lat as number,
         lng: observation.lng as number,

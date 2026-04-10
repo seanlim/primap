@@ -11,12 +11,29 @@ export function SightingLegend({
 }: {
   points: Array<Pick<AnalyticsReportMapPoint, 'outcome' | 'species'>>
 }) {
-  const sightedCount = points.filter((point) => point.outcome === 'SIGHTED').length
-  const notSightedCount = points.filter((point) => point.outcome === 'NOT_SIGHTED').length
-  const rblCount = points.filter((point) => point.outcome === 'SIGHTED' && point.species === 'RBL').length
-  const ltmCount = points.filter((point) => point.outcome === 'SIGHTED' && point.species === 'LTM').length
-  const duskyCount = points.filter((point) => point.outcome === 'SIGHTED' && point.species === 'DUSKY').length
-  const otherCount = points.filter((point) => point.outcome === 'SIGHTED' && point.species === 'OTHER').length
+  const totals = points.reduce(
+    (acc, point) => {
+      if (point.outcome === 'NOT_SIGHTED') {
+        acc.notSightedCount += 1
+        return acc
+      }
+
+      acc.sightedCount += 1
+      if (point.species === 'RBL') acc.rblCount += 1
+      if (point.species === 'LTM') acc.ltmCount += 1
+      if (point.species === 'DUSKY') acc.duskyCount += 1
+      if (point.species === 'OTHER') acc.otherCount += 1
+      return acc
+    },
+    {
+      sightedCount: 0,
+      notSightedCount: 0,
+      rblCount: 0,
+      ltmCount: 0,
+      duskyCount: 0,
+      otherCount: 0,
+    }
+  )
 
   return (
     <div className="flex flex-wrap gap-3 text-xs text-gray-600">
@@ -25,24 +42,24 @@ export function SightingLegend({
           <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Sighted</span>
           <div className="flex items-center gap-2">
             <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: DEFAULT_SIGHTING_COLOR }} />
-            <span>Total: {sightedCount}</span>
+            <span>Total: {totals.sightedCount}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: SPECIES_COLORS.RBL }} />
-            <span>RBL: {rblCount}</span>
+            <span>RBL: {totals.rblCount}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: SPECIES_COLORS.LTM }} />
-            <span>LTM: {ltmCount}</span>
+            <span>LTM: {totals.ltmCount}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: SPECIES_COLORS.DUSKY }} />
-            <span>DUSKY: {duskyCount}</span>
+            <span>DUSKY: {totals.duskyCount}</span>
           </div>
-          {otherCount > 0 && (
+          {totals.otherCount > 0 && (
             <div className="flex items-center gap-2">
               <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: SPECIES_COLORS.OTHER }} />
-              <span>OTHER: {otherCount}</span>
+              <span>OTHER: {totals.otherCount}</span>
             </div>
           )}
         </div>
@@ -52,7 +69,7 @@ export function SightingLegend({
           <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Not Sighted</span>
           <div className="flex items-center gap-2">
             <span className="h-3 w-3 rounded-sm ring-2 ring-white shadow-sm" style={{ backgroundColor: NOT_SIGHTED_COLOR }} />
-            <span>Total: {notSightedCount}</span>
+            <span>Total: {totals.notSightedCount}</span>
           </div>
         </div>
       </div>

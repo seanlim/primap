@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback } from 'react'
+import { toLocalDateString } from '@/lib/utils/format-date'
 
 export function WalkFilters() {
   const router = useRouter()
@@ -10,6 +11,7 @@ export function WalkFilters() {
   const date = searchParams.get('date') || ''
   const location = searchParams.get('location') || ''
   const availability = searchParams.get('availability') || ''
+  const today = toLocalDateString(new Date())
 
   const updateParam = useCallback((key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -32,17 +34,20 @@ export function WalkFilters() {
     <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Date</label>
+          <label htmlFor="walk-date-filter" className="block text-xs font-medium text-gray-500 mb-1">Date</label>
           <input
+            id="walk-date-filter"
             type="date"
             value={date}
+            min={today}
             onChange={(e) => updateParam('date', e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Availability</label>
+          <label htmlFor="walk-availability-filter" className="block text-xs font-medium text-gray-500 mb-1">Availability</label>
           <select
+            id="walk-availability-filter"
             value={availability}
             onChange={(e) => updateParam('availability', e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -54,8 +59,9 @@ export function WalkFilters() {
         </div>
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">Location</label>
+        <label htmlFor="walk-location-filter" className="block text-xs font-medium text-gray-500 mb-1">Location</label>
         <input
+          id="walk-location-filter"
           type="text"
           value={location}
           onChange={(e) => updateParam('location', e.target.value)}

@@ -1,6 +1,6 @@
 import { hasWalkEnded } from '@/lib/utils/walk-participation'
 import { buildSlotPopupMeta } from '@/lib/utils/report-map'
-import { toLocalDateString } from '@/lib/utils/format-date'
+import { findCurrentRound } from '@/lib/utils/rounds'
 
 type QueryResult<T> = { data: T | null; error: { message: string } | null }
 type CountResult = { count: number | null; error: { message: string } | null }
@@ -67,12 +67,6 @@ function formatSpeciesLabel(species?: string) {
   if (species === 'DUSKY') return 'DUSKY'
   if (species === 'OTHER') return 'Other'
   return null
-}
-
-function isDateInRound(round: AnalyticsRound, now: Date) {
-  const today = toLocalDateString(now)
-
-  return round.start_date <= today && today <= round.end_date
 }
 
 export interface AnalyticsAllTimeTotals {
@@ -531,7 +525,7 @@ export async function getAdminVolunteerAnalyticsLanding(
     return { targetRound: null, currentRound: null, reportMapPoints: [] }
   }
 
-  const targetRound = base.rounds.find((round) => isDateInRound(round, now)) ?? null
+  const targetRound = findCurrentRound(base.rounds, now)
 
   if (!targetRound) {
     return { targetRound: null, currentRound: null, reportMapPoints: [] }

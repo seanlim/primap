@@ -60,7 +60,7 @@ describe('ProfilePage', () => {
     vi.useRealTimers()
   })
 
-  it('scopes progress stats to the current round', async () => {
+  it('scopes progress stats to the current round while leaving history separate', async () => {
     mockSupabase.auth.getUser.mockResolvedValue({
       data: { user: { id: 'user-1' } },
     })
@@ -80,11 +80,12 @@ describe('ProfilePage', () => {
         },
       ],
       slot_memberships: [
-        { count: 5 },
         { data: [] },
+        { count: 2 },
       ],
       observations: [
         { data: [] },
+        { count: 1 },
         { count: 1 },
       ],
       app_settings: [
@@ -126,7 +127,8 @@ describe('ProfilePage', () => {
     expect(mockProfileClient).toHaveBeenCalledWith(
       expect.objectContaining({
         stats: expect.objectContaining({
-          walksJoined: 5,
+          walksJoined: 2,
+          draftsPending: 1,
           reportsSubmitted: 1,
           requiredWalks: 4,
         }),

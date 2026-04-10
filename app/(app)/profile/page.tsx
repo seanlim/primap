@@ -21,13 +21,6 @@ export default async function ProfilePage() {
 
   if (!profile) redirect('/login')
 
-  // Get stats
-  const { count: walksJoined } = await supabase
-    .from('slot_memberships')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', user.id)
-    .eq('status', 'ACTIVE')
-
   const [{ data: activeMemberships }, { data: submittedObservationHistory }] = await Promise.all([
     supabase
       .from('slot_memberships')
@@ -72,15 +65,6 @@ export default async function ProfilePage() {
   const activeSlotIds = activeWalkHistory
     .map((membership) => (membership.walk_slots as unknown as WalkRef)?.id)
     .filter(Boolean)
-
-  const { count: draftsPending } = activeSlotIds.length > 0
-    ? await supabase
-        .from('observations')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('status', 'DRAFT')
-        .in('slot_id', activeSlotIds)
-    : { count: 0 }
 
   const walkHistoryItems = [
     ...activeWalkHistory.map((membership) => ({
@@ -202,14 +186,28 @@ export default async function ProfilePage() {
 
   const currentRoundSlotIds = (currentRoundSlots || []).map((slot) => slot.id)
 
-  const { count: reportsSubmitted } = currentRoundSlotIds.length > 0
-    ? await supabase
-        .from('observations')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('status', 'SUBMITTED')
-        .in('slot_id', currentRoundSlotIds)
-    : { count: 0 }
+  const [{ count: walksJoined }, { count: draftsPending }, { count: reportsSubmitted }] = currentRoundSlotIds.length > 0
+    ? await Promise.all([
+        supabase
+          .from('slot_memberships')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('status', 'ACTIVE')
+          .in('slot_id', currentRoundSlotIds),
+        supabase
+          .from('observations')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('status', 'DRAFT')
+          .in('slot_id', currentRoundSlotIds),
+        supabase
+          .from('observations')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('status', 'SUBMITTED')
+          .in('slot_id', currentRoundSlotIds),
+      ])
+    : [{ count: 0 }, { count: 0 }, { count: 0 }]
 
   return (
     <ProfileClient

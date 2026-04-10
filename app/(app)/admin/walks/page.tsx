@@ -9,12 +9,12 @@ export default async function AdminWalksPage() {
 
   const { data: walks } = await supabase
     .from('walk_slots')
-    .select('*, survey_rounds(name, status, start_date), slot_memberships(count)')
+    .select('*, survey_rounds(name, status, start_date, end_date), slot_memberships(count)')
     .order('walk_date', { ascending: false })
 
   const { data: rounds } = await supabase
     .from('survey_rounds')
-    .select('id, name')
+    .select('id, name, start_date, end_date')
     .in('status', ['DRAFT', 'OPEN'])
     .order('start_date', { ascending: false })
 
@@ -28,6 +28,7 @@ export default async function AdminWalksPage() {
         roundName: s.survey_rounds?.name || '',
         roundStatus: s.survey_rounds?.status || '',
         roundStartDate: s.survey_rounds?.start_date || '',
+        roundEndDate: s.survey_rounds?.end_date || '',
         locationName: s.location_name,
         walkDate: s.walk_date,
         startTime: s.start_time,
@@ -35,7 +36,12 @@ export default async function AdminWalksPage() {
         maxVolunteers: s.max_volunteers,
         memberCount: s.slot_memberships[0]?.count,
       }))}
-      rounds={(rounds || []).map(r => ({ id: r.id, name: r.name }))}
+      rounds={(rounds || []).map(r => ({
+        id: r.id,
+        name: r.name,
+        startDate: r.start_date,
+        endDate: r.end_date,
+      }))}
     />
   )
 }

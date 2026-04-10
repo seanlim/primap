@@ -345,6 +345,34 @@ function validateWalkData(data: {
   return errors
 }
 
+async function getRoundDateRange(
+  supabase: SupabaseClient<Database>,
+  roundId: string
+) {
+  const { data: round, error } = await supabase
+    .from('survey_rounds')
+    .select('start_date, end_date')
+    .eq('id', roundId)
+    .single()
+
+  if (error) return { error: error.message }
+  if (!round) return { error: 'Round not found' }
+  return { round }
+}
+
+function validateWalkDatesInRound(
+  walkDates: string[],
+  round: { start_date: string; end_date: string }
+) {
+  const invalidDate = walkDates.find(
+    (walkDate) => walkDate < round.start_date || walkDate > round.end_date
+  )
+
+  return invalidDate
+    ? `Walk date ${invalidDate} must be between the round start date (${round.start_date}) and end date (${round.end_date}).`
+    : null
+}
+
 export async function createWalk(data: {
   roundId: string
   locationName: string
@@ -358,6 +386,11 @@ export async function createWalk(data: {
   if (errors.length > 0) return { error: errors.join('; ') }
 
   const { supabase } = await requireAdmin()
+  const roundDateRange = await getRoundDateRange(supabase, data.roundId)
+  if (roundDateRange.error) return { error: roundDateRange.error }
+
+  const rangeError = validateWalkDatesInRound([data.walkDate], roundDateRange.round)
+  if (rangeError) return { error: rangeError }
 
   const { error } = await supabase
     .from('walk_slots')
@@ -391,6 +424,11 @@ export async function updateWalk(walkId: string, data: {
   if (errors.length > 0) return { error: errors.join('; ') }
 
   const { supabase } = await requireAdmin()
+  const roundDateRange = await getRoundDateRange(supabase, data.roundId)
+  if (roundDateRange.error) return { error: roundDateRange.error }
+
+  const rangeError = validateWalkDatesInRound([data.walkDate], roundDateRange.round)
+  if (rangeError) return { error: rangeError }
 
   const { error } = await supabase
     .from('walk_slots')
@@ -470,6 +508,14 @@ export async function bulkCreateWalks(data: {
   }
 
   const { supabase } = await requireAdmin()
+  const roundDateRange = await getRoundDateRange(supabase, data.roundId)
+  if (roundDateRange.error) return { error: roundDateRange.error }
+
+  const rangeError = validateWalkDatesInRound(
+    data.slots.map((slot) => slot.walkDate),
+    roundDateRange.round
+  )
+  if (rangeError) return { error: rangeError }
 
   const { data: result, error } = await supabase.functions.invoke('bulk-create-walks', {
     body: { roundId: data.roundId, slots: data.slots },

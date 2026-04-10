@@ -94,6 +94,13 @@ const walkData = {
   endTime: '10:00',
 }
 
+function mockRoundDateRange(startDate = '2026-04-01', endDate = '2026-04-30') {
+  methods.single.mockResolvedValueOnce({
+    data: { start_date: startDate, end_date: endDate },
+    error: null,
+  })
+}
+
 describe('admin-round-actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -222,6 +229,7 @@ describe('admin-round-actions', () => {
   describe('createWalk', () => {
     it('creates a slot with default maxVolunteers of 3', async () => {
       setupAdmin()
+      mockRoundDateRange()
 
       const result = await createWalk(walkData)
 
@@ -236,6 +244,7 @@ describe('admin-round-actions', () => {
 
     it('creates a slot with custom maxVolunteers', async () => {
       setupAdmin()
+      mockRoundDateRange()
 
       const result = await createWalk({ ...walkData, maxVolunteers: 5 })
 
@@ -247,6 +256,7 @@ describe('admin-round-actions', () => {
 
     it('returns error on DB failure', async () => {
       setupAdmin()
+      mockRoundDateRange()
       methods.insert.mockReturnValueOnce({
         error: { message: 'Slot insert failed' },
       })
@@ -254,6 +264,21 @@ describe('admin-round-actions', () => {
       const result = await createWalk(walkData)
 
       expect(result).toEqual({ error: 'Slot insert failed' })
+    })
+
+    it('returns error when walk date is outside the round date range', async () => {
+      setupAdmin()
+      mockRoundDateRange()
+
+      const result = await createWalk({
+        ...walkData,
+        walkDate: '2026-05-01',
+      })
+
+      expect(result).toEqual({
+        error: 'Walk date 2026-05-01 must be between the round start date (2026-04-01) and end date (2026-04-30).',
+      })
+      expect(methods.insert).not.toHaveBeenCalled()
     })
   })
 
@@ -768,6 +793,7 @@ describe('admin-round-actions', () => {
   describe('updateWalk', () => {
     it('updates a slot and revalidates', async () => {
       setupAdmin()
+      mockRoundDateRange()
 
       const result = await updateWalk('slot-1', walkData)
 
@@ -808,19 +834,44 @@ describe('admin-round-actions', () => {
 
     it('returns error on DB failure', async () => {
       setupAdmin()
-      methods.eq
-        .mockReturnValueOnce(methods)
-        .mockReturnValueOnce({ error: { message: 'Update failed' } })
+      mockRoundDateRange()
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'walk_slots') {
+          return {
+            ...methods,
+            update: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ error: { message: 'Update failed' } }),
+            }),
+          }
+        }
+        return methods
+      })
 
       const result = await updateWalk('slot-1', walkData)
 
       expect(result).toEqual({ error: 'Update failed' })
+    })
+
+    it('returns error when updated walk date is outside the selected round', async () => {
+      setupAdmin()
+      mockRoundDateRange()
+
+      const result = await updateWalk('slot-1', {
+        ...walkData,
+        walkDate: '2026-03-31',
+      })
+
+      expect(result).toEqual({
+        error: 'Walk date 2026-03-31 must be between the round start date (2026-04-01) and end date (2026-04-30).',
+      })
+      expect(methods.update).not.toHaveBeenCalled()
     })
   })
 
   describe('bulkCreateWalks', () => {
     it('invokes edge function and revalidates', async () => {
       setupAdmin()
+      mockRoundDateRange()
       mockSupabase.functions = {
         invoke: vi.fn().mockResolvedValue({
           data: { success: true, created: 2 },
@@ -867,6 +918,7 @@ describe('admin-round-actions', () => {
 
     it('returns error on edge function failure', async () => {
       setupAdmin()
+      mockRoundDateRange()
       mockSupabase.functions = {
         invoke: vi.fn().mockResolvedValue({
           data: null,
@@ -882,6 +934,24 @@ describe('admin-round-actions', () => {
       })
 
       expect(result).toEqual({ error: 'Edge function failed' })
+    })
+
+    it('returns error when a bulk walk date is outside the round', async () => {
+      setupAdmin()
+      mockRoundDateRange()
+
+      const result = await bulkCreateWalks({
+        roundId: 'round-1',
+        slots: [
+          { locationName: 'Park A', walkDate: '2026-04-15', startTime: '08:00', endTime: '10:00' },
+          { locationName: 'Park B', walkDate: '2026-05-01', startTime: '09:00', endTime: '11:00' },
+        ],
+      })
+
+      expect(result).toEqual({
+        error: 'Walk date 2026-05-01 must be between the round start date (2026-04-01) and end date (2026-04-30).',
+      })
+      expect(mockSupabase.functions.invoke).not.toHaveBeenCalled()
     })
   })
 
@@ -940,9 +1010,17 @@ describe('admin-round-actions', () => {
 
     it('returns error on DB failure', async () => {
       setupAdmin()
-      methods.eq
-        .mockReturnValueOnce(methods) // requireAdmin's eq
-        .mockReturnValueOnce({ error: { message: 'Resolve failed' } }) // action's eq
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'incidents') {
+          return {
+            ...methods,
+            update: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ error: { message: 'Resolve failed' } }),
+            }),
+          }
+        }
+        return methods
+      })
 
       const result = await resolveIncident('incident-1', 'Notes')
 

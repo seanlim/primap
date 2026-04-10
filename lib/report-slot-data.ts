@@ -120,8 +120,12 @@ export async function getSlotReportViewData(
   const members = membersResult.data
   const incidents = incidentsResult.data
   const round = slot.survey_rounds as unknown as { name: string }
-  const isParticipant = (members || []).some(m => m.user_id === currentUserId)
-  const hasSubmittedOwnObservation = (observations || []).some(
+  const activeMemberIds = new Set((members || []).map((member) => member.user_id))
+  const visibleObservations = (observations || []).filter(
+    (observation) => observation.status === 'SUBMITTED' || activeMemberIds.has(observation.user_id)
+  )
+  const isParticipant = activeMemberIds.has(currentUserId)
+  const hasSubmittedOwnObservation = visibleObservations.some(
     obs => obs.user_id === currentUserId && obs.status === 'SUBMITTED'
   )
 
@@ -134,7 +138,7 @@ export async function getSlotReportViewData(
       endTime: slot.end_time,
       roundName: round.name,
     },
-    observations: (observations || []).map(obs => ({
+    observations: visibleObservations.map(obs => ({
       id: obs.id,
       userId: obs.user_id,
       userName: obs.profiles.full_name || obs.profiles.email,

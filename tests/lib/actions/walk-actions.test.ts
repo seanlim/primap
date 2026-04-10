@@ -417,7 +417,7 @@ describe('walk-actions', () => {
         success: true,
         warning: 'Cancelled successfully, but failed to remove your draft report.',
       })
-      expect(sendWalkCancellationEmail).not.toHaveBeenCalled()
+      expect(sendWalkCancellationEmail).toHaveBeenCalled()
     })
 
     it('uses full_name for cancellingName', async () => {

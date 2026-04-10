@@ -48,14 +48,12 @@ function ReportCard({ item }: { item: ReportItem }) {
 
 function ReportSection({
   title,
-  description,
   items,
   emptyTitle,
   emptyDescription,
   emptyIcon = ClipboardList,
 }: {
   title: string
-  description: string
   items: ReportItem[]
   emptyTitle: string
   emptyDescription?: string
@@ -67,7 +65,6 @@ function ReportSection({
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
           {title} {items.length > 0 && `(${items.length})`}
         </h2>
-        <p className="mt-1 text-sm text-gray-500">{description}</p>
       </div>
 
       {items.length === 0 ? (
@@ -261,30 +258,25 @@ export default async function ReportListPage() {
         <>
           <ReportSection
             title="Needs Action"
-            description="Started walks that need your report."
             items={needsAction}
             emptyTitle="Nothing needs attention right now"
-            emptyDescription="Walks that need your report will show up here."
+            emptyDescription="Started walks that need your report will appear here."
           />
 
           <ReportSection
             title="Submitted"
-            description="Reports you've already submitted."
             items={submittedHistory}
             emptyTitle="No submitted reports yet"
-            emptyDescription="Your submitted reports will show up here."
+            emptyDescription="Your submitted reports will appear here."
           />
 
-          {upcomingWalks.length > 0 && (
-            <ReportSection
-              title="Upcoming Walks"
-              description="Joined walks that haven't started yet."
-              items={upcomingWalks}
-              emptyTitle="No upcoming walks"
-              emptyDescription="Your upcoming joined walks will show up here."
-              emptyIcon={Search}
-            />
-          )}
+          <ReportSection
+            title="Upcoming Walks"
+            items={upcomingWalks}
+            emptyTitle="No upcoming walks"
+            emptyDescription="Your upcoming joined walks will appear here."
+            emptyIcon={Search}
+          />
         </>
       )}
     </div>

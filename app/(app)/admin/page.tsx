@@ -14,6 +14,7 @@ function formatPercent(value: number) {
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
+  const analyticsClient = { from: supabase.from.bind(supabase) }
 
   const [
     { count: totalUsers },
@@ -30,9 +31,7 @@ export default async function AdminDashboard() {
     supabase.from('walk_slots').select('id', { count: 'exact', head: true }),
     supabase.from('observations').select('id', { count: 'exact', head: true }).eq('status', 'SUBMITTED'),
     supabase.from('incidents').select('id', { count: 'exact', head: true }).eq('resolved', false),
-    getAdminVolunteerAnalyticsLanding(
-      supabase as unknown as Parameters<typeof getAdminVolunteerAnalyticsLanding>[0]
-    ),
+    getAdminVolunteerAnalyticsLanding(analyticsClient),
   ])
 
   const cards = [

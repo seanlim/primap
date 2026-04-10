@@ -18,8 +18,9 @@ export default async function AdminWalksAnalyticsPage({
 }) {
   const params = (await searchParams) ?? {}
   const supabase = await createClient()
+  const analyticsClient = { from: supabase.from.bind(supabase) }
   const analytics = await getAdminWalksAnalyticsPageSnapshotByRound(
-    supabase as unknown as Parameters<typeof getAdminWalksAnalyticsPageSnapshotByRound>[0],
+    analyticsClient,
     {
       roundId: params.round ?? null,
       walkId: params.walk ?? null,

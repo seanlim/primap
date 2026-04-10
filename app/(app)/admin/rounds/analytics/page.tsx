@@ -17,8 +17,9 @@ export default async function AdminRoundsAnalyticsPage({
 }) {
   const params = (await searchParams) ?? {}
   const supabase = await createClient()
+  const analyticsClient = { from: supabase.from.bind(supabase) }
   const analytics = await getAdminRoundsAnalyticsPageSnapshot(
-    supabase as unknown as Parameters<typeof getAdminRoundsAnalyticsPageSnapshot>[0],
+    analyticsClient,
     {
       roundId: params.round ?? null,
     }

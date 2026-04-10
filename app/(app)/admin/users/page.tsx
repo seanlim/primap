@@ -31,6 +31,7 @@ export default async function AdminUsersPage({
   const to = from + PAGE_SIZE - 1
 
   const supabase = await createClient()
+  const analyticsClient = { from: supabase.from.bind(supabase) }
 
   const [{ data: users }, { count: totalCount }, { data: settings }, ...statusResults] = await Promise.all([
     (() => {
@@ -69,7 +70,7 @@ export default async function AdminUsersPage({
   }))
 
   const analytics = await getAdminUsersAnalytics(
-    supabase as unknown as Parameters<typeof getAdminUsersAnalytics>[0],
+    analyticsClient,
     userRows.map((user) => user.id),
     {
       lateCancelHours: settings?.late_cancel_hours ?? DEFAULT_LATE_CANCEL_HOURS,

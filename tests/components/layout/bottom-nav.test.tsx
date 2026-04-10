@@ -14,8 +14,8 @@ describe('BottomNav', () => {
   it('renders 4 nav items for non-admin', () => {
     render(<BottomNav isAdmin={false} />)
     expect(screen.getByText('Home')).toBeInTheDocument()
-    expect(screen.getByText('Walk')).toBeInTheDocument()
-    expect(screen.getByText('Report')).toBeInTheDocument()
+    expect(screen.getByText('Walks')).toBeInTheDocument()
+    expect(screen.getByText('Reports')).toBeInTheDocument()
     expect(screen.getByText('Profile')).toBeInTheDocument()
     expect(screen.queryByText('Admin')).not.toBeInTheDocument()
   })
@@ -23,8 +23,8 @@ describe('BottomNav', () => {
   it('renders 5 nav items for admin including Admin', () => {
     render(<BottomNav isAdmin={true} />)
     expect(screen.getByText('Home')).toBeInTheDocument()
-    expect(screen.getByText('Walk')).toBeInTheDocument()
-    expect(screen.getByText('Report')).toBeInTheDocument()
+    expect(screen.getByText('Walks')).toBeInTheDocument()
+    expect(screen.getByText('Reports')).toBeInTheDocument()
     expect(screen.getByText('Profile')).toBeInTheDocument()
     expect(screen.getByText('Admin')).toBeInTheDocument()
   })
@@ -39,7 +39,7 @@ describe('BottomNav', () => {
   it('non-active links have gray class', () => {
     // usePathname returns '/home', so /walk should be inactive
     render(<BottomNav isAdmin={false} />)
-    const walkLink = screen.getByText('Walk').closest('a')
+    const walkLink = screen.getByText('Walks').closest('a')
     expect(walkLink?.className).toContain('text-gray-400')
   })
 })

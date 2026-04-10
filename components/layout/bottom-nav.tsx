@@ -6,8 +6,8 @@ import { Home, Footprints, ClipboardList, User, Shield } from 'lucide-react'
 
 const navItems = [
   { href: '/home', label: 'Home', icon: Home },
-  { href: '/walk', label: 'Walk', icon: Footprints },
-  { href: '/report', label: 'Report', icon: ClipboardList },
+  { href: '/walk', label: 'Walks', icon: Footprints },
+  { href: '/report', label: 'Reports', icon: ClipboardList },
   { href: '/profile', label: 'Profile', icon: User },
 ]
 

@@ -3,8 +3,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { sendWalkCancellationEmail } from '@/lib/email'
-import { deleteDraftObservationsForSlot } from '@/lib/actions/observation-actions'
 import { getJoinBlockInfo, hasWalkStarted } from '@/lib/utils/walk-participation'
+import { OBSERVATION_MEDIA_BUCKET } from '@/lib/utils/storage'
 
 
 export async function joinWalk(walkId: string) {
@@ -80,37 +80,36 @@ export async function cancelWalk(walkId: string) {
   if (!user) return { error: 'Not authenticated' }
   const warnings: string[] = []
 
-  const { data: submittedObservations, error: submittedObservationError } = await supabase
-    .from('observations')
-    .select('id')
-    .eq('slot_id', walkId)
-    .eq('user_id', user.id)
-    .eq('status', 'SUBMITTED')
-  if (submittedObservationError) return { error: submittedObservationError.message }
-  if (submittedObservations && submittedObservations.length > 0) {
-    return { error: "You can't cancel this walk after submitting your report." }
-  }
-
-  const draftCleanupResult = await deleteDraftObservationsForSlot(supabase, user.id, walkId)
-  if (draftCleanupResult.error) {
-    console.error('Error deleting draft observations before cancellation:', draftCleanupResult.error)
-    warnings.push('Cancelled successfully, but failed to remove your draft report.')
-  }
-
-  const { data: cancelledMemberships, error } = await supabase
-    .from('slot_memberships')
-    .update({
-      status: 'CANCELLED',
-      cancelled_at: new Date().toISOString(),
-    })
-    .eq('slot_id', walkId)
-    .eq('user_id', user.id)
-    .eq('status', 'ACTIVE')
-    .select('id')
+  const { data, error } = await supabase.rpc('cancel_slot_with_draft_cleanup', {
+    p_slot_id: walkId,
+  })
 
   if (error) return { error: error.message }
-  if (!cancelledMemberships || cancelledMemberships.length === 0) {
-    return { error: 'You are not actively joined to this walk.' }
+
+  const result = data as {
+    success?: boolean
+    error?: string
+    deleted_draft_count?: number
+    file_paths?: string[]
+  } | null
+  if (!result || typeof result !== 'object') {
+    return { error: 'Unexpected cancellation response.' }
+  }
+  if (result.error) return { error: result.error }
+
+  const filePaths = Array.isArray(result.file_paths)
+    ? result.file_paths.filter((path): path is string => typeof path === 'string' && path.length > 0)
+    : []
+
+  if (filePaths.length > 0) {
+    const { error: storageError } = await supabase.storage
+      .from(OBSERVATION_MEDIA_BUCKET)
+      .remove(filePaths)
+
+    if (storageError) {
+      console.error('Error deleting draft observation media after cancellation:', storageError)
+      warnings.push('Cancelled successfully, but failed to remove your draft report media.')
+    }
   }
 
   // Notify other members

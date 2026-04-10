@@ -2,12 +2,91 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils/format-date'
-import { ClipboardList } from 'lucide-react'
+import { ClipboardList, Search } from 'lucide-react'
 import { EmptyState } from '@/components/ui/empty-state'
 import type { WalkRef } from '@/lib/types/supabase-helpers'
-import { hasWalkEnded } from '@/lib/utils/walk-participation'
+import { hasWalkEnded, hasWalkStarted } from '@/lib/utils/walk-participation'
 
 export const dynamic = 'force-dynamic'
+
+type ReportItem = {
+  key: string
+  href: string
+  locationName: string
+  walkDate: string
+  startTime: string
+  roundName: string | null
+  statusLabel: 'No Report' | 'Draft' | 'Submitted' | 'Upcoming'
+  statusColor: string
+  sortKey: string
+}
+
+function ReportCard({ item }: { item: ReportItem }) {
+  return (
+    <Link
+      key={item.key}
+      href={item.href}
+      className="block bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow"
+    >
+      <div className="flex justify-between items-start gap-3">
+        <div className="min-w-0">
+          <p className="font-semibold text-gray-900">{item.locationName}</p>
+          <p className="text-sm text-gray-600 mt-1">
+            {formatDate(item.walkDate, 'short')} &middot; {item.startTime.slice(0, 5)}
+          </p>
+          {item.roundName && (
+            <p className="text-xs text-gray-400 mt-1">{item.roundName}</p>
+          )}
+        </div>
+        <span className={`text-xs px-2.5 py-1 rounded-full font-medium shrink-0 ${item.statusColor}`}>
+          {item.statusLabel}
+        </span>
+      </div>
+    </Link>
+  )
+}
+
+function ReportSection({
+  title,
+  description,
+  items,
+  emptyTitle,
+  emptyDescription,
+  emptyIcon = ClipboardList,
+}: {
+  title: string
+  description: string
+  items: ReportItem[]
+  emptyTitle: string
+  emptyDescription?: string
+  emptyIcon?: typeof ClipboardList
+}) {
+  return (
+    <section className="space-y-3">
+      <div>
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+          {title} {items.length > 0 && `(${items.length})`}
+        </h2>
+        <p className="mt-1 text-sm text-gray-500">{description}</p>
+      </div>
+
+      {items.length === 0 ? (
+        <EmptyState
+          icon={emptyIcon}
+          title={emptyTitle}
+          description={emptyDescription}
+          color="blue"
+        />
+      ) : (
+        <div className="space-y-2 stagger-children">
+          {items.map((item) => (
+            <ReportCard key={item.key} item={item} />
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
 
 export default async function ReportListPage() {
   const supabase = await createClient()
@@ -54,39 +133,12 @@ export default async function ReportListPage() {
   const memberships = membershipResult.data || []
   const submittedObservations = submittedResult.data || []
 
-  const reportItems = new Map<string, {
-    key: string
-    href: string
-    locationName: string
-    walkDate: string
-    startTime: string
-    roundName: string | null
-    statusLabel: string
-    statusColor: string
-    sortKey: string
-  }>()
-
-  for (const membership of memberships) {
-    const slot = membership.walk_slots as unknown as WalkRef
-    if (!slot) continue
-
-    reportItems.set(slot.id, {
-      key: membership.id,
-      href: `/report/${slot.id}`,
-      locationName: slot.location_name,
-      walkDate: slot.walk_date,
-      startTime: slot.start_time,
-      roundName: slot.survey_rounds?.name || null,
-      statusLabel: 'Draft',
-      statusColor: 'bg-yellow-100 text-yellow-700',
-      sortKey: `${slot.walk_date}T${slot.start_time}`,
+  const slotIds = memberships
+    .map((membership) => {
+      const slot = membership.walk_slots as unknown as WalkRef | null
+      return slot?.id
     })
-  }
-
-  const slotIds = memberships.map((membership) => {
-    const slot = membership.walk_slots as unknown as WalkRef
-    return slot?.id
-  }).filter(Boolean)
+    .filter(Boolean)
 
   const { data: observations } = slotIds.length > 0
     ? await supabase
@@ -103,43 +155,76 @@ export default async function ReportListPage() {
     ])
   )
 
+  const needsActionItems: ReportItem[] = []
+  const upcomingWalkItems: ReportItem[] = []
+  const submittedHistoryItems: ReportItem[] = []
+
   for (const membership of memberships) {
-    const slot = membership.walk_slots as unknown as WalkRef
+    const slot = membership.walk_slots as unknown as WalkRef | null
     if (!slot) continue
 
     const observation = observationMap.get(slot.id)
-    const statusLabel = !observation
-      ? 'No Report'
-      : observation.status === 'DRAFT'
-      ? 'Draft'
-      : 'Submitted'
-    const statusColor = !observation
-      ? 'bg-gray-100 text-gray-500'
-      : observation.status === 'DRAFT'
-      ? 'bg-yellow-100 text-yellow-700'
-      : 'bg-green-100 text-green-700'
-
-    reportItems.set(slot.id, {
-      key: membership.id,
+    const baseItem = {
       href: `/report/${slot.id}`,
       locationName: slot.location_name,
       walkDate: slot.walk_date,
       startTime: slot.start_time,
       roundName: slot.survey_rounds?.name || null,
-      statusLabel,
-      statusColor,
       sortKey: `${slot.walk_date}T${slot.start_time}`,
+    }
+
+    if (observation?.status === 'DRAFT') {
+      const draftItem = {
+        key: observation.id,
+        ...baseItem,
+        statusLabel: 'Draft',
+        statusColor: 'bg-yellow-100 text-yellow-700',
+      }
+
+      if (hasWalkStarted(slot.walk_date, slot.start_time)) {
+        needsActionItems.push(draftItem)
+      } else {
+        upcomingWalkItems.push(draftItem)
+      }
+      continue
+    }
+
+    if (observation?.status === 'SUBMITTED') {
+      submittedHistoryItems.push({
+        key: observation.id,
+        ...baseItem,
+        statusLabel: 'Submitted',
+        statusColor: 'bg-green-100 text-green-700',
+      })
+      continue
+    }
+
+    if (hasWalkStarted(slot.walk_date, slot.start_time)) {
+      needsActionItems.push({
+        key: membership.id,
+        ...baseItem,
+        statusLabel: 'No Report',
+        statusColor: 'bg-gray-100 text-gray-500',
+      })
+      continue
+    }
+
+    upcomingWalkItems.push({
+      key: membership.id,
+      ...baseItem,
+      statusLabel: 'Upcoming',
+      statusColor: 'bg-blue-100 text-blue-700',
     })
   }
 
   for (const observation of submittedObservations) {
-    if (reportItems.has(observation.slot_id)) continue
+    if (slotIds.includes(observation.slot_id)) continue
 
-    const slot = observation.walk_slots as unknown as WalkRef
+    const slot = observation.walk_slots as unknown as WalkRef | null
     if (!slot) continue
     if (!hasWalkEnded(slot.walk_date, slot.end_time)) continue
 
-    reportItems.set(slot.id, {
+    submittedHistoryItems.push({
       key: observation.id,
       href: `/report/${slot.id}`,
       locationName: slot.location_name,
@@ -152,48 +237,55 @@ export default async function ReportListPage() {
     })
   }
 
-  const items = Array.from(reportItems.values())
-    .sort((a, b) => b.sortKey.localeCompare(a.sortKey))
+  const byNewest = (left: ReportItem, right: ReportItem) => right.sortKey.localeCompare(left.sortKey)
+  const bySoonest = (left: ReportItem, right: ReportItem) => left.sortKey.localeCompare(right.sortKey)
+
+  const needsAction = needsActionItems.sort(byNewest)
+  const upcomingWalks = upcomingWalkItems.sort(bySoonest)
+  const submittedHistory = submittedHistoryItems.sort(byNewest)
+  const hasAnyItems = needsAction.length > 0 || upcomingWalks.length > 0 || submittedHistory.length > 0
 
   return (
     <div className="space-y-6 animate-fade-in">
       <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
 
-      {items.length === 0 ? (
+      {!hasAnyItems ? (
         <EmptyState
           icon={ClipboardList}
-          title="No walks to report on yet"
-          description="Join a walk first to start submitting reports"
+          title="No reports yet"
+          description="Join a walk first to start drafting and submitting reports."
           action={{ label: 'Browse Walks', href: '/walk' }}
           color="green"
         />
       ) : (
-        <div className="space-y-2 stagger-children">
-          {items.map((item) => {
-            return (
-              <Link
-                key={item.key}
-                href={item.href}
-                className="block bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow"
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-semibold text-gray-900">{item.locationName}</p>
-                    <p className="text-sm text-gray-600 mt-1">
-                      {formatDate(item.walkDate, 'short')} &middot; {item.startTime.slice(0, 5)}
-                    </p>
-                    {item.roundName && (
-                      <p className="text-xs text-gray-400 mt-1">{item.roundName}</p>
-                    )}
-                  </div>
-                  <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${item.statusColor}`}>
-                    {item.statusLabel}
-                  </span>
-                </div>
-              </Link>
-            )
-          })}
-        </div>
+        <>
+          <ReportSection
+            title="Needs Action"
+            description="Started walks that need your report."
+            items={needsAction}
+            emptyTitle="Nothing needs attention right now"
+            emptyDescription="Walks that need your report will show up here."
+          />
+
+          <ReportSection
+            title="Submitted"
+            description="Reports you've already submitted."
+            items={submittedHistory}
+            emptyTitle="No submitted reports yet"
+            emptyDescription="Your submitted reports will show up here."
+          />
+
+          {upcomingWalks.length > 0 && (
+            <ReportSection
+              title="Upcoming Walks"
+              description="Joined walks that haven't started yet."
+              items={upcomingWalks}
+              emptyTitle="No upcoming walks"
+              emptyDescription="Your upcoming joined walks will show up here."
+              emptyIcon={Search}
+            />
+          )}
+        </>
       )}
     </div>
   )

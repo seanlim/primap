@@ -78,6 +78,7 @@ export async function cancelWalk(walkId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
+  const warnings: string[] = []
 
   const { data: submittedObservations, error: submittedObservationError } = await supabase
     .from('observations')
@@ -88,6 +89,12 @@ export async function cancelWalk(walkId: string) {
   if (submittedObservationError) return { error: submittedObservationError.message }
   if (submittedObservations && submittedObservations.length > 0) {
     return { error: "You can't cancel this walk after submitting your report." }
+  }
+
+  const draftCleanupResult = await deleteDraftObservationsForSlot(supabase, user.id, walkId)
+  if (draftCleanupResult.error) {
+    console.error('Error deleting draft observations before cancellation:', draftCleanupResult.error)
+    warnings.push('Cancelled successfully, but failed to remove your draft report.')
   }
 
   const { data: cancelledMemberships, error } = await supabase
@@ -104,18 +111,6 @@ export async function cancelWalk(walkId: string) {
   if (error) return { error: error.message }
   if (!cancelledMemberships || cancelledMemberships.length === 0) {
     return { error: 'You are not actively joined to this walk.' }
-  }
-
-  const draftCleanupResult = await deleteDraftObservationsForSlot(supabase, user.id, walkId)
-  if (draftCleanupResult.error) {
-    console.error('Error deleting draft observations after cancellation:', draftCleanupResult.error)
-    revalidatePath('/walk')
-    revalidatePath(`/walk/${walkId}`)
-    revalidatePath('/home')
-    revalidatePath('/report')
-    revalidatePath(`/report/${walkId}`)
-    revalidatePath('/profile')
-    return { success: true, warning: 'Cancelled successfully, but failed to remove your draft report.' }
   }
 
   // Notify other members
@@ -169,14 +164,7 @@ export async function cancelWalk(walkId: string) {
     }
   } catch (err) {
     console.error('Error sending cancellation emails:', err)
-    // Return success with warning so UI can show a toast
-    revalidatePath('/walk')
-    revalidatePath(`/walk/${walkId}`)
-    revalidatePath('/home')
-    revalidatePath('/report')
-    revalidatePath(`/report/${walkId}`)
-    revalidatePath('/profile')
-    return { success: true, warning: 'Cancelled successfully, but failed to notify other members.' }
+    warnings.push('Cancelled successfully, but failed to notify other members.')
   }
 
   revalidatePath('/walk')
@@ -184,6 +172,10 @@ export async function cancelWalk(walkId: string) {
   revalidatePath('/home')
   revalidatePath('/report')
   revalidatePath(`/report/${walkId}`)
+  revalidatePath('/admin/reports')
+  revalidatePath(`/admin/reports/${walkId}`)
   revalidatePath('/profile')
-  return { success: true }
+  return warnings.length > 0
+    ? { success: true, warning: warnings.join(' ') }
+    : { success: true }
 }

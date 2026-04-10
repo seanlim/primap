@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+
+const mockShowToast = vi.fn()
 
 // Mock toast
 vi.mock('@/components/ui/toast', () => ({
-  useToast: () => ({ showToast: vi.fn() }),
+  useToast: () => ({ showToast: mockShowToast }),
 }))
 
 import { DataClient } from '@/app/(app)/admin/data/data-client'
@@ -24,7 +26,8 @@ describe('DataClient', () => {
   it('renders export, restore, and import buttons', () => {
     render(<DataClient />)
 
-    expect(screen.getByText('Export All Data')).toBeInTheDocument()
+    expect(screen.getByText('Export Backup')).toBeInTheDocument()
+    expect(screen.getByText('Export for Viewing')).toBeInTheDocument()
     expect(screen.getByText('Upload & Restore')).toBeInTheDocument()
     expect(screen.getByText('Validate & Import')).toBeInTheDocument()
   })
@@ -88,5 +91,43 @@ describe('DataClient', () => {
     render(<DataClient />)
 
     expect(screen.getByText(/Existing data will NOT be overwritten/)).toBeInTheDocument()
+  })
+
+  it('explains the difference between backup and view exports', () => {
+    render(<DataClient />)
+
+    expect(screen.getByText(/Backup export preserves the restore format/)).toBeInTheDocument()
+    expect(screen.getByText(/View export creates readable report sheets/)).toBeInTheDocument()
+  })
+
+  it('shows info toast when view export has media warnings', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: vi.fn().mockResolvedValue(new Blob(['zip'])),
+      headers: {
+        get: vi.fn((name: string) => {
+          if (name === 'Content-Disposition') return 'attachment; filename="primap-view-export-test.zip"'
+          if (name === 'X-Export-Warning-Count') return '2'
+          return null
+        }),
+      },
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn(() => 'blob:test'),
+      revokeObjectURL: vi.fn(),
+    })
+
+    render(<DataClient />)
+    fireEvent.click(screen.getByText('Export for Viewing'))
+
+    await waitFor(() => {
+      expect(mockShowToast).toHaveBeenCalledWith(
+        'View export downloaded with 2 media warning(s). See export-warnings.txt inside the zip.',
+        'info'
+      )
+    })
+
+    vi.unstubAllGlobals()
   })
 })

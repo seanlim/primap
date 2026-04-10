@@ -32,7 +32,8 @@ export function DataClient() {
   const { showToast } = useToast()
 
   // Export state
-  const [isExporting, setIsExporting] = useState(false)
+  const [isExportingBackup, setIsExportingBackup] = useState(false)
+  const [isExportingView, setIsExportingView] = useState(false)
 
   // Backup restore state
   const [isImporting, setIsImporting] = useState(false)
@@ -45,31 +46,68 @@ export function DataClient() {
   const [legacyErrors, setLegacyErrors] = useState<ValidationError[]>([])
   const legacyFileRef = useRef<HTMLInputElement>(null)
 
-  const handleExport = async () => {
-    setIsExporting(true)
+  const downloadExport = async (
+    endpoint: string,
+    fallbackFilename: string,
+    successMessage: string,
+    warningMessage?: (warningCount: number) => string
+  ) => {
     try {
-      const res = await fetch('/api/admin/export')
+      const res = await fetch(endpoint)
       if (!res.ok) {
         const body = await res.json().catch(() => null)
         throw new Error(body?.error ?? `Export failed (${res.status})`)
       }
 
       const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
+      const objectUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = url
+      a.href = objectUrl
       a.download = res.headers.get('Content-Disposition')
         ?.match(/filename="(.+)"/)?.[1]
-        ?? `primap-export-${new Date().toISOString().slice(0, 10)}.zip`
+        ?? fallbackFilename
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-      showToast('Export downloaded successfully', 'success')
+      URL.revokeObjectURL(objectUrl)
+      const warningCount = Number(res.headers.get('X-Export-Warning-Count') ?? 0)
+      if (warningCount > 0) {
+        showToast(
+          warningMessage?.(warningCount) ?? `${successMessage}, but ${warningCount} media file(s) were skipped`,
+          'info'
+        )
+      } else {
+        showToast(successMessage, 'success')
+      }
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Export failed', 'error')
+    }
+  }
+
+  const handleBackupExport = async () => {
+    setIsExportingBackup(true)
+    try {
+      await downloadExport(
+        '/api/admin/export',
+        `primap-export-${new Date().toISOString().slice(0, 10)}.zip`,
+        'Backup export downloaded successfully'
+      )
     } finally {
-      setIsExporting(false)
+      setIsExportingBackup(false)
+    }
+  }
+
+  const handleViewExport = async () => {
+    setIsExportingView(true)
+    try {
+      await downloadExport(
+        '/api/admin/export-view',
+        `primap-view-export-${new Date().toISOString().slice(0, 10)}.zip`,
+        'View export downloaded successfully',
+        warningCount => `View export downloaded with ${warningCount} media warning(s). See export-warnings.txt inside the zip.`
+      )
+    } finally {
+      setIsExportingView(false)
     }
   }
 
@@ -167,20 +205,31 @@ export function DataClient() {
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Export Data</h2>
             <p className="text-sm text-gray-500">
-              Download all data as an Excel workbook with media files
+              Download a backup export or a view-friendly export with media files
             </p>
           </div>
         </div>
-        <p className="text-xs text-gray-400">
-          Exports all tables (profiles, rounds, walks, observations, sightings, media, incidents, settings)
-          as a .zip file containing an Excel workbook and all uploaded photos/videos.
-        </p>
+        <div className="text-xs text-gray-400 space-y-1">
+          <p>
+            Backup export preserves the restore format: all tables in a .zip with an Excel workbook and the original media files.
+          </p>
+          <p>
+            View export creates readable report sheets plus media folders grouped by round, walk, and user.
+          </p>
+        </div>
         <button
-          onClick={handleExport}
-          disabled={isExporting}
+          onClick={handleBackupExport}
+          disabled={isExportingBackup}
           className="w-full bg-green-600 text-white py-3 rounded-xl text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
         >
-          {isExporting ? 'Exporting... This may take a while' : 'Export All Data'}
+          {isExportingBackup ? 'Exporting backup... This may take a while' : 'Export Backup'}
+        </button>
+        <button
+          onClick={handleViewExport}
+          disabled={isExportingView}
+          className="w-full bg-emerald-600 text-white py-3 rounded-xl text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+        >
+          {isExportingView ? 'Exporting view file... This may take a while' : 'Export for Viewing'}
         </button>
       </div>
 

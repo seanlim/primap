@@ -8,7 +8,7 @@ const { mockSupabase, mockRedirect, mockNotFound, mockGroupViewClient, mockGetSl
   }
   const mockRedirect = vi.fn()
   const mockNotFound = vi.fn()
-  const mockGroupViewClient = vi.fn(() => <div data-testid="group-view-client" />)
+  const mockGroupViewClient = vi.fn((_props: unknown) => <div data-testid="group-view-client" />)
   const mockGetSlotReportViewData = vi.fn()
   return { mockSupabase, mockRedirect, mockNotFound, mockGroupViewClient, mockGetSlotReportViewData }
 })

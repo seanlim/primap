@@ -7,7 +7,7 @@ const { mockSupabase, mockProfileClient, mockRedirect } = vi.hoisted(() => {
     },
     from: vi.fn(),
   }
-  const mockProfileClient = vi.fn(() => <div data-testid="profile-client" />)
+  const mockProfileClient = vi.fn((_props: unknown) => <div data-testid="profile-client" />)
   const mockRedirect = vi.fn()
   return { mockSupabase, mockProfileClient, mockRedirect }
 })

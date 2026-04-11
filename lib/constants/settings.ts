@@ -6,7 +6,9 @@
 export const DEFAULT_REQUIRED_WALKS_PER_ROUND = 4
 export const DEFAULT_LATE_CANCEL_HOURS = 48
 export const DEFAULT_MAX_MEDIA_PER_REPORT = 10
+export const DEFAULT_HIGH_PARTICIPATION_THRESHOLD = 8
 
 export const REQUIRED_WALKS_PER_ROUND_RANGE = { min: 1, max: 20 } as const
 export const LATE_CANCEL_HOURS_RANGE = { min: 1, max: 168 } as const
 export const MAX_MEDIA_PER_REPORT_RANGE = { min: 1, max: 50 } as const
+export const HIGH_PARTICIPATION_THRESHOLD_RANGE = { min: 1, max: 100 } as const

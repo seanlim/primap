@@ -8,7 +8,7 @@ import { approveUser, rejectUser, disableUser, enableUser, setUserRole } from '@
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { ToastProvider, useToast } from '@/components/ui/toast'
 import { EmptyState } from '@/components/ui/empty-state'
-import type { UserRole } from '@/lib/types/database'
+import type { Enums } from '@/lib/types/database'
 import type { UserStatus } from '@/lib/auth/access-policy'
 import type { AdminUsersAnalyticsSnapshot } from '@/lib/admin-volunteer-analytics'
 
@@ -16,7 +16,7 @@ interface UserData {
   id: string
   email: string
   fullName: string | null
-  role: UserRole
+  role: Enums<'user_role'>
   status: UserStatus
   createdAt: string
 }
@@ -53,6 +53,7 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, 
   const filter: 'all' | UserStatus = activeFilter ?? 'all'
   const [query, setQuery] = useState('')
   const [sortBy, setSortBy] = useState<'default' | 'participations' | 'submissions' | 'cancellations'>('default')
+  const [indicatorFilter, setIndicatorFilter] = useState<'ALL' | 'HIGH' | 'LATE'>('ALL')
   const [roleFilter, setRoleFilter] = useState<'ALL' | 'VOLUNTEER' | 'ADMIN'>(activeRoleFilter ?? 'ALL')
   const [loading, setLoading] = useState<string | null>(null)
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
@@ -68,8 +69,16 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, 
       (u.fullName || '').toLowerCase().includes(normalized) ||
       u.email.toLowerCase().includes(normalized)
     )
+    const indicatorFiltered = indicatorFilter === 'ALL'
+      ? searched
+      : searched.filter((user) => {
+        const stats = analytics?.userStats[user.id]
+        return indicatorFilter === 'HIGH'
+          ? Boolean(stats?.hasHighParticipationIndicator)
+          : Boolean(stats?.hasLateCancellationIndicator)
+      })
 
-    return [...searched].sort((left, right) => {
+    return [...indicatorFiltered].sort((left, right) => {
       if (sortBy === 'default') {
         return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
       }
@@ -79,7 +88,7 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, 
       if (diff !== 0) return diff
       return (left.fullName || left.email).localeCompare(right.fullName || right.email)
     })
-  }, [analytics?.userStats, query, sortBy, users])
+  }, [analytics?.userStats, indicatorFilter, query, sortBy, users])
 
   const buildUsersHref = (next: { page?: number; status?: 'all' | UserStatus; role?: 'ALL' | 'VOLUNTEER' | 'ADMIN' }) => {
     const params = new URLSearchParams()
@@ -157,7 +166,7 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, 
               className="w-full rounded-lg border border-gray-300 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-green-500"
             />
           </div>
-          <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-3">
+          <div className="grid gap-3 md:grid-cols-3">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Sort By</label>
               <select
@@ -169,6 +178,19 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, 
                 <option value="participations">Participations</option>
                 <option value="submissions">Submissions</option>
                 <option value="cancellations">Cancellations</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1" htmlFor="indicator-filter">Indicator</label>
+              <select
+                id="indicator-filter"
+                value={indicatorFilter}
+                onChange={(event) => setIndicatorFilter(event.target.value as typeof indicatorFilter)}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="ALL">All indicators</option>
+                <option value="HIGH">High participation</option>
+                <option value="LATE">Late cancellation</option>
               </select>
             </div>
             <div>
@@ -222,7 +244,10 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, 
           />
         ) : (
           <div className="space-y-2">
-            {filteredUsers.map((user) => (
+            {filteredUsers.map((user) => {
+              const stats = analytics?.userStats[user.id]
+
+              return (
               <div key={user.id} className="overflow-hidden rounded-xl bg-white shadow-sm">
                 <div className="flex items-start justify-between gap-3 p-4">
                   <div className="min-w-0">
@@ -298,10 +323,17 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, 
                         : 'text-gray-500'
                     }`}
                   >
-                    <span className="font-semibold">
-                      {analytics?.userStats[user.id]?.participations ?? 0}
-                    </span>{' '}
-                    participations
+                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                      <span className="font-semibold">
+                        {stats?.participations ?? 0}
+                      </span>{' '}
+                      <span>participations</span>
+                      {stats?.hasHighParticipationIndicator && (
+                        <span className="inline-flex rounded-lg bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                          High
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div
                     className={`px-4 py-3 text-xs ${
@@ -324,14 +356,22 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, 
                         : 'text-gray-500'
                     }`}
                   >
-                    <span className="font-semibold">
-                      {analytics?.userStats[user.id]?.cancellations ?? 0}
-                    </span>{' '}
-                    cancellations
+                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                      <span className="font-semibold">
+                        {stats?.cancellations ?? 0}
+                      </span>
+                      <span>cancellations</span>
+                      {stats?.hasLateCancellationIndicator && (
+                        <span className="inline-flex rounded-lg bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
+                          Late ({stats.lateCancellations})
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
 

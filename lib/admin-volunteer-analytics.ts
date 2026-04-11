@@ -1,21 +1,32 @@
-import { hasWalkEnded } from '@/lib/utils/walk-participation'
+import { getWalkStartDateTime, hasWalkEnded } from '@/lib/utils/walk-participation'
 import { buildSlotPopupMeta } from '@/lib/utils/report-map'
 import { findCurrentRound } from '@/lib/utils/rounds'
+import {
+  DEFAULT_HIGH_PARTICIPATION_THRESHOLD,
+  DEFAULT_LATE_CANCEL_HOURS,
+} from '@/lib/constants/settings'
+import { getSpeciesShortLabel } from '@/lib/constants/species'
 
 type QueryResult<T> = { data: T | null; error: { message: string } | null }
 type CountResult = { count: number | null; error: { message: string } | null }
 
-type SupabaseQueryLike = {
-  eq: (...args: any[]) => SupabaseQueryLike
-  order: (...args: any[]) => SupabaseQueryLike
-  limit: (...args: any[]) => SupabaseQueryLike
-  in: (...args: any[]) => SupabaseQueryLike
-  then?: unknown
+type SupabaseQueryLike<T> = PromiseLike<QueryResult<T>> & {
+  eq: (...args: unknown[]) => SupabaseQueryLike<T>
+  order: (...args: unknown[]) => SupabaseQueryLike<T>
+  limit: (...args: unknown[]) => SupabaseQueryLike<T>
+  in: (...args: unknown[]) => SupabaseQueryLike<T>
+}
+
+type SupabaseCountQueryLike = PromiseLike<CountResult> & {
+  eq: (...args: unknown[]) => SupabaseCountQueryLike
+  order: (...args: unknown[]) => SupabaseCountQueryLike
+  limit: (...args: unknown[]) => SupabaseCountQueryLike
+  in: (...args: unknown[]) => SupabaseCountQueryLike
 }
 
 type SupabaseClientLike = {
   from: (table: string) => {
-    select: (...args: any[]) => SupabaseQueryLike
+    select: (...args: unknown[]) => SupabaseQueryLike<unknown> | SupabaseCountQueryLike
   }
 }
 
@@ -29,7 +40,7 @@ export interface AnalyticsRound {
 
 export interface AnalyticsWalkSlot {
   id: string
-  round_id?: string
+  round_id: string
   walk_date: string
   start_time: string
   end_time: string
@@ -59,14 +70,6 @@ export interface AnalyticsReportMapPoint {
   label: string
   popupMeta: string[]
   species?: string
-}
-
-function formatSpeciesLabel(species?: string) {
-  if (species === 'RBL') return 'RBL'
-  if (species === 'LTM') return 'LTM'
-  if (species === 'DUSKY') return 'DUSKY'
-  if (species === 'OTHER') return 'Other'
-  return null
 }
 
 export interface AnalyticsAllTimeTotals {
@@ -135,6 +138,9 @@ export interface AdminUserActivityMetrics {
   participations: number
   submissions: number
   cancellations: number
+  lateCancellations: number
+  hasLateCancellationIndicator: boolean
+  hasHighParticipationIndicator: boolean
 }
 
 export interface AdminUsersAnalyticsSnapshot {
@@ -223,19 +229,6 @@ function buildMetrics(input: {
   }
 }
 
-function buildAllTimeTotals(input: {
-  activeRegisteredVolunteers: number
-  memberships: AnalyticsMembership[]
-  observations: AnalyticsObservation[]
-}): AnalyticsAllTimeTotals {
-  return {
-    activeRegisteredVolunteers: input.activeRegisteredVolunteers,
-    totalVolunteerSignUps: input.memberships.filter((membership) => membership.status === 'ACTIVE').length,
-    totalVolunteerCancellations: input.memberships.filter((membership) => membership.status === 'CANCELLED').length,
-    totalSubmittedReports: input.observations.filter((observation) => observation.status === 'SUBMITTED').length,
-  }
-}
-
 export function buildVolunteerAnalyticsSnapshot(input: {
   availableRounds?: AnalyticsRound[]
   round: AnalyticsRound
@@ -276,25 +269,25 @@ export function buildVolunteerAnalyticsSnapshot(input: {
 
 async function getAnalyticsBaseData(supabase: SupabaseClientLike) {
   const [roundsResult, slotsResult, membershipsResult, observationsResult, activeVolunteersCountResult] = await Promise.all([
-    asPromise<QueryResult<AnalyticsRound[]>>(supabase
+    supabase
       .from('survey_rounds')
       .select('id, name, start_date, end_date, status')
-      .order('start_date', { ascending: false })),
-    asPromise<QueryResult<AnalyticsWalkSlot[]>>(supabase
+      .order('start_date', { ascending: false }) as SupabaseQueryLike<AnalyticsRound[]>,
+    supabase
       .from('walk_slots')
       .select('id, round_id, walk_date, start_time, end_time, location_name, max_volunteers')
-      .order('walk_date', { ascending: true })),
-    asPromise<QueryResult<AnalyticsMembership[]>>(supabase
+      .order('walk_date', { ascending: true }) as SupabaseQueryLike<AnalyticsWalkSlot[]>,
+    supabase
       .from('slot_memberships')
-      .select('slot_id, user_id, status')),
-    asPromise<QueryResult<AnalyticsObservation[]>>(supabase
+      .select('slot_id, user_id, status') as SupabaseQueryLike<AnalyticsMembership[]>,
+    supabase
       .from('observations')
-      .select('id, slot_id, status, outcome, lat, lng')),
-    asPromise<CountResult>(supabase
+      .select('id, slot_id, status, outcome, lat, lng') as SupabaseQueryLike<AnalyticsObservation[]>,
+    supabase
       .from('profiles')
       .select('id', { count: 'exact', head: true })
       .eq('role', 'VOLUNTEER')
-      .eq('status', 'ACTIVE')),
+      .eq('status', 'ACTIVE') as SupabaseCountQueryLike,
   ])
 
   return {
@@ -334,8 +327,8 @@ export async function getAdminWalksAnalyticsPageSnapshotByRound(
   const targetWalk =
     (options?.walkId ? slotsById.get(options.walkId) ?? null : null) ??
     [...scopedSlots].sort((left, right) => {
-      const leftTime = new Date(`${left.walk_date}T${left.start_time}`).getTime()
-      const rightTime = new Date(`${right.walk_date}T${right.start_time}`).getTime()
+      const leftTime = getWalkStartDateTime(left.walk_date, left.start_time).getTime()
+      const rightTime = getWalkStartDateTime(right.walk_date, right.start_time).getTime()
       return leftTime - rightTime
     })[0] ??
     null
@@ -374,20 +367,20 @@ export async function getAdminWalksAnalyticsPageSnapshotByRound(
     targetRound,
     availableWalks: [...scopedSlots]
       .sort((left, right) => {
-        const leftTime = new Date(`${left.walk_date}T${left.start_time}`).getTime()
-        const rightTime = new Date(`${right.walk_date}T${right.start_time}`).getTime()
+        const leftTime = getWalkStartDateTime(left.walk_date, left.start_time).getTime()
+        const rightTime = getWalkStartDateTime(right.walk_date, right.start_time).getTime()
         return leftTime - rightTime
       })
       .map((slot) => ({
         id: slot.id,
         label: `${slot.location_name} · ${slot.walk_date} · ${slot.start_time.slice(0, 5)}`,
-        roundId: slot.round_id ?? '',
-        roundName: slot.round_id ? (roundNameById.get(slot.round_id) ?? 'Unknown Round') : 'Unknown Round',
+        roundId: slot.round_id,
+        roundName: roundNameById.get(slot.round_id) ?? 'Unknown Round',
         walkDate: slot.walk_date,
         startTime: slot.start_time,
       })),
     targetWalk,
-    targetWalkRoundName: targetWalk.round_id ? (roundNameById.get(targetWalk.round_id) ?? null) : null,
+    targetWalkRoundName: roundNameById.get(targetWalk.round_id) ?? null,
     overview: {
       reportCompletionRate: metrics.reportCompletionRate,
       completionRateSubmittedReports: metrics.completionRateSubmittedReports,
@@ -416,7 +409,7 @@ async function getReportMapPoints(
     ? await (supabase
         .from('sightings')
         .select('observation_id, lat, lng, species')
-        .in('observation_id', observationIds) as unknown as Promise<QueryResult<Array<{ observation_id: string; lat: number | null; lng: number | null; species: string }>>>)
+        .in('observation_id', observationIds) as SupabaseQueryLike<Array<{ observation_id: string; lat: number | null; lng: number | null; species: string }>>)
     : { data: [], error: null }
 
   const observationById = new Map(
@@ -433,14 +426,14 @@ async function getReportMapPoints(
       const slot = observation ? slotsById.get(observation.slot_id) : null
       const sequence = (sightedPointCounts.get(sighting.observation_id) ?? 0) + 1
       sightedPointCounts.set(sighting.observation_id, sequence)
-      const speciesLabel = formatSpeciesLabel(sighting.species)
+      const speciesLabel = getSpeciesShortLabel(sighting.species)
 
         return {
           lat: sighting.lat as number,
           lng: sighting.lng as number,
           outcome: 'SIGHTED' as const,
           label: speciesLabel ?? `Sighting ${sequence}`,
-          popupMeta: buildSlotPopupMeta(slot, slot?.round_id ? (roundNameById.get(slot.round_id) ?? null) : null),
+          popupMeta: buildSlotPopupMeta(slot, roundNameById.get(slot?.round_id ?? '') ?? null),
           species: sighting.species,
         }
       })
@@ -464,23 +457,25 @@ async function getReportMapPoints(
         lng: observation.lng as number,
         outcome: 'NOT_SIGHTED' as const,
         label: `No sighting report ${sequence}`,
-        popupMeta: buildSlotPopupMeta(slot, slot?.round_id ? (roundNameById.get(slot.round_id) ?? null) : null),
+        popupMeta: buildSlotPopupMeta(slot, roundNameById.get(slot?.round_id ?? '') ?? null),
       }
     })
 
   return [...sightedPoints, ...notSightedPoints]
 }
 
-function asPromise<T>(query: unknown): Promise<T> {
-  return query as Promise<T>
-}
-
 export async function getAdminUsersAnalytics(
   supabase: SupabaseClientLike,
-  userIds?: string[]
+  userIds?: string[],
+  options?: {
+    lateCancelHours?: number
+    highParticipationThreshold?: number
+  }
 ): Promise<AdminUsersAnalyticsSnapshot> {
   const profileQuery = supabase.from('profiles').select('id')
-  const membershipsQuery = supabase.from('slot_memberships').select('user_id, status')
+  const membershipsQuery = supabase
+    .from('slot_memberships')
+    .select('user_id, status, cancelled_at, walk_slots(walk_date, start_time)')
   const observationsQuery = supabase.from('observations').select('user_id, status')
 
   const scopedProfileQuery = userIds?.length ? profileQuery.in('id', userIds) : profileQuery
@@ -488,23 +483,45 @@ export async function getAdminUsersAnalytics(
   const scopedObservationsQuery = userIds?.length ? observationsQuery.in('user_id', userIds) : observationsQuery
 
   const [profilesResult, membershipsResult, observationsResult] = await Promise.all([
-    asPromise<QueryResult<Array<{ id: string }>>>(scopedProfileQuery),
-    asPromise<QueryResult<Array<{ user_id: string; status: 'ACTIVE' | 'CANCELLED' }>>>(scopedMembershipQuery),
-    asPromise<QueryResult<Array<{ user_id: string; status: 'DRAFT' | 'SUBMITTED' }>>>(scopedObservationsQuery),
+    scopedProfileQuery as SupabaseQueryLike<Array<{ id: string }>>,
+    scopedMembershipQuery as SupabaseQueryLike<Array<{
+      user_id: string
+      status: 'ACTIVE' | 'CANCELLED'
+      cancelled_at?: string | null
+      walk_slots?: { walk_date?: string | null; start_time?: string | null } | null
+    }>>,
+    scopedObservationsQuery as SupabaseQueryLike<Array<{ user_id: string; status: 'DRAFT' | 'SUBMITTED' }>>,
   ])
 
   const validUserIds = new Set((profilesResult.data ?? []).map((profile) => profile.id))
   const userStats = Object.fromEntries(
     Array.from(validUserIds).map((userId) => [
       userId,
-      { participations: 0, submissions: 0, cancellations: 0 },
+      {
+        participations: 0,
+        submissions: 0,
+        cancellations: 0,
+        lateCancellations: 0,
+        hasLateCancellationIndicator: false,
+        hasHighParticipationIndicator: false,
+      },
     ])
   ) as Record<string, AdminUserActivityMetrics>
+  const lateCancelHours = options?.lateCancelHours ?? DEFAULT_LATE_CANCEL_HOURS
+  const highParticipationThreshold =
+    options?.highParticipationThreshold ?? DEFAULT_HIGH_PARTICIPATION_THRESHOLD
 
   for (const membership of membershipsResult.data ?? []) {
     if (!validUserIds.has(membership.user_id)) continue
     if (membership.status === 'ACTIVE') userStats[membership.user_id].participations += 1
-    if (membership.status === 'CANCELLED') userStats[membership.user_id].cancellations += 1
+    if (membership.status === 'CANCELLED') {
+      const stats = userStats[membership.user_id]
+      stats.cancellations += 1
+      if (isLateCancellation(membership, lateCancelHours)) {
+        stats.lateCancellations += 1
+        stats.hasLateCancellationIndicator = true
+      }
+    }
   }
 
   for (const observation of observationsResult.data ?? []) {
@@ -512,7 +529,31 @@ export async function getAdminUsersAnalytics(
     if (observation.status === 'SUBMITTED') userStats[observation.user_id].submissions += 1
   }
 
+  for (const stats of Object.values(userStats)) {
+    stats.hasHighParticipationIndicator = stats.participations >= highParticipationThreshold
+  }
+
   return { userStats }
+}
+
+function isLateCancellation(
+  membership: {
+    cancelled_at?: string | null
+    walk_slots?: { walk_date?: string | null; start_time?: string | null } | null
+  },
+  lateCancelHours: number
+) {
+  const cancelledAt = membership.cancelled_at ? new Date(membership.cancelled_at) : null
+  const slot = membership.walk_slots
+  if (!cancelledAt || Number.isNaN(cancelledAt.getTime()) || !slot?.walk_date || !slot.start_time) {
+    return false
+  }
+
+  const walkStart = getWalkStartDateTime(slot.walk_date, slot.start_time)
+  if (Number.isNaN(walkStart.getTime())) return false
+
+  const cutoff = new Date(walkStart.getTime() - lateCancelHours * 60 * 60 * 1000)
+  return cancelledAt >= cutoff
 }
 
 export async function getAdminVolunteerAnalyticsLanding(

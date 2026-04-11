@@ -189,6 +189,7 @@ export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: 
               <div className="flex-1">
                 <p className="text-sm font-semibold text-green-700">{stats.walksJoined}</p>
                 <p className="text-xs text-gray-500">Walks Joined</p>
+                <p className="text-[11px] text-gray-400">This round</p>
               </div>
             </div>
             <div className="flex items-center gap-3 bg-blue-50 rounded-xl p-3">
@@ -196,6 +197,7 @@ export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: 
               <div className="flex-1">
                 <p className="text-sm font-semibold text-blue-700">{stats.reportsSubmitted}</p>
                 <p className="text-xs text-gray-500">Submitted</p>
+                <p className="text-[11px] text-gray-400">This round</p>
               </div>
             </div>
             <div className="flex items-center gap-3 bg-yellow-50 rounded-xl p-3">
@@ -203,6 +205,7 @@ export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: 
               <div className="flex-1">
                 <p className="text-sm font-semibold text-yellow-700">{stats.draftsPending}</p>
                 <p className="text-xs text-gray-500">Drafts</p>
+                <p className="text-[11px] text-gray-400">This round</p>
               </div>
             </div>
           </div>

@@ -81,6 +81,35 @@ function groupSlotsByRound(slots: WalkSlotWithRound[]) {
     })
 }
 
+function sliceGroupedSlotsByPage(
+  groups: ReturnType<typeof groupSlotsByRound>,
+  from: number,
+  to: number
+) {
+  const paginatedGroups: ReturnType<typeof groupSlotsByRound> = []
+  let slotIndex = 0
+
+  for (const group of groups) {
+    const groupStart = slotIndex
+    const groupEnd = groupStart + group.slots.length
+    slotIndex = groupEnd
+
+    if (groupEnd <= from || groupStart >= to) {
+      continue
+    }
+
+    const sliceStart = Math.max(0, from - groupStart)
+    const sliceEnd = Math.min(group.slots.length, to - groupStart)
+
+    paginatedGroups.push({
+      ...group,
+      slots: group.slots.slice(sliceStart, sliceEnd),
+    })
+  }
+
+  return paginatedGroups
+}
+
 function RoundSection({
   group,
   isCurrentRound,
@@ -233,8 +262,9 @@ export default async function WalkPage({
   const totalAvailable = availableSlots.length
   const totalPages = Math.max(1, Math.ceil(totalAvailable / PAGE_SIZE))
   const from = (page - 1) * PAGE_SIZE
-  const paginatedSlots = availableSlots.slice(from, from + PAGE_SIZE)
-  const groupedPaginatedSlots = groupSlotsByRound(paginatedSlots)
+  const groupedAvailableSlots = groupSlotsByRound(availableSlots)
+  const groupedPaginatedSlots = sliceGroupedSlotsByPage(groupedAvailableSlots, from, from + PAGE_SIZE)
+  const paginatedSlots = groupedPaginatedSlots.flatMap((group) => group.slots)
   const availableCountByRoundId = new Map(
     groupedPaginatedSlots.map((group) => [group.roundId, group.slots.length])
   )

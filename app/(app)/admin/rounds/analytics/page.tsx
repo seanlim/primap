@@ -111,7 +111,6 @@ export default async function AdminRoundsAnalyticsPage({
                   trackColor="#bbf7d0"
                   iconBgColor="#f0fdf4"
                   iconColor="#15803d"
-                  accentColor="#16a34a"
                 />
                 <DonutMetricCard
                   title="Sign-up Rate"
@@ -126,7 +125,6 @@ export default async function AdminRoundsAnalyticsPage({
                   trackColor="#fed7aa"
                   iconBgColor="#fff7ed"
                   iconColor="#c2410c"
-                  accentColor="#ea580c"
                 />
               </div>
 
@@ -135,7 +133,6 @@ export default async function AdminRoundsAnalyticsPage({
                   title="Total Walks"
                   value={analytics.overview.totalWalks}
                   icon={Footprints}
-                  accentColor="#9333ea"
                   iconBgColor="#faf5ff"
                   iconColor="#9333ea"
                 />
@@ -143,7 +140,6 @@ export default async function AdminRoundsAnalyticsPage({
                   title="Total Volunteers"
                   value={analytics.overview.participatingVolunteers}
                   icon={Users}
-                  accentColor="#2563eb"
                   iconBgColor="#eff6ff"
                   iconColor="#2563eb"
                 />

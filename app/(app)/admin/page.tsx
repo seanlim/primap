@@ -97,7 +97,6 @@ export default async function AdminDashboard() {
             trackColor="#bbf7d0"
             iconBgColor="#f0fdf4"
             iconColor="#15803d"
-            accentColor="#16a34a"
           />
           <DonutMetricCard
             title="Sign-up Rate"
@@ -112,7 +111,6 @@ export default async function AdminDashboard() {
             trackColor="#fed7aa"
             iconBgColor="#fff7ed"
             iconColor="#c2410c"
-            accentColor="#ea580c"
           />
         </div>
       ) : (

@@ -96,6 +96,7 @@ export async function cancelWalk(walkId: string) {
     return { error: 'Unexpected cancellation response.' }
   }
   if (result.error) return { error: result.error }
+  if (result.success !== true) return { error: 'Unexpected cancellation response.' }
 
   const filePaths = Array.isArray(result.file_paths)
     ? result.file_paths.filter((path): path is string => typeof path === 'string' && path.length > 0)

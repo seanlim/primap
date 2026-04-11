@@ -454,7 +454,7 @@ export type Database = {
         Args: { p_slot_id: string }
         Returns: Json
       }
-      }
+    }
     Enums: {
       incident_type:
         | "INJURED_ANIMAL"

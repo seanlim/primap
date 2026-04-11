@@ -218,13 +218,17 @@ export default async function WalkPage({
 
   const allUpcomingSlots = ((slotsResult.data || []) as WalkSlot[])
     .filter((slot) => !hasWalkStarted(slot.walk_date, slot.start_time))
-    .map((slot) => {
+    .flatMap((slot) => {
       const round = roundMetaById.get(slot.round_id)
+      if (!round) {
+        return []
+      }
+
       return {
         ...slot,
-        roundName: round?.name || 'Unknown Round',
-        roundStartDate: round?.start_date || '',
-        roundEndDate: round?.end_date || '',
+        roundName: round.name,
+        roundStartDate: round.start_date,
+        roundEndDate: round.end_date,
       }
     })
 

@@ -559,6 +559,7 @@ describe('admin-round-actions', () => {
       const result = await updateSettings({
         requiredWalksPerRound: 4,
         lateCancelHours: 24,
+        highParticipationThreshold: 8,
         maxMediaPerReport: 10,
       })
 
@@ -566,6 +567,7 @@ describe('admin-round-actions', () => {
       expect(methods.update).toHaveBeenCalledWith({
         required_walks_per_round: 4,
         late_cancel_hours: 24,
+        high_participation_threshold: 8,
         max_media_per_report: 10,
       })
       expect(revalidatePath).toHaveBeenCalledWith('/admin/settings')
@@ -578,6 +580,7 @@ describe('admin-round-actions', () => {
       const result = await updateSettings({
         requiredWalksPerRound: 4,
         lateCancelHours: 24,
+        highParticipationThreshold: 8,
         maxMediaPerReport: 10,
       })
 
@@ -598,6 +601,7 @@ describe('admin-round-actions', () => {
       const result = await updateSettings({
         requiredWalksPerRound: 4,
         lateCancelHours: 24,
+        highParticipationThreshold: 8,
         maxMediaPerReport: 10,
       })
 
@@ -614,6 +618,7 @@ describe('admin-round-actions', () => {
       await updateSettings({
         requiredWalksPerRound: 4,
         lateCancelHours: 48,
+        highParticipationThreshold: 8,
         maxMediaPerReport: 15,
       })
 
@@ -627,6 +632,7 @@ describe('admin-round-actions', () => {
         const result = await updateSettings({
           requiredWalksPerRound: 4,
           lateCancelHours: 48,
+          highParticipationThreshold: 8,
           maxMediaPerReport: 0,
         })
         expect(result).toEqual({
@@ -639,6 +645,7 @@ describe('admin-round-actions', () => {
         const result = await updateSettings({
           requiredWalksPerRound: 4,
           lateCancelHours: 48,
+          highParticipationThreshold: 8,
           maxMediaPerReport: 51,
         })
         expect(result).toEqual({
@@ -651,6 +658,7 @@ describe('admin-round-actions', () => {
         const result = await updateSettings({
           requiredWalksPerRound: 4,
           lateCancelHours: 48,
+          highParticipationThreshold: 8,
           maxMediaPerReport: 5.5,
         })
         expect(result).toEqual({
@@ -663,6 +671,7 @@ describe('admin-round-actions', () => {
         const result = await updateSettings({
           requiredWalksPerRound: 4,
           lateCancelHours: 48,
+          highParticipationThreshold: 8,
           maxMediaPerReport: Number.NaN,
         })
         expect(result).toEqual({
@@ -670,10 +679,38 @@ describe('admin-round-actions', () => {
         })
       })
 
+      it('rejects highParticipationThreshold out of range', async () => {
+        const result = await updateSettings({
+          requiredWalksPerRound: 4,
+          lateCancelHours: 48,
+          highParticipationThreshold: 101,
+          maxMediaPerReport: 10,
+        })
+
+        expect(result).toEqual({
+          error: expect.stringContaining('High participation threshold must be an integer between 1 and 100 participations'),
+        })
+        expect(methods.update).not.toHaveBeenCalled()
+      })
+
+      it('rejects NaN highParticipationThreshold', async () => {
+        const result = await updateSettings({
+          requiredWalksPerRound: 4,
+          lateCancelHours: 48,
+          highParticipationThreshold: Number.NaN,
+          maxMediaPerReport: 10,
+        })
+
+        expect(result).toEqual({
+          error: expect.stringContaining('High participation threshold must be an integer between 1 and 100 participations'),
+        })
+      })
+
       it('rejects requiredWalksPerRound out of range', async () => {
         const result = await updateSettings({
           requiredWalksPerRound: 0,
           lateCancelHours: 48,
+          highParticipationThreshold: 8,
           maxMediaPerReport: 10,
         })
         expect(result).toEqual({
@@ -685,6 +722,7 @@ describe('admin-round-actions', () => {
         const result = await updateSettings({
           requiredWalksPerRound: 4,
           lateCancelHours: 200,
+          highParticipationThreshold: 8,
           maxMediaPerReport: 10,
         })
         expect(result).toEqual({
@@ -696,17 +734,20 @@ describe('admin-round-actions', () => {
         const result = await updateSettings({
           requiredWalksPerRound: 0,
           lateCancelHours: 0,
+          highParticipationThreshold: 0,
           maxMediaPerReport: 0,
         })
         expect(result.error).toContain('Required walks per round must be an integer between 1 and 20')
         expect(result.error).toContain('Late cancellation window must be an integer between 1 and 168 hours')
         expect(result.error).toContain('Max media per report must be an integer between 1 and 50')
+        expect(result.error).toContain('High participation threshold must be an integer between 1 and 100 participations')
       })
 
       it('does not call requireAdmin/db when validation fails', async () => {
         await updateSettings({
           requiredWalksPerRound: 0,
           lateCancelHours: 48,
+          highParticipationThreshold: 8,
           maxMediaPerReport: 10,
         })
         // requireAdmin is not invoked, so neither auth nor db access should happen
@@ -725,6 +766,7 @@ describe('admin-round-actions', () => {
         const result = await updateSettings({
           requiredWalksPerRound: 1,
           lateCancelHours: 1,
+          highParticipationThreshold: 1,
           maxMediaPerReport: 1,
         })
 
@@ -741,6 +783,7 @@ describe('admin-round-actions', () => {
         const result = await updateSettings({
           requiredWalksPerRound: 20,
           lateCancelHours: 168,
+          highParticipationThreshold: 100,
           maxMediaPerReport: 50,
         })
 

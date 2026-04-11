@@ -11,12 +11,29 @@ export function SightingLegend({
 }: {
   points: Array<Pick<AnalyticsReportMapPoint, 'outcome' | 'species'>>
 }) {
-  const sightedCount = points.filter((point) => point.outcome === 'SIGHTED').length
-  const notSightedCount = points.filter((point) => point.outcome === 'NOT_SIGHTED').length
-  const rblCount = points.filter((point) => point.outcome === 'SIGHTED' && point.species === 'RBL').length
-  const ltmCount = points.filter((point) => point.outcome === 'SIGHTED' && point.species === 'LTM').length
-  const duskyCount = points.filter((point) => point.outcome === 'SIGHTED' && point.species === 'DUSKY').length
-  const otherCount = points.filter((point) => point.outcome === 'SIGHTED' && point.species === 'OTHER').length
+  const totals = points.reduce(
+    (acc, point) => {
+      if (point.outcome === 'NOT_SIGHTED') {
+        acc.notSightedCount += 1
+        return acc
+      }
+
+      acc.sightedCount += 1
+      if (point.species === 'RBL') acc.rblCount += 1
+      if (point.species === 'LTM') acc.ltmCount += 1
+      if (point.species === 'DUSKY') acc.duskyCount += 1
+      if (point.species === 'OTHER') acc.otherCount += 1
+      return acc
+    },
+    {
+      sightedCount: 0,
+      notSightedCount: 0,
+      rblCount: 0,
+      ltmCount: 0,
+      duskyCount: 0,
+      otherCount: 0,
+    }
+  )
 
   return (
     <div className="flex flex-wrap gap-3 text-xs text-gray-600">
@@ -25,24 +42,24 @@ export function SightingLegend({
           <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Sighted</span>
           <div className="flex items-center gap-2">
             <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: DEFAULT_SIGHTING_COLOR }} />
-            <span>Total: {sightedCount}</span>
+            <span>Total: {totals.sightedCount}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: SPECIES_COLORS.RBL }} />
-            <span>RBL: {rblCount}</span>
+            <span>RBL: {totals.rblCount}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: SPECIES_COLORS.LTM }} />
-            <span>LTM: {ltmCount}</span>
+            <span>LTM: {totals.ltmCount}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: SPECIES_COLORS.DUSKY }} />
-            <span>DUSKY: {duskyCount}</span>
+            <span>DUSKY: {totals.duskyCount}</span>
           </div>
-          {otherCount > 0 && (
+          {totals.otherCount > 0 && (
             <div className="flex items-center gap-2">
               <span className="h-3 w-3 rounded-full ring-2 ring-white shadow-sm" style={{ backgroundColor: SPECIES_COLORS.OTHER }} />
-              <span>OTHER: {otherCount}</span>
+              <span>OTHER: {totals.otherCount}</span>
             </div>
           )}
         </div>
@@ -52,90 +69,7 @@ export function SightingLegend({
           <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Not Sighted</span>
           <div className="flex items-center gap-2">
             <span className="h-3 w-3 rounded-sm ring-2 ring-white shadow-sm" style={{ backgroundColor: NOT_SIGHTED_COLOR }} />
-            <span>Total: {notSightedCount}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-export function DonutMetricCard({
-  title,
-  value,
-  numerator,
-  denominator,
-  numeratorLabel,
-  denominatorLabel,
-  progress,
-  icon: Icon,
-  ringColor,
-  trackColor,
-  iconBgColor,
-  iconColor,
-  accentColor,
-}: {
-  title: string
-  value: string
-  numerator: number
-  denominator: number
-  numeratorLabel: string
-  denominatorLabel: string
-  progress: number
-  icon: IconComponent
-  ringColor: string
-  trackColor: string
-  iconBgColor: string
-  iconColor: string
-  accentColor: string
-}) {
-  const boundedProgress = Math.max(0, Math.min(progress, 1))
-  const radius = 31
-  const circumference = 2 * Math.PI * radius
-  const dashOffset = circumference * (1 - boundedProgress)
-
-  return (
-    <div className="min-w-0 rounded-2xl border-l-4 bg-white p-4 shadow-sm" style={{ borderLeftColor: accentColor }}>
-      <div className="flex items-center gap-2.5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: iconBgColor }}>
-          <Icon className="h-[18px] w-[18px]" style={{ color: iconColor }} />
-        </div>
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{title}</h2>
-      </div>
-
-      <div className="mt-4 flex items-center gap-4">
-        <div className="relative h-28 w-28 shrink-0">
-          <svg viewBox="0 0 84 84" className="h-full w-full -rotate-90" aria-hidden="true">
-            <circle cx="42" cy="42" r={radius} fill="none" stroke={trackColor} strokeWidth="8" />
-            <circle
-              cx="42"
-              cy="42"
-              r={radius}
-              fill="none"
-              stroke={ringColor}
-              strokeWidth="8"
-              strokeLinecap="round"
-              strokeDasharray={circumference}
-              strokeDashoffset={dashOffset}
-            />
-          </svg>
-          <div className="absolute inset-0 flex items-center justify-center text-xl font-bold text-gray-900">{value}</div>
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="grid w-full grid-cols-2 gap-2">
-            <div className="flex min-h-[88px] flex-col rounded-lg bg-gray-50 p-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 whitespace-normal break-words">
-                {numeratorLabel}
-              </div>
-              <div className="mt-auto text-right text-xl font-bold text-gray-900">{numerator}</div>
-            </div>
-            <div className="flex min-h-[88px] flex-col rounded-lg bg-gray-50 p-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 whitespace-normal break-words">
-                {denominatorLabel}
-              </div>
-              <div className="mt-auto text-right text-xl font-bold text-gray-900">{denominator}</div>
-            </div>
+            <span>Total: {totals.notSightedCount}</span>
           </div>
         </div>
       </div>

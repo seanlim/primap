@@ -5,6 +5,7 @@ import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { MAPBOX_TOKEN, DEFAULT_CENTER, DEFAULT_ZOOM, MAP_STYLE } from '@/lib/config/mapbox'
 import { MapPin } from 'lucide-react'
+import { getSpeciesDisplayName } from '@/lib/constants/species'
 
 export interface MapMarker {
   lat: number
@@ -32,14 +33,6 @@ function escapeHtml(value: string) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;')
-}
-
-function getSpeciesDisplayName(species?: string) {
-  if (species === 'RBL') return "Raffles' Banded Langur"
-  if (species === 'LTM') return 'Long-tailed Macaque'
-  if (species === 'DUSKY') return 'Dusky Langur'
-  if (species === 'OTHER') return 'Other Species'
-  return null
 }
 
 function renderPopupHtml(marker: MapMarker) {
@@ -244,7 +237,7 @@ export function MapView({
         el.textContent = '-'
       } else {
         el.style.backgroundColor = marker.color || '#16a34a'
-        el.style.border = marker.species === 'RBL' ? '2px solid #ffffff' : '2px solid #ffffff'
+        el.style.border = '2px solid #ffffff'
         el.style.borderRadius = '999px'
         el.style.boxShadow = '0 2px 8px rgba(15, 23, 42, 0.25)'
       }

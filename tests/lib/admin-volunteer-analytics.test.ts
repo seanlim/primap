@@ -1,5 +1,6 @@
 import {
   buildVolunteerAnalyticsSnapshot,
+  getAdminUsersAnalytics,
   getAdminRoundsAnalyticsPageSnapshot,
   getAdminVolunteerAnalyticsLanding,
   getAdminWalksAnalyticsPageSnapshotByRound,
@@ -135,6 +136,113 @@ describe('buildVolunteerAnalyticsSnapshot', () => {
       completedWalks: 1,
       upcomingWalks: 1,
       missingReportWalks: 1,
+    })
+  })
+})
+
+describe('getAdminUsersAnalytics indicators', () => {
+  function createQuery(result: { data?: unknown }) {
+    const query = {
+      eq: () => query,
+      order: () => query,
+      limit: () => query,
+      in: () => query,
+      then: (resolve: (value: unknown) => unknown) =>
+        Promise.resolve(resolve({ data: result.data ?? null, error: null })),
+    }
+
+    return query
+  }
+
+  it('flags high participation by active sign-ups, not submitted reports', async () => {
+    const supabase = {
+      from: (table: string) => ({
+        select: (..._args: unknown[]) => {
+          if (table === 'profiles') {
+            return createQuery({ data: [{ id: 'user-1' }, { id: 'user-2' }] })
+          }
+          if (table === 'slot_memberships') {
+            return createQuery({
+              data: [
+                { user_id: 'user-1', status: 'ACTIVE' },
+                { user_id: 'user-1', status: 'ACTIVE' },
+                { user_id: 'user-1', status: 'ACTIVE' },
+              ],
+            })
+          }
+          if (table === 'observations') {
+            return createQuery({
+              data: [
+                { user_id: 'user-2', status: 'SUBMITTED' },
+                { user_id: 'user-2', status: 'SUBMITTED' },
+              ],
+            })
+          }
+          throw new Error(`Unexpected table ${table}`)
+        },
+      }),
+    }
+
+    const snapshot = await getAdminUsersAnalytics(supabase as never, undefined, {
+      highParticipationThreshold: 2,
+    })
+
+    expect(snapshot.userStats['user-1']).toMatchObject({
+      participations: 3,
+      submissions: 0,
+      hasHighParticipationIndicator: true,
+    })
+    expect(snapshot.userStats['user-2']).toMatchObject({
+      participations: 0,
+      submissions: 2,
+      hasHighParticipationIndicator: false,
+    })
+  })
+
+  it('counts late cancellations inside and on the threshold boundary only', async () => {
+    const supabase = {
+      from: (table: string) => ({
+        select: (..._args: unknown[]) => {
+          if (table === 'profiles') return createQuery({ data: [{ id: 'user-1' }] })
+          if (table === 'slot_memberships') {
+            return createQuery({
+              data: [
+                {
+                  user_id: 'user-1',
+                  status: 'CANCELLED',
+                  cancelled_at: '2026-04-09T06:00:00',
+                  walk_slots: { walk_date: '2026-04-10', start_time: '06:00:00' },
+                },
+                {
+                  user_id: 'user-1',
+                  status: 'CANCELLED',
+                  cancelled_at: '2026-04-08T05:59:59',
+                  walk_slots: { walk_date: '2026-04-10', start_time: '06:00:00' },
+                },
+                {
+                  user_id: 'user-1',
+                  status: 'CANCELLED',
+                  cancelled_at: '2026-04-10T05:00:00',
+                  walk_slots: { walk_date: '2026-04-10', start_time: '06:00:00' },
+                },
+              ],
+            })
+          }
+          if (table === 'observations') return createQuery({ data: [] })
+          throw new Error(`Unexpected table ${table}`)
+        },
+      }),
+    }
+
+    const snapshot = await getAdminUsersAnalytics(supabase as never, undefined, {
+      lateCancelHours: 24,
+      highParticipationThreshold: 10,
+    })
+
+    expect(snapshot.userStats['user-1']).toMatchObject({
+      cancellations: 3,
+      lateCancellations: 2,
+      hasLateCancellationIndicator: true,
     })
   })
 })

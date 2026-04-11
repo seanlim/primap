@@ -172,7 +172,9 @@ export default async function ProfilePage() {
       .single(),
     supabase
       .from('survey_rounds')
-      .select('id, name, start_date, end_date'),
+      .select('id, name, start_date, end_date')
+      .eq('status', 'OPEN')
+      .order('start_date', { ascending: false }),
   ])
 
   const currentRound = findCurrentRound(rounds || [])

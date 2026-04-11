@@ -135,7 +135,7 @@ export default async function ReportListPage() {
       const slot = membership.walk_slots as unknown as WalkRef | null
       return slot?.id
     })
-    .filter(Boolean)
+    .filter((id): id is string => Boolean(id))
 
   const { data: observations } = slotIds.length > 0
     ? await supabase

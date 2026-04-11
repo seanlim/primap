@@ -33,6 +33,7 @@ interface Props {
     lng: number
     outcome: 'SIGHTED' | 'NOT_SIGHTED'
     species?: string
+    speciesOther?: string | null
     label?: string
     popupMeta?: string[]
   }[]

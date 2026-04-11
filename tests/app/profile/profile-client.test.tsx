@@ -61,4 +61,49 @@ describe('ProfileClient', () => {
       })
     )
   })
+
+  it('passes through custom OTHER species names for map popups', () => {
+    render(
+      <ProfileClient
+        profile={{
+          id: 'user-1',
+          email: 'volunteer@example.com',
+          fullName: 'Volunteer One',
+          avatarUrl: null,
+          role: 'VOLUNTEER',
+          status: 'ACTIVE',
+          createdAt: '2026-01-01T00:00:00.000Z',
+        }}
+        stats={{
+          walksJoined: 5,
+          reportsSubmitted: 3,
+          draftsPending: 1,
+          requiredWalks: 4,
+        }}
+        reportMapPoints={[
+          {
+            lat: 1.3521,
+            lng: 103.8198,
+            outcome: 'SIGHTED',
+            species: 'OTHER',
+            speciesOther: 'Silvered Langur',
+            label: 'Silvered Langur',
+          },
+        ]}
+        walkHistory={[]}
+      />
+    )
+
+    expect(mockMapView).toHaveBeenCalledWith(
+      expect.objectContaining({
+        markers: [
+          expect.objectContaining({
+            species: 'OTHER',
+            speciesOther: 'Silvered Langur',
+            label: 'Silvered Langur',
+          }),
+        ],
+      })
+    )
+  })
 })

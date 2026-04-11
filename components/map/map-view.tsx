@@ -16,6 +16,7 @@ export interface MapMarker {
   popupMeta?: string[]
   variant?: 'sighted' | 'not_sighted'
   species?: string
+  speciesOther?: string | null
 }
 
 interface MapViewProps {
@@ -36,7 +37,7 @@ function escapeHtml(value: string) {
 }
 
 function renderPopupHtml(marker: MapMarker) {
-  const speciesName = getSpeciesDisplayName(marker.species)
+  const speciesName = getSpeciesDisplayName(marker.species, marker.speciesOther)
   const title = escapeHtml(
     marker.variant === 'not_sighted'
       ? 'Not Sighted'

@@ -111,7 +111,7 @@ export default async function ProfilePage() {
   const { data: submittedSightings } = submittedObservationIds.length > 0
     ? await supabase
         .from('sightings')
-        .select('observation_id, lat, lng, species')
+        .select('observation_id, lat, lng, species, species_other')
         .in('observation_id', submittedObservationIds)
     : { data: [] }
 
@@ -133,7 +133,10 @@ export default async function ProfilePage() {
       lng: sighting.lng,
       outcome: 'SIGHTED' as const,
       species: sighting.species,
-      label: sighting.species,
+      speciesOther: sighting.species_other,
+      label: sighting.species === 'OTHER'
+        ? (sighting.species_other?.trim() || 'Other')
+        : sighting.species,
       popupMeta: buildSlotPopupMeta(
         {
           location_name: slot?.location_name || 'My sighting',

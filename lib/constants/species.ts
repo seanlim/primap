@@ -13,18 +13,18 @@ export function getSpeciesColor(species?: string) {
   return SPECIES_COLORS[species as keyof typeof SPECIES_COLORS] ?? DEFAULT_SIGHTING_COLOR
 }
 
-export function getSpeciesShortLabel(species?: string) {
+export function getSpeciesShortLabel(species?: string, speciesOther?: string | null) {
   if (species === 'RBL') return 'RBL'
   if (species === 'LTM') return 'LTM'
   if (species === 'DUSKY') return 'DUSKY'
-  if (species === 'OTHER') return 'Other'
+  if (species === 'OTHER') return speciesOther?.trim() || 'Other'
   return null
 }
 
-export function getSpeciesDisplayName(species?: string) {
+export function getSpeciesDisplayName(species?: string, speciesOther?: string | null) {
   if (species === 'RBL') return "Raffles' Banded Langur"
   if (species === 'LTM') return 'Long-tailed Macaque'
   if (species === 'DUSKY') return 'Dusky Langur'
-  if (species === 'OTHER') return 'Other Species'
+  if (species === 'OTHER') return speciesOther?.trim() || 'Other Species'
   return null
 }

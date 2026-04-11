@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback } from 'react'
-import { toLocalDateString } from '@/lib/utils/format-date'
+import { getAppDateString } from '@/lib/utils/walk-participation'
 
 export function WalkFilters() {
   const router = useRouter()
@@ -11,7 +11,7 @@ export function WalkFilters() {
   const date = searchParams.get('date') || ''
   const location = searchParams.get('location') || ''
   const availability = searchParams.get('availability') || ''
-  const today = toLocalDateString(new Date())
+  const today = getAppDateString()
 
   const updateParam = useCallback((key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString())

@@ -1,14 +1,14 @@
 import ExcelJS from 'exceljs'
 import { type ViewExportData } from './build-view-export-data'
 
-type WorksheetColumn<T extends Record<string, unknown>> = {
+type WorksheetColumn<T extends object> = {
   header: string
   key: keyof T
   width?: number
   kind?: 'date' | 'datetime' | 'multiline' | 'path'
 }
 
-function parseCellValue(value: unknown, kind?: WorksheetColumn<Record<string, unknown>>['kind']): unknown {
+function parseCellValue(value: unknown, kind?: WorksheetColumn<object>['kind']): unknown {
   if (kind !== 'date' && kind !== 'datetime') return value
   if (typeof value !== 'string') return value
   if (!value) return ''
@@ -16,7 +16,7 @@ function parseCellValue(value: unknown, kind?: WorksheetColumn<Record<string, un
   return Number.isNaN(parsed.getTime()) ? value : parsed
 }
 
-function addWorksheet<T extends Record<string, unknown>>(
+function addWorksheet<T extends object>(
   workbook: ExcelJS.Workbook,
   name: string,
   columns: WorksheetColumn<T>[],
@@ -32,7 +32,7 @@ function addWorksheet<T extends Record<string, unknown>>(
   for (const row of rows) {
     const output: Record<string, unknown> = {}
     for (const column of columns) {
-      output[String(column.key)] = parseCellValue(row[column.key], column.kind)
+      output[String(column.key)] = parseCellValue(row[column.key as keyof T], column.kind)
     }
     worksheet.addRow(output)
   }
@@ -74,11 +74,13 @@ function addWorksheet<T extends Record<string, unknown>>(
 
   worksheet.columns.forEach(column => {
     if (column.values) {
-      const maxLen = column.values.reduce((max, cellValue) => {
-        const len = cellValue ? String(cellValue).length : 0
-        return Math.max(max, len)
-      }, 10)
-      column.width = Math.min(Math.max(column.width ?? 10, maxLen + 2), 40)
+      let maxLen = 10
+      for (const cellValue of column.values) {
+        const len = cellValue == null ? 0 : String(cellValue).length
+        maxLen = Math.max(maxLen, len)
+      }
+      const currentWidth = typeof column.width === 'number' ? column.width : 10
+      column.width = Math.min(Math.max(currentWidth, maxLen + 2), 40)
     }
   })
 

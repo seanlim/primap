@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { ArrowLeft, CheckCircle, Gauge, UserMinus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { getAdminWalksAnalyticsPageSnapshotByRound } from '@/lib/admin-volunteer-analytics'
+import { getAdminWalksAnalyticsPageSnapshotByRound, type SupabaseClientLike } from '@/lib/admin-volunteer-analytics'
 import { ReportMapCard, SummaryCard } from '@/components/admin/analytics-shared'
 import { WalkAnalyticsFilters } from './walk-analytics-filters'
 import DonutMetricCard from '@/components/ui/DonutMetricCard'
@@ -18,7 +18,7 @@ export default async function AdminWalksAnalyticsPage({
 }) {
   const params = (await searchParams) ?? {}
   const supabase = await createClient()
-  const analyticsClient = { from: supabase.from.bind(supabase) }
+  const analyticsClient = supabase as unknown as SupabaseClientLike
   const analytics = await getAdminWalksAnalyticsPageSnapshotByRound(
     analyticsClient,
     {

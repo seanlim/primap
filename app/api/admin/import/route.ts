@@ -5,6 +5,7 @@ import JSZip from 'jszip'
 import { TABLE_ORDER, EXPORT_XLSX_FILENAME, MEDIA_DIR, BATCH_SIZE, type TableName } from '@/lib/export-import/constants'
 import { parseWorkbookToTableData } from '@/lib/export-import/import-workbook'
 import { uploadMediaFile } from '@/lib/export-import/media-helpers'
+import type { TablesInsert } from '@/lib/types/database'
 
 export const maxDuration = 300
 
@@ -14,9 +15,21 @@ interface TableSummary {
   errors: string[]
 }
 
+type ImportRow = Record<string, unknown>
+
+function cleanImportRows(rows: ImportRow[]) {
+  return rows.map(row => {
+    const cleaned: ImportRow = {}
+    for (const [key, val] of Object.entries(row)) {
+      cleaned[key] = val === '' ? null : val
+    }
+    return cleaned
+  })
+}
+
 async function upsertAppSettings(
   adminClient: ReturnType<typeof createAdminClient>,
-  rows: Record<string, unknown>[]
+  rows: ImportRow[]
 ): Promise<TableSummary> {
   const result: TableSummary = { inserted: 0, skipped: 0, errors: [] }
   if (rows.length === 0) return result
@@ -24,7 +37,7 @@ async function upsertAppSettings(
   const importedRow = rows[0]
   // Extract only data columns, not the id
   const { id: _importedId, ...dataColumns } = importedRow
-  const cleanedData: Record<string, unknown> = {}
+  const cleanedData: ImportRow = {}
   for (const [key, val] of Object.entries(dataColumns)) {
     cleanedData[key] = val === '' ? null : val
   }
@@ -50,7 +63,7 @@ async function upsertAppSettings(
     }
   } else {
     // No existing row — insert the imported one (with its original id)
-    const cleanedRow: Record<string, unknown> = {}
+    const cleanedRow: ImportRow = {}
     for (const [key, val] of Object.entries(importedRow)) {
       cleanedRow[key] = val === '' ? null : val
     }
@@ -136,18 +149,15 @@ export async function POST(request: NextRequest) {
         const batch = rows.slice(i, i + BATCH_SIZE)
 
         // Clean rows: remove empty string values for nullable fields, keep nulls
-        const cleanedBatch = batch.map(row => {
-          const cleaned: Record<string, unknown> = {}
-          for (const [key, val] of Object.entries(row)) {
-            // Keep null as null, convert empty strings to null
-            cleaned[key] = val === '' ? null : val
+        const cleanedBatch = cleanImportRows(batch)
+        const tableClient = adminClient.from(table) as unknown as {
+          upsert: (values: unknown[], options: { onConflict: string; ignoreDuplicates: boolean }) => {
+            select: (columns: string) => Promise<{ data: Array<{ id: string }> | null; error: { message: string } | null }>
           }
-          return cleaned
-        })
+        }
 
-        const { data, error } = await adminClient
-          .from(table)
-          .upsert(cleanedBatch, { onConflict: 'id', ignoreDuplicates: true })
+        const { data, error } = await tableClient
+          .upsert(cleanedBatch as TablesInsert<TableName>[], { onConflict: 'id', ignoreDuplicates: true })
           .select('id')
 
         if (error) {
@@ -212,17 +222,11 @@ export async function POST(request: NextRequest) {
 
       for (let i = 0; i < eligibleRows.length; i += BATCH_SIZE) {
         const batch = eligibleRows.slice(i, i + BATCH_SIZE)
-        const cleanedBatch = batch.map(row => {
-          const cleaned: Record<string, unknown> = {}
-          for (const [key, val] of Object.entries(row)) {
-            cleaned[key] = val === '' ? null : val
-          }
-          return cleaned
-        })
+        const cleanedBatch = cleanImportRows(batch)
 
         const { data, error } = await adminClient
           .from('media')
-          .upsert(cleanedBatch, { onConflict: 'id', ignoreDuplicates: true })
+          .upsert(cleanedBatch as TablesInsert<'media'>[], { onConflict: 'id', ignoreDuplicates: true })
           .select('id')
 
         if (error) {

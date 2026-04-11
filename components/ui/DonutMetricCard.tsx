@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react'
+import type { ComponentType, CSSProperties } from 'react'
 
 export default function DonutMetricCard({
   title,
@@ -21,7 +21,7 @@ export default function DonutMetricCard({
   numeratorLabel: string
   denominatorLabel: string
   progress: number
-  icon: ComponentType<{ className?: string }>
+  icon: ComponentType<{ className?: string; style?: CSSProperties }>
   ringColor: string
   trackColor: string
   iconBgColor: string

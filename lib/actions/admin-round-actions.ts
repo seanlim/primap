@@ -418,8 +418,10 @@ export async function createWalk(data: {
   const { supabase } = await requireAdmin()
   const roundDateRange = await getRoundDateRange(supabase, data.roundId)
   if (roundDateRange.error) return { error: roundDateRange.error }
+  const round = roundDateRange.round
+  if (!round) return { error: 'Round not found' }
 
-  const rangeError = validateWalkDatesInRound([data.walkDate], roundDateRange.round)
+  const rangeError = validateWalkDatesInRound([data.walkDate], round)
   if (rangeError) return { error: rangeError }
 
   const { error } = await supabase
@@ -456,8 +458,10 @@ export async function updateWalk(walkId: string, data: {
   const { supabase } = await requireAdmin()
   const roundDateRange = await getRoundDateRange(supabase, data.roundId)
   if (roundDateRange.error) return { error: roundDateRange.error }
+  const round = roundDateRange.round
+  if (!round) return { error: 'Round not found' }
 
-  const rangeError = validateWalkDatesInRound([data.walkDate], roundDateRange.round)
+  const rangeError = validateWalkDatesInRound([data.walkDate], round)
   if (rangeError) return { error: rangeError }
 
   const { error } = await supabase
@@ -540,10 +544,12 @@ export async function bulkCreateWalks(data: {
   const { supabase } = await requireAdmin()
   const roundDateRange = await getRoundDateRange(supabase, data.roundId)
   if (roundDateRange.error) return { error: roundDateRange.error }
+  const round = roundDateRange.round
+  if (!round) return { error: 'Round not found' }
 
   const rangeError = validateWalkDatesInRound(
     data.slots.map((slot) => slot.walkDate),
-    roundDateRange.round
+    round
   )
   if (rangeError) return { error: rangeError }
 

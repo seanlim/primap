@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Users, Calendar, AlertTriangle, Settings, ClipboardList, CheckCircle, Gauge, ArrowRight, Footprints, Database } from 'lucide-react'
-import { getAdminVolunteerAnalyticsLanding } from '@/lib/admin-volunteer-analytics'
+import { getAdminVolunteerAnalyticsLanding, type SupabaseClientLike } from '@/lib/admin-volunteer-analytics'
 import { formatDate } from '@/lib/utils/format-date'
 import DonutMetricCard from '../../../components/ui/DonutMetricCard'
 import { ReportMapCard } from '@/components/admin/analytics-shared'
@@ -14,7 +14,7 @@ function formatPercent(value: number) {
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
-  const analyticsClient = { from: supabase.from.bind(supabase) }
+  const analyticsClient = supabase as unknown as SupabaseClientLike
 
   const [
     { count: totalUsers },

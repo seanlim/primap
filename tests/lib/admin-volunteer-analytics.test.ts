@@ -27,8 +27,8 @@ describe('buildVolunteerAnalyticsSnapshot', () => {
       round,
       now: new Date('2026-03-20T12:00:00+08:00'),
       slots: [
-        { id: 'ended-slot', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 3 },
-        { id: 'future-slot', walk_date: '2026-03-25', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 3 },
+        { id: 'ended-slot', round_id: 'round-1', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 3 },
+        { id: 'future-slot', round_id: 'round-1', walk_date: '2026-03-25', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 3 },
       ],
       memberships: [
         { slot_id: 'ended-slot', user_id: 'user-1', status: 'ACTIVE' },
@@ -48,8 +48,8 @@ describe('buildVolunteerAnalyticsSnapshot', () => {
       round,
       now: new Date('2026-03-20T12:00:00+08:00'),
       slots: [
-        { id: 'slot-1', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 2 },
-        { id: 'slot-2', walk_date: '2026-03-11', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 4 },
+        { id: 'slot-1', round_id: 'round-1', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 2 },
+        { id: 'slot-2', round_id: 'round-1', walk_date: '2026-03-11', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 4 },
       ],
       memberships: [
         { slot_id: 'slot-1', user_id: 'user-1', status: 'ACTIVE' },
@@ -68,8 +68,8 @@ describe('buildVolunteerAnalyticsSnapshot', () => {
       round,
       now: new Date('2026-03-20T12:00:00+08:00'),
       slots: [
-        { id: 'slot-1', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 3 },
-        { id: 'slot-2', walk_date: '2026-03-11', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 3 },
+        { id: 'slot-1', round_id: 'round-1', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 3 },
+        { id: 'slot-2', round_id: 'round-1', walk_date: '2026-03-11', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 3 },
       ],
       memberships: [
         { slot_id: 'slot-1', user_id: 'user-1', status: 'ACTIVE' },
@@ -88,8 +88,8 @@ describe('buildVolunteerAnalyticsSnapshot', () => {
       round,
       now: new Date('2026-03-20T12:00:00+08:00'),
       slots: [
-        { id: 'slot-1', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 3 },
-        { id: 'slot-2', walk_date: '2026-03-11', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 3 },
+        { id: 'slot-1', round_id: 'round-1', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 3 },
+        { id: 'slot-2', round_id: 'round-1', walk_date: '2026-03-11', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 3 },
       ],
       memberships: [
         { slot_id: 'slot-1', user_id: 'user-1', status: 'ACTIVE' },
@@ -111,8 +111,8 @@ describe('buildVolunteerAnalyticsSnapshot', () => {
       round,
       now: new Date('2026-03-20T12:00:00+08:00'),
       slots: [
-        { id: 'slot-ended', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 4 },
-        { id: 'slot-upcoming', walk_date: '2026-03-25', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 2 },
+        { id: 'slot-ended', round_id: 'round-1', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 4 },
+        { id: 'slot-upcoming', round_id: 'round-1', walk_date: '2026-03-25', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 2 },
       ],
       memberships: [
         { slot_id: 'slot-ended', user_id: 'user-1', status: 'ACTIVE' },

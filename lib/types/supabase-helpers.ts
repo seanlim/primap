@@ -51,7 +51,7 @@ export type IncidentWithRelations = Incident & {
 // --- Walk with membership count (admin) ---
 
 export type WalkWithCount = WalkSlot & {
-  survey_rounds: Pick<SurveyRound, 'name' | 'status'>
+  survey_rounds: Pick<SurveyRound, 'name' | 'status' | 'start_date' | 'end_date'>
   slot_memberships: { count: number }[]
 }
 

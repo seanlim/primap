@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { UsersClient } from './users-client'
 import type { UserStatus } from '@/lib/auth/access-policy'
-import { getAdminUsersAnalytics } from '@/lib/admin-volunteer-analytics'
+import { getAdminUsersAnalytics, type SupabaseClientLike } from '@/lib/admin-volunteer-analytics'
 import {
   DEFAULT_HIGH_PARTICIPATION_THRESHOLD,
   DEFAULT_LATE_CANCEL_HOURS,
@@ -31,7 +31,7 @@ export default async function AdminUsersPage({
   const to = from + PAGE_SIZE - 1
 
   const supabase = await createClient()
-  const analyticsClient = { from: supabase.from.bind(supabase) }
+  const analyticsClient = supabase as unknown as SupabaseClientLike
 
   const [{ data: users }, { count: totalCount }, { data: settings }, ...statusResults] = await Promise.all([
     (() => {

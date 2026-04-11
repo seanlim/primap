@@ -148,4 +148,62 @@ describe('WalkPage', () => {
     expect(screen.getAllByText('Available').length).toBeGreaterThan(0)
     expect(screen.getByText('Coast Trail')).toBeInTheDocument()
   })
+
+  it('shows round available counts for the current page slice', async () => {
+    mockSupabase.auth.getUser.mockResolvedValue({
+      data: { user: { id: 'user-1' } },
+    })
+
+    const roundOneSlots = Array.from({ length: 12 }, (_, index) => ({
+      id: `slot-${index + 1}`,
+      round_id: 'round-1',
+      location_name: `Round One Walk ${index + 1}`,
+      walk_date: `2026-04-${String(12 + index).padStart(2, '0')}`,
+      start_time: '08:00:00',
+      end_time: '10:00:00',
+      max_volunteers: 3,
+      slot_memberships: [],
+    }))
+
+    const tableResults: Record<string, Array<{ data?: unknown; count?: number | null }>> = {
+      survey_rounds: [
+        {
+          data: [
+            { id: 'round-1', name: 'Round Alpha', status: 'OPEN', start_date: '2026-04-01', end_date: '2026-04-30' },
+          ],
+        },
+      ],
+      walk_slots: [
+        {
+          data: roundOneSlots,
+          count: 12,
+        },
+      ],
+      slot_memberships: [
+        {
+          data: [],
+        },
+      ],
+    }
+
+    const callCounts = new Map<string, number>()
+    mockSupabase.from.mockImplementation((table: string) => ({
+      select: () => {
+        const index = callCounts.get(table) ?? 0
+        callCounts.set(table, index + 1)
+        const result = tableResults[table]?.[index]
+        if (!result) throw new Error(`Unexpected query for table ${table} at call ${index + 1}`)
+        return createQuery(result)
+      },
+    }))
+
+    render(await WalkPage({ searchParams: Promise.resolve({ page: '2' }) }))
+
+    expect(screen.getByText('Round Alpha')).toBeInTheDocument()
+    expect(screen.getByText('Round One Walk 11')).toBeInTheDocument()
+    expect(screen.getByText('Round One Walk 12')).toBeInTheDocument()
+    expect(screen.queryByText('Round One Walk 1')).not.toBeInTheDocument()
+    expect(screen.getByText('2')).toBeInTheDocument()
+    expect(screen.getByText('Page 2 of 2')).toBeInTheDocument()
+  })
 })

@@ -236,7 +236,7 @@ export default async function WalkPage({
   const paginatedSlots = availableSlots.slice(from, from + PAGE_SIZE)
   const groupedPaginatedSlots = groupSlotsByRound(paginatedSlots)
   const availableCountByRoundId = new Map(
-    groupSlotsByRound(availableSlots).map((group) => [group.roundId, group.slots.length])
+    groupedPaginatedSlots.map((group) => [group.roundId, group.slots.length])
   )
   const joinedCountByRoundId = new Map(
     groupedMySlots.map((group) => [group.roundId, group.slots.length])

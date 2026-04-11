@@ -171,7 +171,7 @@ export default async function ReportListPage() {
     }
 
     if (observation?.status === 'DRAFT') {
-      const draftItem = {
+      const draftItem: ReportItem = {
         key: observation.id,
         ...baseItem,
         statusLabel: 'Draft',

@@ -10,6 +10,15 @@ function parseAppDateTime(date: string, time: string) {
   return new Date(`${date}T${time}${APP_TIME_ZONE_OFFSET}`)
 }
 
+export function getAppDateString(now = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: APP_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now)
+}
+
 export function getWalkStartDateTime(walkDate: string, startTime: string) {
   return parseAppDateTime(walkDate, startTime)
 }

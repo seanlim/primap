@@ -1,6 +1,6 @@
 import { getWalkStartDateTime, hasWalkEnded } from '@/lib/utils/walk-participation'
 import { buildSlotPopupMeta } from '@/lib/utils/report-map'
-import { toLocalDateString } from '@/lib/utils/format-date'
+import { findCurrentRound } from '@/lib/utils/rounds'
 import {
   DEFAULT_HIGH_PARTICIPATION_THRESHOLD,
   DEFAULT_LATE_CANCEL_HOURS,
@@ -24,9 +24,9 @@ type SupabaseCountQueryLike = PromiseLike<CountResult> & {
   in: (...args: unknown[]) => SupabaseCountQueryLike
 }
 
-type SupabaseClientLike = {
+export type SupabaseClientLike = {
   from: (table: string) => {
-    select: (...args: unknown[]) => SupabaseQueryLike<unknown> | SupabaseCountQueryLike
+    select: (...args: any[]) => SupabaseQueryLike<unknown> | SupabaseCountQueryLike
   }
 }
 
@@ -70,12 +70,7 @@ export interface AnalyticsReportMapPoint {
   label: string
   popupMeta: string[]
   species?: string
-}
-
-function isDateInRound(round: AnalyticsRound, now: Date) {
-  const today = toLocalDateString(now)
-
-  return round.start_date <= today && today <= round.end_date
+  speciesOther?: string | null
 }
 
 export interface AnalyticsAllTimeTotals {
@@ -411,11 +406,23 @@ async function getReportMapPoints(
     .map((observation) => observation.id)
     .filter((observationId): observationId is string => Boolean(observationId))
 
-  const sightingsResult: QueryResult<Array<{ observation_id: string; lat: number | null; lng: number | null; species: string }>> = observationIds.length > 0
+  const sightingsResult: QueryResult<Array<{
+    observation_id: string
+    lat: number | null
+    lng: number | null
+    species: string
+    species_other: string | null
+  }>> = observationIds.length > 0
     ? await (supabase
         .from('sightings')
-        .select('observation_id, lat, lng, species')
-        .in('observation_id', observationIds) as SupabaseQueryLike<Array<{ observation_id: string; lat: number | null; lng: number | null; species: string }>>)
+        .select('observation_id, lat, lng, species, species_other')
+        .in('observation_id', observationIds) as SupabaseQueryLike<Array<{
+          observation_id: string
+          lat: number | null
+          lng: number | null
+          species: string
+          species_other: string | null
+        }>>)
     : { data: [], error: null }
 
   const observationById = new Map(
@@ -432,7 +439,7 @@ async function getReportMapPoints(
       const slot = observation ? slotsById.get(observation.slot_id) : null
       const sequence = (sightedPointCounts.get(sighting.observation_id) ?? 0) + 1
       sightedPointCounts.set(sighting.observation_id, sequence)
-      const speciesLabel = getSpeciesShortLabel(sighting.species)
+      const speciesLabel = getSpeciesShortLabel(sighting.species, sighting.species_other)
 
         return {
           lat: sighting.lat as number,
@@ -441,6 +448,7 @@ async function getReportMapPoints(
           label: speciesLabel ?? `Sighting ${sequence}`,
           popupMeta: buildSlotPopupMeta(slot, roundNameById.get(slot?.round_id ?? '') ?? null),
           species: sighting.species,
+          speciesOther: sighting.species_other,
         }
       })
 
@@ -572,7 +580,7 @@ export async function getAdminVolunteerAnalyticsLanding(
     return { targetRound: null, currentRound: null, reportMapPoints: [] }
   }
 
-  const targetRound = base.rounds.find((round) => isDateInRound(round, now)) ?? null
+  const targetRound = findCurrentRound(base.rounds, now)
 
   if (!targetRound) {
     return { targetRound: null, currentRound: null, reportMapPoints: [] }

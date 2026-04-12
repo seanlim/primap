@@ -176,8 +176,8 @@ export default async function HomePage() {
             <div className="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-2">
               <ClipboardList className="w-5 h-5 text-green-600" />
             </div>
-            <p className="font-medium text-gray-900">My Reports</p>
-            <p className="text-xs text-gray-500 mt-1">View and submit reports</p>
+            <p className="font-medium text-gray-900">View Reports</p>
+            <p className="text-xs text-gray-500 mt-1">Check drafts and submitted reports</p>
           </Link>
         </div>
       </div>

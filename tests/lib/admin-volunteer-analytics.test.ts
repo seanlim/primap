@@ -27,8 +27,8 @@ describe('buildVolunteerAnalyticsSnapshot', () => {
       round,
       now: new Date('2026-03-20T12:00:00+08:00'),
       slots: [
-        { id: 'ended-slot', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 3 },
-        { id: 'future-slot', walk_date: '2026-03-25', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 3 },
+        { id: 'ended-slot', round_id: 'round-1', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 3 },
+        { id: 'future-slot', round_id: 'round-1', walk_date: '2026-03-25', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 3 },
       ],
       memberships: [
         { slot_id: 'ended-slot', user_id: 'user-1', status: 'ACTIVE' },
@@ -48,8 +48,8 @@ describe('buildVolunteerAnalyticsSnapshot', () => {
       round,
       now: new Date('2026-03-20T12:00:00+08:00'),
       slots: [
-        { id: 'slot-1', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 2 },
-        { id: 'slot-2', walk_date: '2026-03-11', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 4 },
+        { id: 'slot-1', round_id: 'round-1', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 2 },
+        { id: 'slot-2', round_id: 'round-1', walk_date: '2026-03-11', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 4 },
       ],
       memberships: [
         { slot_id: 'slot-1', user_id: 'user-1', status: 'ACTIVE' },
@@ -68,8 +68,8 @@ describe('buildVolunteerAnalyticsSnapshot', () => {
       round,
       now: new Date('2026-03-20T12:00:00+08:00'),
       slots: [
-        { id: 'slot-1', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 3 },
-        { id: 'slot-2', walk_date: '2026-03-11', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 3 },
+        { id: 'slot-1', round_id: 'round-1', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 3 },
+        { id: 'slot-2', round_id: 'round-1', walk_date: '2026-03-11', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 3 },
       ],
       memberships: [
         { slot_id: 'slot-1', user_id: 'user-1', status: 'ACTIVE' },
@@ -88,8 +88,8 @@ describe('buildVolunteerAnalyticsSnapshot', () => {
       round,
       now: new Date('2026-03-20T12:00:00+08:00'),
       slots: [
-        { id: 'slot-1', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 3 },
-        { id: 'slot-2', walk_date: '2026-03-11', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 3 },
+        { id: 'slot-1', round_id: 'round-1', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 3 },
+        { id: 'slot-2', round_id: 'round-1', walk_date: '2026-03-11', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 3 },
       ],
       memberships: [
         { slot_id: 'slot-1', user_id: 'user-1', status: 'ACTIVE' },
@@ -111,8 +111,8 @@ describe('buildVolunteerAnalyticsSnapshot', () => {
       round,
       now: new Date('2026-03-20T12:00:00+08:00'),
       slots: [
-        { id: 'slot-ended', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 4 },
-        { id: 'slot-upcoming', walk_date: '2026-03-25', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 2 },
+        { id: 'slot-ended', round_id: 'round-1', walk_date: '2026-03-10', start_time: '07:00:00', end_time: '10:00:00', location_name: 'Hill', max_volunteers: 4 },
+        { id: 'slot-upcoming', round_id: 'round-1', walk_date: '2026-03-25', start_time: '07:00:00', end_time: '10:00:00', location_name: 'River', max_volunteers: 2 },
       ],
       memberships: [
         { slot_id: 'slot-ended', user_id: 'user-1', status: 'ACTIVE' },
@@ -392,6 +392,78 @@ describe('getAdminWalksAnalyticsPageSnapshotByRound', () => {
         outcome: 'NOT_SIGHTED',
         label: 'No sighting report 1',
         popupMeta: ['Hill', '10 Mar 2026 07:00', 'Round 1'],
+      },
+    ])
+  })
+
+  it('uses the custom species name for OTHER sighting map labels', async () => {
+    const supabase = {
+      from: (table: string) => ({
+        select: (..._args: unknown[]) => {
+          if (table === 'survey_rounds') {
+            return createQuery({
+              data: [
+                {
+                  id: 'round-1',
+                  name: 'Round 1',
+                  start_date: '2026-03-01',
+                  end_date: '2026-03-31',
+                  status: 'OPEN',
+                },
+              ],
+            })
+          }
+          if (table === 'walk_slots') {
+            return createQuery({
+              data: [
+                {
+                  id: 'slot-1',
+                  round_id: 'round-1',
+                  walk_date: '2026-03-10',
+                  start_time: '07:00:00',
+                  end_time: '10:00:00',
+                  location_name: 'Hill',
+                  max_volunteers: 3,
+                },
+              ],
+            })
+          }
+          if (table === 'slot_memberships') return createQuery({ data: [] })
+          if (table === 'observations') {
+            return createQuery({
+              data: [
+                { id: 'obs-1', slot_id: 'slot-1', status: 'SUBMITTED', outcome: 'SIGHTED', lat: 1.35, lng: 103.81 },
+              ],
+            })
+          }
+          if (table === 'sightings') {
+            return createQuery({
+              data: [
+                { observation_id: 'obs-1', lat: 1.3521, lng: 103.8198, species: 'OTHER', species_other: 'Silvered Langur' },
+              ],
+            })
+          }
+          if (table === 'profiles') return createQuery({ count: 0 })
+          throw new Error(`Unexpected table ${table}`)
+        },
+      }),
+    }
+
+    const snapshot = await getAdminWalksAnalyticsPageSnapshotByRound(supabase as never, {
+      roundId: 'round-1',
+      walkId: 'slot-1',
+      now: new Date('2026-03-20T12:00:00+08:00'),
+    })
+
+    expect(snapshot.reportMapPoints).toEqual([
+      {
+        lat: 1.3521,
+        lng: 103.8198,
+        outcome: 'SIGHTED',
+        label: 'Silvered Langur',
+        popupMeta: ['Hill', '10 Mar 2026 07:00', 'Round 1'],
+        species: 'OTHER',
+        speciesOther: 'Silvered Langur',
       },
     ])
   })

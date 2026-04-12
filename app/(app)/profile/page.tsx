@@ -4,6 +4,7 @@ import { ProfileClient } from './profile-client'
 import type { WalkRef, HistoryObservation } from '@/lib/types/supabase-helpers'
 import { getWalkStartDateTime, hasWalkEnded } from '@/lib/utils/walk-participation'
 import { buildSlotPopupMeta } from '@/lib/utils/report-map'
+import { findCurrentRound } from '@/lib/utils/rounds'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,19 +20,6 @@ export default async function ProfilePage() {
     .single()
 
   if (!profile) redirect('/login')
-
-  // Get stats
-  const { count: walksJoined } = await supabase
-    .from('slot_memberships')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', user.id)
-    .eq('status', 'ACTIVE')
-
-  const { count: reportsSubmitted } = await supabase
-    .from('observations')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', user.id)
-    .eq('status', 'SUBMITTED')
 
   const [{ data: activeMemberships }, { data: submittedObservationHistory }] = await Promise.all([
     supabase
@@ -78,15 +66,6 @@ export default async function ProfilePage() {
     .map((membership) => (membership.walk_slots as WalkRef | undefined)?.id)
     .filter(Boolean)
 
-  const { count: draftsPending } = activeSlotIds.length > 0
-    ? await supabase
-        .from('observations')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('status', 'DRAFT')
-        .in('slot_id', activeSlotIds)
-    : { count: 0 }
-
   const walkHistoryItems = [
     ...activeWalkHistory.map((membership) => ({
       membershipId: membership.id,
@@ -132,7 +111,7 @@ export default async function ProfilePage() {
   const { data: submittedSightings } = submittedObservationIds.length > 0
     ? await supabase
         .from('sightings')
-        .select('observation_id, lat, lng, species')
+        .select('observation_id, lat, lng, species, species_other')
         .in('observation_id', submittedObservationIds)
     : { data: [] }
 
@@ -154,7 +133,10 @@ export default async function ProfilePage() {
       lng: sighting.lng,
       outcome: 'SIGHTED' as const,
       species: sighting.species,
-      label: sighting.species,
+      speciesOther: sighting.species_other,
+      label: sighting.species === 'OTHER'
+        ? (sighting.species_other?.trim() || 'Other')
+        : sighting.species,
       popupMeta: buildSlotPopupMeta(
         {
           location_name: slot?.location_name || 'My sighting',
@@ -186,12 +168,52 @@ export default async function ProfilePage() {
       }
     })
 
-  // Get app settings for progress
-  const { data: settings } = await supabase
-    .from('app_settings')
-    .select('required_walks_per_round')
-    .limit(1)
-    .single()
+  const [{ data: settings }, { data: rounds }] = await Promise.all([
+    supabase
+      .from('app_settings')
+      .select('required_walks_per_round')
+      .limit(1)
+      .single(),
+    supabase
+      .from('survey_rounds')
+      .select('id, name, start_date, end_date')
+      .eq('status', 'OPEN')
+      .order('start_date', { ascending: false }),
+  ])
+
+  const currentRound = findCurrentRound(rounds || [])
+
+  const { data: currentRoundSlots } = currentRound
+    ? await supabase
+        .from('walk_slots')
+        .select('id')
+        .eq('round_id', currentRound.id)
+    : { data: [] }
+
+  const currentRoundSlotIds = (currentRoundSlots || []).map((slot) => slot.id)
+
+  const [{ count: walksJoined }, { count: draftsPending }, { count: reportsSubmitted }] = currentRoundSlotIds.length > 0
+    ? await Promise.all([
+        supabase
+          .from('slot_memberships')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('status', 'ACTIVE')
+          .in('slot_id', currentRoundSlotIds),
+        supabase
+          .from('observations')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('status', 'DRAFT')
+          .in('slot_id', currentRoundSlotIds),
+        supabase
+          .from('observations')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('status', 'SUBMITTED')
+          .in('slot_id', currentRoundSlotIds),
+      ])
+    : [{ count: 0 }, { count: 0 }, { count: 0 }]
 
   return (
     <ProfileClient

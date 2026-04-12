@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { ArrowLeft, CheckCircle, Gauge, Footprints, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { getAdminRoundsAnalyticsPageSnapshot } from '@/lib/admin-volunteer-analytics'
+import { getAdminRoundsAnalyticsPageSnapshot, type SupabaseClientLike } from '@/lib/admin-volunteer-analytics'
 import DonutMetricCard from '../../../../../components/ui/DonutMetricCard'
 import { ReportMapCard, SummaryCard } from '@/components/admin/analytics-shared'
 
@@ -17,7 +17,7 @@ export default async function AdminRoundsAnalyticsPage({
 }) {
   const params = (await searchParams) ?? {}
   const supabase = await createClient()
-  const analyticsClient = { from: supabase.from.bind(supabase) }
+  const analyticsClient = supabase as unknown as SupabaseClientLike
   const analytics = await getAdminRoundsAnalyticsPageSnapshot(
     analyticsClient,
     {
@@ -111,7 +111,6 @@ export default async function AdminRoundsAnalyticsPage({
                   trackColor="#bbf7d0"
                   iconBgColor="#f0fdf4"
                   iconColor="#15803d"
-                  accentColor="#16a34a"
                 />
                 <DonutMetricCard
                   title="Sign-up Rate"
@@ -126,7 +125,6 @@ export default async function AdminRoundsAnalyticsPage({
                   trackColor="#fed7aa"
                   iconBgColor="#fff7ed"
                   iconColor="#c2410c"
-                  accentColor="#ea580c"
                 />
               </div>
 
@@ -135,7 +133,6 @@ export default async function AdminRoundsAnalyticsPage({
                   title="Total Walks"
                   value={analytics.overview.totalWalks}
                   icon={Footprints}
-                  accentColor="#9333ea"
                   iconBgColor="#faf5ff"
                   iconColor="#9333ea"
                 />
@@ -143,7 +140,6 @@ export default async function AdminRoundsAnalyticsPage({
                   title="Total Volunteers"
                   value={analytics.overview.participatingVolunteers}
                   icon={Users}
-                  accentColor="#2563eb"
                   iconBgColor="#eff6ff"
                   iconColor="#2563eb"
                 />

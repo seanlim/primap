@@ -12,6 +12,7 @@ import {
   OBSERVATION_MEDIA_BUCKET,
   INCIDENT_MEDIA_BUCKET,
 } from '@/lib/utils/storage'
+import { findOverlappingRound } from '@/lib/utils/rounds'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
 
@@ -45,6 +46,30 @@ async function hasSubmittedObservationsForSlots(
 
   if (error) return { error: error.message }
   return { hasSubmitted: (data?.length ?? 0) > 0 }
+}
+
+async function validateRoundDateAvailability(
+  supabase: SupabaseClient<Database>,
+  candidate: { startDate: string; endDate: string },
+  excludeRoundId?: string
+) {
+  const { data: rounds, error } = await supabase
+    .from('survey_rounds')
+    .select('id, name, start_date, end_date')
+
+  if (error) return { error: error.message }
+
+  const overlappingRound = findOverlappingRound(
+    rounds ?? [],
+    { start_date: candidate.startDate, end_date: candidate.endDate },
+    excludeRoundId
+  )
+
+  if (!overlappingRound) return { error: null }
+
+  return {
+    error: `Round dates overlap with ${overlappingRound.name || 'another round'} (${overlappingRound.start_date} to ${overlappingRound.end_date}). Rounds must not overlap.`,
+  }
 }
 
 type ObservationDeleteStatus = 'DRAFT' | 'SUBMITTED'
@@ -200,6 +225,8 @@ export async function createRound(data: {
   if (errors.length > 0) return { error: errors.join('; ') }
 
   const { supabase, userId } = await requireAdmin()
+  const overlapCheck = await validateRoundDateAvailability(supabase, data)
+  if (overlapCheck.error) return { error: overlapCheck.error }
 
   const { error } = await supabase
     .from('survey_rounds')
@@ -233,6 +260,8 @@ export async function updateRound(roundId: string, data: {
   if (errors.length > 0) return { error: errors.join('; ') }
 
   const { supabase } = await requireAdmin()
+  const overlapCheck = await validateRoundDateAvailability(supabase, data, roundId)
+  if (overlapCheck.error) return { error: overlapCheck.error }
 
   const { error } = await supabase
     .from('survey_rounds')
@@ -389,8 +418,10 @@ export async function createWalk(data: {
   const { supabase } = await requireAdmin()
   const roundDateRange = await getRoundDateRange(supabase, data.roundId)
   if (roundDateRange.error) return { error: roundDateRange.error }
+  const round = roundDateRange.round
+  if (!round) return { error: 'Round not found' }
 
-  const rangeError = validateWalkDatesInRound([data.walkDate], roundDateRange.round)
+  const rangeError = validateWalkDatesInRound([data.walkDate], round)
   if (rangeError) return { error: rangeError }
 
   const { error } = await supabase
@@ -427,8 +458,10 @@ export async function updateWalk(walkId: string, data: {
   const { supabase } = await requireAdmin()
   const roundDateRange = await getRoundDateRange(supabase, data.roundId)
   if (roundDateRange.error) return { error: roundDateRange.error }
+  const round = roundDateRange.round
+  if (!round) return { error: 'Round not found' }
 
-  const rangeError = validateWalkDatesInRound([data.walkDate], roundDateRange.round)
+  const rangeError = validateWalkDatesInRound([data.walkDate], round)
   if (rangeError) return { error: rangeError }
 
   const { error } = await supabase
@@ -511,10 +544,12 @@ export async function bulkCreateWalks(data: {
   const { supabase } = await requireAdmin()
   const roundDateRange = await getRoundDateRange(supabase, data.roundId)
   if (roundDateRange.error) return { error: roundDateRange.error }
+  const round = roundDateRange.round
+  if (!round) return { error: 'Round not found' }
 
   const rangeError = validateWalkDatesInRound(
     data.slots.map((slot) => slot.walkDate),
-    roundDateRange.round
+    round
   )
   if (rangeError) return { error: rangeError }
 

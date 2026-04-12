@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { ArrowLeft, CheckCircle, Gauge, UserMinus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { getAdminWalksAnalyticsPageSnapshotByRound } from '@/lib/admin-volunteer-analytics'
+import { getAdminWalksAnalyticsPageSnapshotByRound, type SupabaseClientLike } from '@/lib/admin-volunteer-analytics'
 import { ReportMapCard, SummaryCard } from '@/components/admin/analytics-shared'
 import { WalkAnalyticsFilters } from './walk-analytics-filters'
 import DonutMetricCard from '@/components/ui/DonutMetricCard'
@@ -18,7 +18,7 @@ export default async function AdminWalksAnalyticsPage({
 }) {
   const params = (await searchParams) ?? {}
   const supabase = await createClient()
-  const analyticsClient = { from: supabase.from.bind(supabase) }
+  const analyticsClient = supabase as unknown as SupabaseClientLike
   const analytics = await getAdminWalksAnalyticsPageSnapshotByRound(
     analyticsClient,
     {
@@ -89,7 +89,6 @@ export default async function AdminWalksAnalyticsPage({
                   trackColor="#bbf7d0"
                   iconBgColor="#f0fdf4"
                   iconColor="#15803d"
-                  accentColor="#16a34a"
                 />
                 <DonutMetricCard
                   title="Sign-up Rate"
@@ -104,7 +103,6 @@ export default async function AdminWalksAnalyticsPage({
                   trackColor="#fed7aa"
                   iconBgColor="#fff7ed"
                   iconColor="#c2410c"
-                  accentColor="#ea580c"
                 />
               </div>
 
@@ -113,7 +111,6 @@ export default async function AdminWalksAnalyticsPage({
                   title="Cancellations"
                   value={analytics.overview.cancellations}
                   icon={UserMinus}
-                  accentColor="#dc2626"
                   iconBgColor="#fef2f2"
                   iconColor="#dc2626"
                 />

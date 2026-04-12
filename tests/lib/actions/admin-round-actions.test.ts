@@ -19,6 +19,9 @@ const { mockSupabase, methods } = vi.hoisted(() => {
     neq: vi.fn(),
     in: vi.fn(),
     limit: vi.fn(),
+    then: vi.fn((resolve: (value: unknown) => unknown) =>
+      Promise.resolve(resolve({ data: null, error: null, count: null }))
+    ),
     single: vi.fn().mockResolvedValue({ data: null, error: null }),
   }
   for (const key of Object.keys(methods) as (keyof typeof methods)[]) {
@@ -69,6 +72,9 @@ function resetChain() {
   methods.neq.mockReturnThis()
   methods.in.mockReturnThis()
   methods.limit.mockReturnThis()
+  methods.then.mockImplementation((resolve: (value: unknown) => unknown) =>
+    Promise.resolve(resolve({ data: null, error: null, count: null }))
+  )
   methods.single.mockResolvedValue({ data: null, error: null })
 }
 
@@ -130,6 +136,9 @@ describe('admin-round-actions', () => {
   describe('createRound', () => {
     it('creates a round and revalidates', async () => {
       setupAdmin()
+      methods.then.mockImplementationOnce((resolve: (value: unknown) => unknown) =>
+        Promise.resolve(resolve({ data: [], error: null, count: null }))
+      )
 
       const result = await createRound(roundData)
 
@@ -147,6 +156,9 @@ describe('admin-round-actions', () => {
 
     it('returns error on DB insert failure', async () => {
       setupAdmin()
+      methods.then.mockImplementationOnce((resolve: (value: unknown) => unknown) =>
+        Promise.resolve(resolve({ data: [], error: null, count: null }))
+      )
       methods.insert.mockReturnValueOnce({
         error: { message: 'Insert failed' },
       })
@@ -155,6 +167,24 @@ describe('admin-round-actions', () => {
 
       expect(result).toEqual({ error: 'Insert failed' })
       expect(revalidatePath).not.toHaveBeenCalled()
+    })
+
+    it('rejects overlapping round dates', async () => {
+      setupAdmin()
+      methods.then.mockImplementationOnce((resolve: (value: unknown) => unknown) =>
+        Promise.resolve(resolve({
+          data: [{ id: 'round-2', name: 'Round 2', start_date: '2026-04-15', end_date: '2026-05-15' }],
+          error: null,
+          count: null,
+        }))
+      )
+
+      const result = await createRound(roundData)
+
+      expect(result).toEqual({
+        error: 'Round dates overlap with Round 2 (2026-04-15 to 2026-05-15). Rounds must not overlap.',
+      })
+      expect(methods.insert).not.toHaveBeenCalled()
     })
   })
 
@@ -795,6 +825,9 @@ describe('admin-round-actions', () => {
   describe('updateRound', () => {
     it('updates a round and revalidates', async () => {
       setupAdmin()
+      methods.then.mockImplementationOnce((resolve: (value: unknown) => unknown) =>
+        Promise.resolve(resolve({ data: [], error: null, count: null }))
+      )
 
       const result = await updateRound('round-1', roundData)
 
@@ -823,6 +856,9 @@ describe('admin-round-actions', () => {
 
     it('returns error on DB failure', async () => {
       setupAdmin()
+      methods.then.mockImplementationOnce((resolve: (value: unknown) => unknown) =>
+        Promise.resolve(resolve({ data: [], error: null, count: null }))
+      )
       methods.eq
         .mockReturnValueOnce(methods)
         .mockReturnValueOnce({ error: { message: 'Update failed' } })
@@ -830,6 +866,31 @@ describe('admin-round-actions', () => {
       const result = await updateRound('round-1', roundData)
 
       expect(result).toEqual({ error: 'Update failed' })
+    })
+
+    it('rejects overlap with another round during updates', async () => {
+      setupAdmin()
+      methods.then.mockImplementationOnce((resolve: (value: unknown) => unknown) =>
+        Promise.resolve(resolve({
+          data: [
+            { id: 'round-1', name: 'Round 1', start_date: '2026-04-01', end_date: '2026-04-30' },
+            { id: 'round-2', name: 'Round 2', start_date: '2026-05-01', end_date: '2026-05-31' },
+          ],
+          error: null,
+          count: null,
+        }))
+      )
+
+      const result = await updateRound('round-1', {
+        ...roundData,
+        startDate: '2026-04-20',
+        endDate: '2026-05-10',
+      })
+
+      expect(result).toEqual({
+        error: 'Round dates overlap with Round 2 (2026-05-01 to 2026-05-31). Rounds must not overlap.',
+      })
+      expect(methods.update).not.toHaveBeenCalled()
     })
   })
 

@@ -81,26 +81,31 @@ export function SummaryCard({
   title,
   value,
   icon: Icon,
-  accentColor,
   iconBgColor,
   iconColor,
 }: {
   title: string
   value: number
   icon: IconComponent
-  accentColor: string
   iconBgColor: string
   iconColor: string
 }) {
   return (
-    <div className="rounded-2xl border-l-4 bg-white p-4 shadow-sm" style={{ borderLeftColor: accentColor }}>
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: iconBgColor }}>
-          <Icon className="h-5 w-5" style={{ color: iconColor }} />
+    <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+      <div
+        className="border-b border-gray-100 px-4 py-3.5"
+        style={{ background: `linear-gradient(90deg, ${iconBgColor}, rgba(255,255,255,0.96))` }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl ring-1 ring-black/5" style={{ backgroundColor: iconBgColor }}>
+            <Icon className="h-5 w-5" style={{ color: iconColor }} />
+          </div>
+          <p className="text-sm font-semibold uppercase tracking-wider text-gray-500">{title}</p>
         </div>
-        <p className="text-sm font-semibold uppercase tracking-wider text-gray-500">{title}</p>
       </div>
-      <p className="mt-4 text-2xl font-bold text-gray-900">{value}</p>
+      <div className="px-4 py-4">
+        <p className="text-[30px] font-semibold leading-none tracking-[-0.04em] text-gray-900 tabular-nums">{value}</p>
+      </div>
     </div>
   )
 }

@@ -39,14 +39,6 @@ vi.mock('@/lib/email', () => ({
   sendWalkCancellationEmail: vi.fn(),
 }))
 
-const { mockDeleteDraftObservationsForSlot } = vi.hoisted(() => ({
-  mockDeleteDraftObservationsForSlot: vi.fn().mockResolvedValue({ deletedCount: 0 }),
-}))
-
-vi.mock('@/lib/actions/observation-actions', () => ({
-  deleteDraftObservationsForSlot: (...args: unknown[]) => mockDeleteDraftObservationsForSlot(...args),
-}))
-
 import { joinWalk, cancelWalk } from '@/lib/actions/walk-actions'
 import { sendWalkCancellationEmail } from '@/lib/email'
 
@@ -64,7 +56,9 @@ function resetChain() {
   methods.single.mockResolvedValue({ data: null, error: null })
   mockSupabase.rpc.mockResolvedValue({ data: null, error: null })
   mockSupabase.from.mockReturnValue(methods)
-  mockDeleteDraftObservationsForSlot.mockResolvedValue({ deletedCount: 0 })
+  mockSupabase.storage.from.mockReturnValue({
+    remove: vi.fn().mockResolvedValue({ error: null }),
+  })
 }
 
 function setupUser(userId = 'user-1') {
@@ -94,20 +88,23 @@ function mockJoinableSlot(overrides?: Partial<{
 }
 
 function setupCancelMocks(overrides?: {
-  submittedObservation?: { id: string } | null
-  submittedObservationError?: { message: string } | null
-  cancelledMemberships?: Array<{ id: string }>
-  updateError?: { message: string } | null
+  rpcResult?: {
+    success?: boolean
+    error?: string
+    deleted_draft_count?: number
+    file_paths?: string[]
+  } | null
+  rpcError?: { message: string } | null
+  storageError?: { message: string } | null
   slot?: { walk_date: string; start_time: string; location_name: string } | null
   profile?: { full_name: string | null; email: string | null } | null
   otherMembers?: Array<{ user_id: string; profiles: { email: string | null } }>
 }) {
-  const submittedObservation = overrides && 'submittedObservation' in overrides ? overrides.submittedObservation : null
-  const submittedObservationError = overrides && 'submittedObservationError' in overrides
-    ? overrides.submittedObservationError
-    : null
-  const cancelledMemberships = overrides?.cancelledMemberships ?? [{ id: 'membership-1' }]
-  const updateError = overrides?.updateError ?? null
+  const rpcResult = overrides && 'rpcResult' in overrides
+    ? overrides.rpcResult
+    : { success: true, deleted_draft_count: 0, file_paths: [] }
+  const rpcError = overrides?.rpcError ?? null
+  const storageError = overrides?.storageError ?? null
   const slot = overrides && 'slot' in overrides
     ? overrides.slot
     : { walk_date: '2026-04-15', start_time: '08:00', location_name: 'Central Park' }
@@ -118,36 +115,17 @@ function setupCancelMocks(overrides?: {
     ? overrides.otherMembers
     : [{ user_id: 'other-1', profiles: { email: 'other@test.com' } }]
 
-  mockSupabase.from.mockImplementation((table: string) => {
-    if (table === 'observations') {
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({
-                data: submittedObservation ? [submittedObservation] : [],
-                error: submittedObservationError,
-              }),
-            }),
-          }),
-        }),
-      }
-    }
+  mockSupabase.rpc.mockResolvedValue({
+    data: rpcResult,
+    error: rpcError,
+  })
+  mockSupabase.storage.from.mockReturnValue({
+    remove: vi.fn().mockResolvedValue({ error: storageError }),
+  })
 
+  mockSupabase.from.mockImplementation((table: string) => {
     if (table === 'slot_memberships') {
       return {
-        update: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                select: vi.fn().mockResolvedValue({
-                  data: cancelledMemberships,
-                  error: updateError,
-                }),
-              }),
-            }),
-          }),
-        }),
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
@@ -307,8 +285,9 @@ describe('walk-actions', () => {
       const result = await cancelWalk('slot-1')
 
       expect(result).toEqual({ success: true })
-      expect(mockSupabase.from).toHaveBeenCalledWith('slot_memberships')
-      expect(mockDeleteDraftObservationsForSlot).toHaveBeenCalledWith(mockSupabase, 'user-1', 'slot-1')
+      expect(mockSupabase.rpc).toHaveBeenCalledWith('cancel_slot_with_draft_cleanup', {
+        p_slot_id: 'slot-1',
+      })
       expect(sendWalkCancellationEmail).toHaveBeenCalledWith(
         ['other@test.com'],
         { date: '2026-04-15', time: '08:00', location: 'Central Park' },
@@ -323,7 +302,7 @@ describe('walk-actions', () => {
     it('returns error when DB update fails', async () => {
       setupUser()
       setupCancelMocks({
-        updateError: { message: 'Update failed' },
+        rpcError: { message: 'Update failed' },
       })
 
       const result = await cancelWalk('slot-1')
@@ -334,7 +313,7 @@ describe('walk-actions', () => {
     it('returns error when no active membership is cancelled', async () => {
       setupUser()
       setupCancelMocks({
-        cancelledMemberships: [],
+        rpcResult: { error: 'You are not actively joined to this walk.' },
       })
 
       const result = await cancelWalk('slot-1')
@@ -345,13 +324,23 @@ describe('walk-actions', () => {
     it('returns error when a submitted report already exists', async () => {
       setupUser()
       setupCancelMocks({
-        submittedObservation: { id: 'obs-1' },
-        submittedObservationError: null,
+        rpcResult: { error: "You can't cancel this walk after submitting your report." },
       })
 
       const result = await cancelWalk('slot-1')
 
       expect(result).toEqual({ error: "You can't cancel this walk after submitting your report." })
+    })
+
+    it('returns error when RPC returns an unexpected empty payload', async () => {
+      setupUser()
+      setupCancelMocks({
+        rpcResult: null,
+      })
+
+      const result = await cancelWalk('slot-1')
+
+      expect(result).toEqual({ error: 'Unexpected cancellation response.' })
     })
 
     it('still succeeds when slot is not found for email', async () => {
@@ -408,16 +397,20 @@ describe('walk-actions', () => {
 
     it('returns success with warning when draft cleanup fails', async () => {
       setupUser()
-      setupCancelMocks()
-      mockDeleteDraftObservationsForSlot.mockResolvedValueOnce({ error: 'Delete failed' })
+      setupCancelMocks({
+        rpcResult: { success: true, deleted_draft_count: 1, file_paths: ['drafts/user-1/photo.jpg'] },
+      })
+      mockSupabase.storage.from.mockReturnValueOnce({
+        remove: vi.fn().mockResolvedValue({ error: { message: 'Delete failed' } }),
+      })
 
       const result = await cancelWalk('slot-1')
 
       expect(result).toEqual({
         success: true,
-        warning: 'Cancelled successfully, but failed to remove your draft report.',
+        warning: 'Cancelled successfully, but failed to remove your draft report media.',
       })
-      expect(sendWalkCancellationEmail).not.toHaveBeenCalled()
+      expect(sendWalkCancellationEmail).toHaveBeenCalled()
     })
 
     it('uses full_name for cancellingName', async () => {

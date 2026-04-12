@@ -453,6 +453,10 @@ export type Database = {
         Args: { p_slot_id: string; p_user_id: string }
         Returns: Json
       }
+      cancel_slot_with_draft_cleanup: {
+        Args: { p_slot_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       incident_type:

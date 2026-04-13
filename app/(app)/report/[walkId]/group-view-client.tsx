@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronDown, ChevronUp, MapPin, Eye, AlertTriangle, ArrowLeft } from 'lucide-react'
+import { ChevronDown, ChevronUp, MapPin, Eye, AlertTriangle, ArrowLeft, Pencil } from 'lucide-react'
 import { submitObservation } from '@/lib/actions/observation-actions'
 import { formatDate } from '@/lib/utils/format-date'
 import { useToast } from '@/components/ui/toast'
@@ -166,7 +166,7 @@ export function GroupViewClient({
                   {myObservation.status}
                 </span>
               </div>
-              {myObservation.status === 'DRAFT' && (
+              {myObservation.status === 'DRAFT' && !isAdminView && (
                 <div className="flex items-center gap-2">
                   <Link
                     href={`/report/${slot.id}/edit`}
@@ -182,6 +182,15 @@ export function GroupViewClient({
                     {submitting ? 'Submitting...' : 'Submit'}
                   </button>
                 </div>
+              )}
+              {isAdminView && (
+                <Link
+                  href={`/admin/reports/${slot.id}/${myObservation.id}/edit`}
+                  className="flex items-center gap-1 text-sm bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-200 font-medium transition-colors"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Edit
+                </Link>
               )}
             </div>
             {myObservation.status === 'SUBMITTED' && myObservation.submittedAt && (
@@ -224,11 +233,23 @@ export function GroupViewClient({
                     </span>
                   )}
                 </div>
-                {expandedCards.has(obs.id) ? (
-                  <ChevronUp className="w-5 h-5 text-gray-400" />
-                ) : (
-                  <ChevronDown className="w-5 h-5 text-gray-400" />
-                )}
+                <div className="flex items-center gap-2">
+                  {isAdminView && (
+                    <Link
+                      href={`/admin/reports/${slot.id}/${obs.id}/edit`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1 text-sm bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-200 font-medium transition-colors"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      Edit
+                    </Link>
+                  )}
+                  {expandedCards.has(obs.id) ? (
+                    <ChevronUp className="w-5 h-5 text-gray-400" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-gray-400" />
+                  )}
+                </div>
               </button>
               {expandedCards.has(obs.id) && (
                 <div className="border-t border-gray-100">

@@ -42,6 +42,11 @@ interface MediaUploaderProps {
    * (e.g., the IncidentModal phase 2 step).
    */
   onUploadingChange?: (uploadingCount: number) => void
+  /**
+   * Custom delete handler. If provided, called instead of the default
+   * `deleteMedia` action. Used by admin edit to bypass RLS via service role.
+   */
+  onDeleteMedia?: (mediaId: string) => Promise<{ success?: true; error?: string }>
 }
 
 export function MediaUploader({
@@ -56,6 +61,7 @@ export function MediaUploader({
   syncKey = 0,
   clientParentId,
   onUploadingChange,
+  onDeleteMedia,
 }: MediaUploaderProps) {
   // Pick the storage bucket based on parent type. Incidents live in
   // INCIDENT_MEDIA_BUCKET; observations and sightings share OBSERVATION_MEDIA_BUCKET.
@@ -246,7 +252,7 @@ export function MediaUploader({
   }
 
   const handleDelete = async (mediaId: string) => {
-    const result = await deleteMedia(mediaId)
+    const result = onDeleteMedia ? await onDeleteMedia(mediaId) : await deleteMedia(mediaId)
     if (result.success) {
       // useMediaUrls re-resolves on `media` change, so the deleted item drops
       // out of signedUrls automatically — no need to maintain a parallel map.

@@ -70,6 +70,7 @@ export default async function EditReportPage({
       existingObservation={existingObs ? {
         id: existingObs.id,
         walkCompletion: existingObs.walk_completion,
+        completionComment: existingObs.completion_comment,
         outcome: existingObs.outcome,
         notes: existingObs.notes,
         lat: existingObs.lat,

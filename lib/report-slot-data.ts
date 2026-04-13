@@ -18,6 +18,7 @@ interface ObservationData {
   userId: string
   userName: string
   walkCompletion: string | null
+  completionComment: string | null
   outcome: string | null
   notes: string | null
   lat: number | null
@@ -143,6 +144,7 @@ export async function getSlotReportViewData(
       userId: obs.user_id,
       userName: obs.profiles.full_name || obs.profiles.email,
       walkCompletion: obs.walk_completion,
+      completionComment: obs.completion_comment,
       outcome: obs.outcome,
       notes: obs.notes,
       lat: obs.lat,

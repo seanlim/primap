@@ -6,6 +6,7 @@ import { TABLE_ORDER, EXPORT_XLSX_FILENAME, MEDIA_DIR, BATCH_SIZE, type TableNam
 import { parseWorkbookToTableData } from '@/lib/export-import/import-workbook'
 import { uploadMediaFile } from '@/lib/export-import/media-helpers'
 import type { TablesInsert } from '@/lib/types/database'
+import { INCIDENT_MEDIA_BUCKET, OBSERVATION_MEDIA_BUCKET, type MediaBucket } from '@/lib/utils/storage'
 
 export const maxDuration = 300
 
@@ -16,6 +17,10 @@ interface TableSummary {
 }
 
 type ImportRow = Record<string, unknown>
+
+function resolveMediaBucket(row: ImportRow | undefined): MediaBucket {
+  return row?.incident_id ? INCIDENT_MEDIA_BUCKET : OBSERVATION_MEDIA_BUCKET
+}
 
 function cleanImportRows(rows: ImportRow[]) {
   return rows.map(row => {
@@ -178,6 +183,12 @@ export async function POST(request: NextRequest) {
     const mediaSummary = { uploaded: 0, skipped: 0, errors: [] as string[] }
     const uploadedPaths = new Set<string>()
     const mediaFolder = zip.folder(MEDIA_DIR)
+    const mediaRows = tableData['media'] ?? []
+    const mediaRowByPath = new Map(
+      mediaRows
+        .map(row => [String(row.file_path ?? ''), row] as const)
+        .filter(([filePath]) => Boolean(filePath))
+    )
 
     if (mediaFolder) {
       const mediaFiles: { path: string; file: JSZip.JSZipObject }[] = []
@@ -189,7 +200,8 @@ export async function POST(request: NextRequest) {
 
       for (const { path, file } of mediaFiles) {
         const fileData = await file.async('uint8array')
-        const { error, skipped } = await uploadMediaFile(adminClient, path, fileData)
+        const bucket = resolveMediaBucket(mediaRowByPath.get(path))
+        const { error, skipped } = await uploadMediaFile(adminClient, path, fileData, undefined, bucket)
 
         if (error) {
           mediaSummary.errors.push(`${path}: ${error}`)
@@ -205,7 +217,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Now insert media DB rows, only for files that were successfully uploaded or already existed
-    const mediaRows = tableData['media']
     const mediaTableSummary: TableSummary = { inserted: 0, skipped: 0, errors: [] }
 
     if (mediaRows && mediaRows.length > 0) {

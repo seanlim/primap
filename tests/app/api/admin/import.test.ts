@@ -273,6 +273,9 @@ describe('POST /api/admin/import', () => {
   it('uploads media files from zip', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'admin1' } } })
     mockProfileSingle.mockResolvedValue({ data: { role: 'ADMIN' } })
+    mockParseWorkbook.mockResolvedValue({
+      media: [{ id: 'm1', file_path: 'user1/obs1/photo.jpg', observation_id: 'obs1' }],
+    })
     setupZipMock(true, [
       { path: 'user1/obs1/photo.jpg', content: new Uint8Array([1, 2, 3]) },
     ])
@@ -280,7 +283,35 @@ describe('POST /api/admin/import', () => {
     const response = await POST(makeRequest())
     const body = await response.json()
     expect(mockUploadMedia).toHaveBeenCalledTimes(1)
+    expect(mockUploadMedia).toHaveBeenCalledWith(
+      expect.anything(),
+      'user1/obs1/photo.jpg',
+      expect.any(Uint8Array),
+      undefined,
+      'observation-media'
+    )
     expect(body.summary.media_files.uploaded).toBe(1)
+  })
+
+  it('uploads incident media files to the incident-media bucket during restore', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'admin1' } } })
+    mockProfileSingle.mockResolvedValue({ data: { role: 'ADMIN' } })
+    mockParseWorkbook.mockResolvedValue({
+      media: [{ id: 'm1', file_path: 'user1/incidents/inc-1/photo.jpg', incident_id: 'inc-1' }],
+    })
+    setupZipMock(true, [
+      { path: 'user1/incidents/inc-1/photo.jpg', content: new Uint8Array([1, 2, 3]) },
+    ])
+
+    await POST(makeRequest())
+
+    expect(mockUploadMedia).toHaveBeenCalledWith(
+      expect.anything(),
+      'user1/incidents/inc-1/photo.jpg',
+      expect.any(Uint8Array),
+      undefined,
+      'incident-media'
+    )
   })
 
   it('correctly counts skipped media files', async () => {

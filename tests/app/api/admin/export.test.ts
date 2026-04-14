@@ -9,11 +9,13 @@ const {
   mockProfileSingle,
   mockFetchAllRows,
   mockBuildExportWorkbook,
+  mockDownloadMediaFile,
 } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockProfileSingle: vi.fn(),
   mockFetchAllRows: vi.fn(),
   mockBuildExportWorkbook: vi.fn(),
+  mockDownloadMediaFile: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -29,7 +31,7 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('@/lib/export-import/media-helpers', () => ({
   fetchAllRows: (...args: unknown[]) => mockFetchAllRows(...args),
-  downloadMediaFile: vi.fn().mockResolvedValue({ data: null, error: 'No file' }),
+  downloadMediaFile: (...args: unknown[]) => mockDownloadMediaFile(...args),
 }))
 
 vi.mock('@/lib/export-import/export-workbook', () => ({
@@ -47,6 +49,7 @@ describe('GET /api/admin/export', () => {
     vi.clearAllMocks()
     mockFetchAllRows.mockResolvedValue([])
     mockBuildExportWorkbook.mockResolvedValue(Buffer.from('fake-xlsx'))
+    mockDownloadMediaFile.mockResolvedValue({ data: null, error: 'No file' })
   })
 
   it('returns 401 when user is not authenticated', async () => {
@@ -148,5 +151,24 @@ describe('GET /api/admin/export', () => {
     const disposition = response.headers.get('Content-Disposition')!
     // Should match pattern primap-export-YYYY-MM-DD.zip
     expect(disposition).toMatch(/primap-export-\d{4}-\d{2}-\d{2}\.zip/)
+  })
+
+  it('downloads incident-linked media from the incident-media bucket', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'admin1' } } })
+    mockProfileSingle.mockResolvedValue({ data: { role: 'ADMIN' } })
+    mockFetchAllRows.mockImplementation(async (_client: unknown, table: string) => {
+      if (table === 'media') {
+        return [{ id: 'm1', file_path: 'u1/incidents/i1/photo.jpg', incident_id: 'i1' }]
+      }
+      return []
+    })
+
+    await GET()
+
+    expect(mockDownloadMediaFile).toHaveBeenCalledWith(
+      expect.anything(),
+      'u1/incidents/i1/photo.jpg',
+      'incident-media'
+    )
   })
 })

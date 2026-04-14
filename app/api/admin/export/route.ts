@@ -5,6 +5,7 @@ import JSZip from 'jszip'
 import { TABLE_ORDER, EXPORT_XLSX_FILENAME, MEDIA_DIR, type TableName } from '@/lib/export-import/constants'
 import { fetchAllRows, downloadMediaFile } from '@/lib/export-import/media-helpers'
 import { buildExportWorkbook } from '@/lib/export-import/export-workbook'
+import { INCIDENT_MEDIA_BUCKET, OBSERVATION_MEDIA_BUCKET } from '@/lib/utils/storage'
 
 export const maxDuration = 300
 
@@ -49,8 +50,9 @@ export async function GET() {
     for (const row of mediaRows) {
       const filePath = row.file_path as string
       if (!filePath) continue
+      const bucket = row.incident_id ? INCIDENT_MEDIA_BUCKET : OBSERVATION_MEDIA_BUCKET
 
-      const { data, error } = await downloadMediaFile(adminClient, filePath)
+      const { data, error } = await downloadMediaFile(adminClient, filePath, bucket)
       if (error || !data) {
         mediaWarnings.push(`Skipped ${filePath}: ${error ?? 'no data'}`)
         continue

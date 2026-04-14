@@ -44,9 +44,9 @@ const baseSlot = {
 
 const baseObservation = {
   user_id: 'user-a',
-  walk_completion: 'COMPLETED' as const,
+  walk_completion: 'COMPLETED' as 'COMPLETED' | 'PARTIAL' | 'ABORTED',
   completion_comment: null as string | null,
-  outcome: 'NOT_SIGHTED' as const,
+  outcome: 'NOT_SIGHTED' as 'SIGHTED' | 'NOT_SIGHTED',
   notes: null,
   lat: 1.3,
   lng: 103.8,

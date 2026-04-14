@@ -42,6 +42,17 @@ interface MediaUploaderProps {
    * (e.g., the IncidentModal phase 2 step).
    */
   onUploadingChange?: (uploadingCount: number) => void
+  /**
+   * Custom delete handler. If provided, called instead of the default
+   * `deleteMedia` action. Used by admin edit to bypass RLS via service role.
+   */
+  onDeleteMedia?: (mediaId: string) => Promise<{ success?: true; error?: string }>
+  /**
+   * When true, hides the upload button and file input. Existing media is
+   * displayed (and deletable if not offline) but no new files can be added.
+   * Used by admin edit where uploads go through a different auth path.
+   */
+  readOnly?: boolean
 }
 
 export function MediaUploader({
@@ -56,6 +67,8 @@ export function MediaUploader({
   syncKey = 0,
   clientParentId,
   onUploadingChange,
+  onDeleteMedia,
+  readOnly = false,
 }: MediaUploaderProps) {
   // Pick the storage bucket based on parent type. Incidents live in
   // INCIDENT_MEDIA_BUCKET; observations and sightings share OBSERVATION_MEDIA_BUCKET.
@@ -246,7 +259,7 @@ export function MediaUploader({
   }
 
   const handleDelete = async (mediaId: string) => {
-    const result = await deleteMedia(mediaId)
+    const result = onDeleteMedia ? await onDeleteMedia(mediaId) : await deleteMedia(mediaId)
     if (result.success) {
       // useMediaUrls re-resolves on `media` change, so the deleted item drops
       // out of signedUrls automatically — no need to maintain a parallel map.
@@ -389,7 +402,7 @@ export function MediaUploader({
       )}
 
       {/* Upload button */}
-      {totalMedia < maxFiles && (
+      {!readOnly && totalMedia < maxFiles && (
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
@@ -400,14 +413,16 @@ export function MediaUploader({
         </button>
       )}
 
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*,video/*"
-        multiple
-        onChange={handleFileSelect}
-        className="hidden"
-      />
+      {!readOnly && (
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*,video/*"
+          multiple
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+      )}
     </div>
   )
 }

@@ -64,7 +64,7 @@ export function IncidentModal({ walkId, onClose, onSubmitted }: IncidentModalPro
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
       <div className="fixed inset-0 bg-black/50" onClick={handleBackdropClick} />
       <div className="relative bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-md p-6 max-h-[80vh] overflow-y-auto">
         <h2 className="text-lg font-bold text-gray-900 mb-4">

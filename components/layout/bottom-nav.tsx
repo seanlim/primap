@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Footprints, ClipboardList, User, Shield } from 'lucide-react'
+import { Home, Footprints, ClipboardList, User, Shield, CircleQuestionMarkIcon } from 'lucide-react'
 
 const navItems = [
   { href: '/home', label: 'Home', icon: Home },
   { href: '/walk', label: 'Walks', icon: Footprints },
   { href: '/report', label: 'Reports', icon: ClipboardList },
   { href: '/profile', label: 'Profile', icon: User },
+  { href: '/primap_beginner_guide.pdf', label: 'Tutorial', icon: CircleQuestionMarkIcon}
 ]
 
 export function BottomNav({ isAdmin }: { isAdmin: boolean }) {

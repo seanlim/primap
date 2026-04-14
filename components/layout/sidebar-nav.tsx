@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Footprints, ClipboardList, User, Shield } from 'lucide-react'
+import { Home, Footprints, ClipboardList, User, Shield, CircleQuestionMarkIcon} from 'lucide-react'
 import { useAuth } from '@/lib/hooks/use-auth'
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
   { href: '/walk', label: 'Walks', icon: Footprints },
   { href: '/report', label: 'Reports', icon: ClipboardList },
   { href: '/profile', label: 'Profile', icon: User },
+  { href: '/primap_beginner_guide.pdf', label: 'Tutorial', icon: CircleQuestionMarkIcon}
 ]
 
 export function SidebarNav({ isAdmin }: { isAdmin: boolean }) {

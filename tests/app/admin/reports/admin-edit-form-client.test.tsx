@@ -80,7 +80,41 @@ const defaultSlot = {
   roundName: 'Round 1',
 }
 
-const sightedObservation = {
+interface MediaItem {
+  id: string
+  file_path: string
+  file_name: string
+  media_type: string
+}
+
+interface TestSighting {
+  id: string
+  species: string
+  speciesOther: string | null
+  count: string
+  observedAt: string | null
+  lat: number
+  lng: number
+  notes: string | null
+  media: MediaItem[]
+}
+
+interface TestObservation {
+  id: string
+  userId: string
+  userName: string
+  slotId: string
+  walkCompletion: string
+  outcome: string
+  notes: string | null
+  lat: number | null
+  lng: number | null
+  status: string
+  sightings: TestSighting[]
+  media: MediaItem[]
+}
+
+const sightedObservation: TestObservation = {
   id: 'obs-1',
   userId: 'user-1',
   userName: 'Alice',
@@ -107,7 +141,7 @@ const sightedObservation = {
   media: [],
 }
 
-const notSightedObservation = {
+const notSightedObservation: TestObservation = {
   id: 'obs-2',
   userId: 'user-1',
   userName: 'Alice',
@@ -122,7 +156,7 @@ const notSightedObservation = {
   media: [{ id: 'm2', file_path: 'q.jpg', file_name: 'q.jpg', media_type: 'PHOTO' }],
 }
 
-function renderForm(observation = sightedObservation) {
+function renderForm(observation: TestObservation = sightedObservation) {
   return render(
     <AdminEditFormClient
       slot={defaultSlot}

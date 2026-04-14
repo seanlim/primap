@@ -47,6 +47,12 @@ interface MediaUploaderProps {
    * `deleteMedia` action. Used by admin edit to bypass RLS via service role.
    */
   onDeleteMedia?: (mediaId: string) => Promise<{ success?: true; error?: string }>
+  /**
+   * When true, hides the upload button and file input. Existing media is
+   * displayed (and deletable if not offline) but no new files can be added.
+   * Used by admin edit where uploads go through a different auth path.
+   */
+  readOnly?: boolean
 }
 
 export function MediaUploader({
@@ -62,6 +68,7 @@ export function MediaUploader({
   clientParentId,
   onUploadingChange,
   onDeleteMedia,
+  readOnly = false,
 }: MediaUploaderProps) {
   // Pick the storage bucket based on parent type. Incidents live in
   // INCIDENT_MEDIA_BUCKET; observations and sightings share OBSERVATION_MEDIA_BUCKET.
@@ -395,7 +402,7 @@ export function MediaUploader({
       )}
 
       {/* Upload button */}
-      {totalMedia < maxFiles && (
+      {!readOnly && totalMedia < maxFiles && (
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
@@ -406,14 +413,16 @@ export function MediaUploader({
         </button>
       )}
 
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*,video/*"
-        multiple
-        onChange={handleFileSelect}
-        className="hidden"
-      />
+      {!readOnly && (
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*,video/*"
+          multiple
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+      )}
     </div>
   )
 }

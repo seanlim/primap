@@ -126,10 +126,12 @@ export async function adminUpdateObservation(
     const keptIds = input.sightings.filter(s => s.id).map(s => s.id)
 
     // Find sightings to remove
-    const { data: existingSightings } = await supabase
+    const { data: existingSightings, error: fetchError } = await supabase
       .from('sightings')
       .select('id')
       .eq('observation_id', input.observationId)
+
+    if (fetchError) return { error: fetchError.message }
 
     const existingIds = (existingSightings ?? []).map(s => s.id)
     const toRemoveIds = existingIds.filter(id => !keptIds.includes(id))
@@ -147,16 +149,18 @@ export async function adminUpdateObservation(
           .remove(mediaRecords.map(m => m.file_path))
       }
 
-      await supabase
+      const { error: deleteError } = await supabase
         .from('sightings')
         .delete()
         .in('id', toRemoveIds)
+
+      if (deleteError) return { error: deleteError.message }
     }
 
     // Update existing and insert new sightings
     for (const s of input.sightings) {
       if (s.id) {
-        await supabase
+        const { error: sightingUpdateError } = await supabase
           .from('sightings')
           .update({
             species: s.species,
@@ -168,8 +172,10 @@ export async function adminUpdateObservation(
             notes: s.notes || null,
           })
           .eq('id', s.id)
+
+        if (sightingUpdateError) return { error: sightingUpdateError.message }
       } else {
-        await supabase
+        const { error: sightingInsertError } = await supabase
           .from('sightings')
           .insert({
             observation_id: input.observationId,
@@ -181,14 +187,18 @@ export async function adminUpdateObservation(
             lng: s.lng,
             notes: s.notes || null,
           })
+
+        if (sightingInsertError) return { error: sightingInsertError.message }
       }
     }
   } else {
     // No sightings provided — remove all
-    const { data: existingSightings } = await supabase
+    const { data: existingSightings, error: fetchError } = await supabase
       .from('sightings')
       .select('id')
       .eq('observation_id', input.observationId)
+
+    if (fetchError) return { error: fetchError.message }
 
     const existingIds = (existingSightings ?? []).map(s => s.id)
     if (existingIds.length > 0) {
@@ -203,10 +213,12 @@ export async function adminUpdateObservation(
           .remove(mediaRecords.map(m => m.file_path))
       }
 
-      await supabase
+      const { error: deleteError } = await supabase
         .from('sightings')
         .delete()
         .in('id', existingIds)
+
+      if (deleteError) return { error: deleteError.message }
     }
   }
 

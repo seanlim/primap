@@ -338,26 +338,22 @@ export function AdminEditFormClient({ slot, observation, maxMediaPerReport }: Pr
                 </div>
 
                 <div>
-                  <MediaUploader
-                    label="Photos/Videos"
-                    parentType="sighting"
-                    parentId={sighting.id ?? null}
-                    clientParentId={sighting.clientTempId}
-                    existingMedia={sighting.media}
-                    maxFiles={maxMediaPerReport}
-                    onExifGps={(exifLat, exifLng) => {
-                      if (!sighting.lat && !sighting.lng) {
-                        updateSighting(index, 'lat', exifLat)
-                        updateSighting(index, 'lng', exifLng)
-                      }
-                    }}
-                    onExifDatetime={(datetime) => {
-                      if (!sighting.observedAt) {
-                        updateSighting(index, 'observedAt', datetime)
-                      }
-                    }}
-                    onDeleteMedia={adminDeleteMedia}
-                  />
+                  {sighting.id ? (
+                    <MediaUploader
+                      label="Photos/Videos"
+                      parentType="sighting"
+                      parentId={sighting.id}
+                      clientParentId={sighting.clientTempId}
+                      existingMedia={sighting.media}
+                      maxFiles={maxMediaPerReport}
+                      onDeleteMedia={adminDeleteMedia}
+                      readOnly
+                    />
+                  ) : (
+                    <p className="text-xs text-gray-400 italic">
+                      Save changes first to manage photos for this sighting.
+                    </p>
+                  )}
                 </div>
               </>
             )}
@@ -409,13 +405,8 @@ export function AdminEditFormClient({ slot, observation, maxMediaPerReport }: Pr
             clientParentId={observation.id}
             existingMedia={observation.media}
             maxFiles={maxMediaPerReport}
-            onExifGps={(exifLat, exifLng) => {
-              if (!lat && !lng) {
-                setLat(exifLat)
-                setLng(exifLng)
-              }
-            }}
             onDeleteMedia={adminDeleteMedia}
+            readOnly
           />
         </div>
       )}

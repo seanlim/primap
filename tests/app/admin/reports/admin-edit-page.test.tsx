@@ -40,8 +40,8 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 vi.mock('next/navigation', () => ({
-  redirect: (...args: unknown[]) => mockRedirect(...args),
-  notFound: (...args: unknown[]) => mockNotFound(...args),
+  redirect: (url: string) => mockRedirect(url),
+  notFound: () => mockNotFound(),
 }))
 
 vi.mock('@/lib/actions/admin-observation-actions', () => ({

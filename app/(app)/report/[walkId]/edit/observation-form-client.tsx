@@ -28,6 +28,7 @@ interface Props {
   existingObservation: {
     id: string
     walkCompletion: 'COMPLETED' | 'PARTIAL' | 'ABORTED'
+    completionComment: string | null
     outcome: 'SIGHTED' | 'NOT_SIGHTED'
     notes: string | null
     lat: number | null
@@ -63,6 +64,7 @@ const SPECIES_OPTIONS = [
 
 export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_MEDIA_PER_REPORT, existingObservation }: Props) {
   const [walkCompletion, setWalkCompletion] = useState(existingObservation?.walkCompletion ?? 'PARTIAL')
+  const [completionComment, setCompletionComment] = useState(existingObservation?.completionComment ?? '')
   const [notes, setNotes] = useState(existingObservation?.notes ?? '')
   const [lat, setLat] = useState<number | null>(existingObservation?.lat ?? null)
   const [lng, setLng] = useState<number | null>(existingObservation?.lng ?? null)
@@ -140,8 +142,8 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
   }
 
   // Ref that always holds current form state
-  const formStateRef = useRef({ walkCompletion, notes, lat, lng, observationId, clientDraftId, sightings })
-  formStateRef.current = { walkCompletion, notes, lat, lng, observationId, clientDraftId, sightings }
+  const formStateRef = useRef({ walkCompletion, completionComment, notes, lat, lng, observationId, clientDraftId, sightings })
+  formStateRef.current = { walkCompletion, completionComment, notes, lat, lng, observationId, clientDraftId, sightings }
 
   // --- DIRTY STATE TRACKING (two-tier) ---
   const lastLocalSnapshotRef = useRef<string>('')
@@ -150,6 +152,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
   const serializeFormState = useCallback((state: typeof formStateRef.current) => {
     return JSON.stringify({
       wc: state.walkCompletion,
+      cc: state.completionComment,
       n: state.notes,
       la: state.lat,
       ln: state.lng,
@@ -192,6 +195,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
       observationId: fs.observationId,
       clientDraftId: fs.clientDraftId,
       walkCompletion: fs.walkCompletion as 'COMPLETED' | 'PARTIAL' | 'ABORTED',
+      completionComment: fs.completionComment || undefined,
       outcome: has ? 'SIGHTED' : 'NOT_SIGHTED',
       notes: fs.notes || undefined,
       lat: fs.lat ?? undefined,
@@ -210,6 +214,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
         // IndexedDB has data — use it as source of truth
         const data = draft.data
         setWalkCompletion(data.walkCompletion)
+        setCompletionComment(data.completionComment ?? '')
         setNotes(data.notes ?? '')
         setLat(data.lat ?? null)
         setLng(data.lng ?? null)
@@ -231,6 +236,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
           observationId: existingObservation.id,
           clientDraftId: existingObservation.id,
           walkCompletion: existingObservation.walkCompletion,
+          completionComment: existingObservation.completionComment ?? undefined,
           outcome: existingObservation.outcome,
           notes: existingObservation.notes ?? undefined,
           lat: existingObservation.lat ?? undefined,
@@ -295,6 +301,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
       walkId: slot.id,
       observationId: draft.data.observationId,
       walkCompletion: draft.data.walkCompletion,
+      completionComment: draft.data.completionComment,
       outcome: draft.data.outcome ?? (hasSightings ? 'SIGHTED' : 'NOT_SIGHTED'),
       notes: draft.data.notes,
       lat: draft.data.lat,
@@ -400,6 +407,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
         observationId: fs.observationId,
         clientDraftId: fs.clientDraftId,
         walkCompletion: fs.walkCompletion as 'COMPLETED' | 'PARTIAL' | 'ABORTED',
+        completionComment: fs.completionComment || undefined,
         outcome: hasSightings ? 'SIGHTED' : 'NOT_SIGHTED',
         notes: fs.notes || undefined,
         lat: fs.lat ?? undefined,
@@ -489,6 +497,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
         observationId: serverData.id,
         clientDraftId: serverData.id,
         walkCompletion: serverData.walkCompletion as 'COMPLETED' | 'PARTIAL' | 'ABORTED',
+        completionComment: serverData.completionComment ?? undefined,
         outcome: serverData.outcome as 'SIGHTED' | 'NOT_SIGHTED',
         notes: serverData.notes ?? undefined,
         lat: serverData.lat ?? undefined,
@@ -498,6 +507,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
       lastServerUpdatedAtRef.current = serverData.serverUpdatedAt
 
       setWalkCompletion(serverData.walkCompletion)
+      setCompletionComment(serverData.completionComment ?? '')
       setNotes(serverData.notes ?? '')
       setLat(serverData.lat ?? null)
       setLng(serverData.lng ?? null)
@@ -668,6 +678,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
       observationId,
       clientDraftId,
       walkCompletion: walkCompletion as 'COMPLETED' | 'PARTIAL' | 'ABORTED',
+      completionComment: completionComment || undefined,
       outcome: (hasSightings ? 'SIGHTED' : 'NOT_SIGHTED') as 'SIGHTED' | 'NOT_SIGHTED',
       notes: notes || undefined,
       lat: lat ?? undefined,
@@ -695,6 +706,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
       walkId: slot.id,
       observationId,
       walkCompletion: walkCompletion,
+      completionComment: completionComment || undefined,
       outcome: hasSightings ? 'SIGHTED' : 'NOT_SIGHTED',
       notes: notes || undefined,
       lat: lat ?? undefined,
@@ -791,6 +803,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
       walkId: slot.id,
       observationId,
       walkCompletion: walkCompletion,
+      completionComment: completionComment || undefined,
       outcome,
       notes: notes || undefined,
       lat: lat ?? undefined,
@@ -882,7 +895,11 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
             <button
               key={opt.value}
               type="button"
-              onClick={() => { setWalkCompletion(opt.value); triggerDebouncedSave() }}
+              onClick={() => {
+                setWalkCompletion(opt.value)
+                if (opt.value === 'COMPLETED') setCompletionComment('')
+                triggerDebouncedSave()
+              }}
               className={`py-2.5 px-3 rounded-xl text-sm font-medium transition-colors ${
                 walkCompletion === opt.value
                   ? 'bg-green-600 text-white'
@@ -893,6 +910,20 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
             </button>
           ))}
         </div>
+        {(walkCompletion === 'PARTIAL' || walkCompletion === 'ABORTED') && (
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">
+              Comment <span className="text-gray-400">(reason for {walkCompletion === 'PARTIAL' ? 'partial' : 'aborted'} walk)</span>
+            </label>
+            <textarea
+              value={completionComment}
+              onChange={(e) => { setCompletionComment(e.target.value); triggerDebouncedSave() }}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+              rows={2}
+              placeholder="Why was the walk not completed?"
+            />
+          </div>
+        )}
       </div>
 
       {/* Step 2: Sightings */}

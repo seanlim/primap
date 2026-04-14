@@ -25,6 +25,7 @@ interface SaveDraftInput {
   walkId: string
   observationId?: string
   walkCompletion: 'COMPLETED' | 'PARTIAL' | 'ABORTED'
+  completionComment?: string
   outcome: 'SIGHTED' | 'NOT_SIGHTED'
   notes?: string
   lat?: number
@@ -65,6 +66,7 @@ export async function saveDraft(input: SaveDraftInput) {
       .from('observations')
       .update({
         walk_completion: input.walkCompletion,
+        completion_comment: input.completionComment || null,
         outcome: input.outcome,
         notes: input.notes,
         lat: input.lat,
@@ -84,6 +86,7 @@ export async function saveDraft(input: SaveDraftInput) {
         slot_id: input.walkId,
         user_id: user.id,
         walk_completion: input.walkCompletion,
+        completion_comment: input.completionComment || null,
         outcome: input.outcome,
         notes: input.notes,
         lat: input.lat,
@@ -354,6 +357,7 @@ export async function getObservationFull(walkId: string) {
   return {
     id: data.id,
     walkCompletion: data.walk_completion,
+    completionComment: data.completion_comment,
     outcome: data.outcome,
     notes: data.notes,
     lat: data.lat,

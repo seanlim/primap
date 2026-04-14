@@ -30,6 +30,7 @@ interface ObservationData {
   userId: string
   userName: string
   walkCompletion: string | null
+  completionComment: string | null
   outcome: string | null
   notes: string | null
   lat: number | null
@@ -339,6 +340,13 @@ function ObservationDetails({ observation }: { observation: ObservationData }) {
           </div>
         )}
       </div>
+
+      {observation.completionComment && (
+        <div>
+          <p className="text-xs text-gray-400">Completion Comment</p>
+          <p className="text-sm text-gray-700 mt-1">{observation.completionComment}</p>
+        </div>
+      )}
 
       {observation.notes && (
         <div>

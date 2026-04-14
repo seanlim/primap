@@ -16,6 +16,7 @@ export interface SightingForm {
 export interface OfflineDraftInput {
   observationId?: string
   walkCompletion: 'COMPLETED' | 'PARTIAL' | 'ABORTED'
+  completionComment?: string
   outcome: 'SIGHTED' | 'NOT_SIGHTED'
   notes?: string
   lat?: number

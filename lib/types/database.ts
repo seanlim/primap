@@ -171,6 +171,7 @@ export type Database = {
       observations: {
         Row: {
           client_draft_id: string | null
+          completion_comment: string | null
           created_at: string
           id: string
           last_user_agent: string | null
@@ -187,6 +188,7 @@ export type Database = {
         }
         Insert: {
           client_draft_id?: string | null
+          completion_comment?: string | null
           created_at?: string
           id?: string
           last_user_agent?: string | null
@@ -203,6 +205,7 @@ export type Database = {
         }
         Update: {
           client_draft_id?: string | null
+          completion_comment?: string | null
           created_at?: string
           id?: string
           last_user_agent?: string | null

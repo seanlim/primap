@@ -232,6 +232,7 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
         userName: user.name,
         userFallback: user.email,
         userId: incident ? asString(incident.reported_by) : asString(observation?.user_id),
+        incidentId: asString(media.incident_id),
         species: asString(sighting?.species),
         count: asNumber(sighting?.count) === '' ? null : Number(asNumber(sighting?.count)),
         sightingId: asString(media.sighting_id),

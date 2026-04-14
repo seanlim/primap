@@ -168,7 +168,7 @@ describe('GET /api/admin/export', () => {
     expect(mockDownloadMediaFile).toHaveBeenCalledWith(
       expect.anything(),
       'u1/incidents/i1/photo.jpg',
-      'incident-media'
+      { bucket: 'incident-media' }
     )
   })
 })

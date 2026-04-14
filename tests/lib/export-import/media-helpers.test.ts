@@ -123,7 +123,7 @@ describe('downloadMediaFile', () => {
       storage: { from: ReturnType<typeof vi.fn> }
     }
 
-    await downloadMediaFile(client as never, 'user1/incidents/i1/photo.jpg', 'incident-media')
+    await downloadMediaFile(client as never, 'user1/incidents/i1/photo.jpg', { bucket: 'incident-media' })
 
     expect(client.storage.from).toHaveBeenCalledWith('incident-media')
   })
@@ -185,8 +185,7 @@ describe('uploadMediaFile', () => {
       client as never,
       'user1/incidents/i1/photo.jpg',
       new Uint8Array([1, 2, 3]),
-      undefined,
-      'incident-media'
+      { bucket: 'incident-media' }
     )
 
     expect(client.storage.from).toHaveBeenCalledWith('incident-media')
@@ -294,7 +293,7 @@ describe('uploadMediaFile', () => {
       },
     } as unknown as Parameters<typeof uploadMediaFile>[0]
 
-    await uploadMediaFile(client, 'file.bin', new Uint8Array([1]), 'application/pdf')
+    await uploadMediaFile(client, 'file.bin', new Uint8Array([1]), { contentType: 'application/pdf' })
 
     expect(uploadMock).toHaveBeenCalledWith(
       'file.bin',

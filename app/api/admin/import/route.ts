@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
       for (const { path, file } of mediaFiles) {
         const fileData = await file.async('uint8array')
         const bucket = resolveMediaBucket(mediaRowByPath.get(path))
-        const { error, skipped } = await uploadMediaFile(adminClient, path, fileData, undefined, bucket)
+        const { error, skipped } = await uploadMediaFile(adminClient, path, fileData, { bucket })
 
         if (error) {
           mediaSummary.errors.push(`${path}: ${error}`)

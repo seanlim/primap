@@ -52,7 +52,7 @@ export async function GET() {
       if (!filePath) continue
       const bucket = row.incident_id ? INCIDENT_MEDIA_BUCKET : OBSERVATION_MEDIA_BUCKET
 
-      const { data, error } = await downloadMediaFile(adminClient, filePath, bucket)
+      const { data, error } = await downloadMediaFile(adminClient, filePath, { bucket })
       if (error || !data) {
         mediaWarnings.push(`Skipped ${filePath}: ${error ?? 'no data'}`)
         continue

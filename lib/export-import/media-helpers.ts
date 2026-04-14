@@ -2,6 +2,11 @@ import { SupabaseClient } from '@supabase/supabase-js'
 import { STORAGE_BUCKET, PAGE_SIZE } from './constants'
 import type { MediaBucket } from '@/lib/utils/storage'
 
+interface MediaFileOptions {
+  bucket?: MediaBucket
+  contentType?: string
+}
+
 export async function fetchAllRows(
   client: SupabaseClient,
   table: string
@@ -30,8 +35,9 @@ export async function fetchAllRows(
 export async function downloadMediaFile(
   adminClient: SupabaseClient,
   filePath: string,
-  bucket: MediaBucket = STORAGE_BUCKET
+  options: MediaFileOptions = {}
 ): Promise<{ data: ArrayBuffer | null; error: string | null }> {
+  const { bucket = STORAGE_BUCKET } = options
   try {
     const { data, error } = await adminClient.storage
       .from(bucket)
@@ -51,9 +57,9 @@ export async function uploadMediaFile(
   adminClient: SupabaseClient,
   filePath: string,
   fileData: Uint8Array | Buffer,
-  contentType?: string,
-  bucket: MediaBucket = STORAGE_BUCKET
+  options: MediaFileOptions = {}
 ): Promise<{ error: string | null; skipped: boolean }> {
+  const { bucket = STORAGE_BUCKET, contentType } = options
   try {
     const { error } = await adminClient.storage
       .from(bucket)

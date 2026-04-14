@@ -287,8 +287,7 @@ describe('POST /api/admin/import', () => {
       expect.anything(),
       'user1/obs1/photo.jpg',
       expect.any(Uint8Array),
-      undefined,
-      'observation-media'
+      { bucket: 'observation-media' }
     )
     expect(body.summary.media_files.uploaded).toBe(1)
   })
@@ -309,8 +308,7 @@ describe('POST /api/admin/import', () => {
       expect.anything(),
       'user1/incidents/inc-1/photo.jpg',
       expect.any(Uint8Array),
-      undefined,
-      'incident-media'
+      { bucket: 'incident-media' }
     )
   })
 

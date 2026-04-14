@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { formatDate, getRelativeDay } from '@/lib/utils/format-date'
-import { Calendar, PenLine, CheckCircle, MapPin, ArrowRight, Footprints, ClipboardList, ChevronRight } from 'lucide-react'
+import { Calendar, PenLine, CheckCircle, MapPin, ArrowRight, Footprints, ClipboardList, ChevronRight, Compass } from 'lucide-react'
 import type { WalkRef } from '@/lib/types/supabase-helpers'
 
 export const dynamic = 'force-dynamic'
@@ -180,6 +180,25 @@ export default async function HomePage() {
             <p className="text-xs text-gray-500 mt-1">Check drafts and submitted reports</p>
           </Link>
         </div>
+
+        <Link
+          href="/guidance"
+          className="flex items-center justify-between rounded-2xl border border-sky-200 bg-sky-50 p-4 shadow-sm hover:shadow-md transition-all"
+        >
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shrink-0">
+              <Compass className="w-5 h-5 text-sky-600" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-sky-700 uppercase tracking-wider">New here?</p>
+              <p className="font-medium text-gray-900 mt-1">Read beginner guide</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Learn how to sign up, join a walk, and submit your first report.
+              </p>
+            </div>
+          </div>
+          <ChevronRight className="w-5 h-5 text-sky-700 shrink-0" aria-hidden="true" />
+        </Link>
       </div>
 
       {/* Upcoming Walks List */}

@@ -72,6 +72,8 @@ function makeViewExportData(): ViewExportData {
       resolved: false,
       resolvedNotes: '',
       createdAt: '2026-03-14T09:30:00Z',
+      mediaCount: 1,
+      mediaFiles: 'media/Round 1/.../incident.jpg',
     }],
     mediaRows: [{
       roundName: 'Round 1',
@@ -112,10 +114,15 @@ describe('buildViewExportWorkbook', () => {
   it('writes friendly headers and rows', async () => {
     const workbook = await parseWorkbook(await buildViewExportWorkbook(makeViewExportData()))
     const observations = workbook.getWorksheet('Observations')!
+    const incidents = workbook.getWorksheet('Incidents')!
 
     expect(observations.getRow(1).getCell(1).value).toBe('Round Name')
     expect(observations.getRow(2).getCell(4).value).toBe('Tan Wei Ming')
     expect(observations.getRow(2).getCell(15).value).toBe('media/Round 1/.../photo.jpg')
+    expect(incidents.getRow(1).getCell(13).value).toBe('Media Count')
+    expect(incidents.getRow(1).getCell(14).value).toBe('Media Files')
+    expect(incidents.getRow(2).getCell(13).value).toBe(1)
+    expect(incidents.getRow(2).getCell(14).value).toBe('media/Round 1/.../incident.jpg')
   })
 
   it('keeps round names as plain text even when they look like dates', async () => {

@@ -1,3 +1,4 @@
+import { INCIDENT_MEDIA_BUCKET, OBSERVATION_MEDIA_BUCKET, type MediaBucket } from '@/lib/utils/storage'
 import { type TableName } from './constants'
 import { buildReadableMediaPath } from './view-export-paths'
 
@@ -69,6 +70,8 @@ export interface IncidentViewRow {
   resolved: boolean | ''
   resolvedNotes: string
   createdAt: string
+  mediaCount: number
+  mediaFiles: string
 }
 
 export interface MediaViewRow {
@@ -79,6 +82,7 @@ export interface MediaViewRow {
   observerEmail: string
   observationId: string
   sightingId: string
+  incidentId: string
   species: string
   count: number | ''
   fileName: string
@@ -86,6 +90,7 @@ export interface MediaViewRow {
   fileSize: number | ''
   originalStoragePath: string
   viewExportPath: string
+  storageBucket: MediaBucket
   exifLat: number | ''
   exifLng: number | ''
   exifDatetime: string
@@ -93,6 +98,7 @@ export interface MediaViewRow {
 }
 
 export interface ViewExportMediaManifestItem {
+  storageBucket: MediaBucket
   storagePath: string
   zipPath: string
 }
@@ -184,6 +190,7 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
   const walksById = indexBy(tableData.walk_slots as WalkRow[], 'id')
   const observationsById = indexBy(tableData.observations as ObservationRow[], 'id')
   const sightingsById = indexBy(tableData.sightings as SightingRow[], 'id')
+  const incidentsById = indexBy(tableData.incidents as IncidentRow[], 'id')
 
   const membershipsBySlotId = groupBy(tableData.slot_memberships as MembershipRow[], 'slot_id')
   const observationsBySlotId = groupBy(tableData.observations as ObservationRow[], 'slot_id')
@@ -194,19 +201,26 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
     (tableData.media as MediaRow[]).filter(row => asString(row.sighting_id)),
     'sighting_id'
   )
-
   const usedMediaPaths = new Set<string>()
   const mediaRows: MediaViewRow[] = []
   const mediaManifest: ViewExportMediaManifestItem[] = []
 
   for (const media of tableData.media as MediaRow[]) {
+    const incident = incidentsById.get(asString(media.incident_id))
     const sighting = sightingsById.get(asString(media.sighting_id))
     const observation = observationsById.get(asString(media.observation_id))
       ?? observationsById.get(asString(sighting?.observation_id))
-    const walk = walksById.get(asString(observation?.slot_id))
-    const userProfile = profilesById.get(asString(observation?.user_id))
+    const walk = incident
+      ? walksById.get(asString(incident.slot_id))
+      : walksById.get(asString(observation?.slot_id))
+    const userProfile = incident
+      ? profilesById.get(asString(incident.reported_by))
+      : profilesById.get(asString(observation?.user_id))
     const user = getProfileDisplay(userProfile)
     const walkContext = getWalkContext(walk, roundsById)
+    const storageBucket: MediaBucket = asString(media.incident_id)
+      ? INCIDENT_MEDIA_BUCKET
+      : OBSERVATION_MEDIA_BUCKET
 
     const zipPath = buildReadableMediaPath(
       {
@@ -217,7 +231,7 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
         locationName: walkContext.location,
         userName: user.name,
         userFallback: user.email,
-        userId: asString(observation?.user_id),
+        userId: incident ? asString(incident.reported_by) : asString(observation?.user_id),
         species: asString(sighting?.species),
         count: asNumber(sighting?.count) === '' ? null : Number(asNumber(sighting?.count)),
         sightingId: asString(media.sighting_id),
@@ -234,6 +248,7 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
       observerEmail: user.email,
       observationId: asString(observation?.id),
       sightingId: asString(media.sighting_id),
+      incidentId: asString(media.incident_id),
       species: asString(sighting?.species),
       count: asNumber(sighting?.count),
       fileName: asString(media.file_name),
@@ -241,6 +256,7 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
       fileSize: asNumber(media.file_size),
       originalStoragePath: asString(media.file_path),
       viewExportPath: zipPath,
+      storageBucket,
       exifLat: asNumber(media.exif_lat),
       exifLng: asNumber(media.exif_lng),
       exifDatetime: asString(media.exif_datetime),
@@ -249,6 +265,7 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
 
     if (asString(media.file_path)) {
       mediaManifest.push({
+        storageBucket,
         storagePath: asString(media.file_path),
         zipPath,
       })
@@ -267,6 +284,7 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
     )
     const mediaCount = mediaRows.filter(row =>
       observations.some(observation => asString(observation.id) === row.observationId)
+      || incidents.some(incident => asString(incident.id) === row.incidentId)
     ).length
 
     return {
@@ -334,6 +352,9 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
     const walk = walksById.get(asString(incident.slot_id))
     const walkContext = getWalkContext(walk, roundsById)
     const reporter = getProfileDisplay(profilesById.get(asString(incident.reported_by)))
+    const mediaPaths = mediaRows
+      .filter(row => row.incidentId === asString(incident.id))
+      .map(row => row.viewExportPath)
 
     return {
       ...walkContext,
@@ -346,6 +367,8 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
       resolved: typeof incident.resolved === 'boolean' ? incident.resolved : '',
       resolvedNotes: asString(incident.resolved_notes),
       createdAt: asString(incident.created_at),
+      mediaCount: mediaPaths.length,
+      mediaFiles: mediaPaths.join('; '),
     }
   })
 

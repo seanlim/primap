@@ -34,6 +34,7 @@ describe('buildViewExportData', () => {
       media: [
         { id: 'md1', observation_id: 'o1', file_path: 'u1/o1/photo.jpg', file_name: 'photo.jpg', media_type: 'image/jpeg', file_size: 1024 },
         { id: 'md2', observation_id: 'o1', sighting_id: 's1', file_path: 'u1/o1/s1/sighting.jpg', file_name: 'sighting.jpg', media_type: 'image/jpeg', file_size: 2048 },
+        { id: 'md3', incident_id: 'i1', file_path: 'u1/incidents/i1/incident.jpg', file_name: 'incident.jpg', media_type: 'image/jpeg', file_size: 512 },
       ],
       incidents: [
         { id: 'i1', slot_id: 'w1', reported_by: 'u1', incident_type: 'OTHER', description: 'Trail blocked', resolved: false, created_at: '2026-03-14T09:30:00Z' },
@@ -44,7 +45,7 @@ describe('buildViewExportData', () => {
 
     expect(result.summaryRows).toEqual(expect.arrayContaining([
       { metric: 'Walks', value: 1 },
-      { metric: 'Media Files', value: 2 },
+      { metric: 'Media Files', value: 3 },
     ]))
 
     expect(result.walkRows[0]).toEqual(expect.objectContaining({
@@ -54,7 +55,7 @@ describe('buildViewExportData', () => {
       observationCount: 1,
       sightingCount: 1,
       incidentCount: 1,
-      mediaCount: 2,
+      mediaCount: 3,
     }))
 
     expect(result.observationRows[0]).toEqual(expect.objectContaining({
@@ -74,12 +75,28 @@ describe('buildViewExportData', () => {
     expect(result.incidentRows[0]).toEqual(expect.objectContaining({
       reportedByName: 'Tan Wei Ming',
       incidentType: 'OTHER',
+      mediaCount: 1,
     }))
+    expect(result.incidentRows[0].mediaFiles).toContain('/Tan Wei Ming/obs/incident.jpg')
 
     expect(result.mediaRows[1].viewExportPath).toBe(
       'media/Round 1/2026-03-14 - Pasir Ris Park/Tan Wei Ming/sg-RBL-2/sighting.jpg'
     )
-    expect(result.mediaManifest).toHaveLength(2)
+    expect(result.mediaRows[2]).toEqual(expect.objectContaining({
+      incidentId: 'i1',
+      observationId: '',
+      sightingId: '',
+      storageBucket: 'incident-media',
+      viewExportPath: 'media/Round 1/2026-03-14 - Pasir Ris Park/Tan Wei Ming/obs/incident.jpg',
+    }))
+    expect(result.mediaManifest).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        storageBucket: 'incident-media',
+        storagePath: 'u1/incidents/i1/incident.jpg',
+        zipPath: 'media/Round 1/2026-03-14 - Pasir Ris Park/Tan Wei Ming/obs/incident.jpg',
+      }),
+    ]))
+    expect(result.mediaManifest).toHaveLength(3)
   })
 
   it('associates sighting-only media with the parent observation and walk', () => {

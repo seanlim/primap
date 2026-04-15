@@ -165,6 +165,8 @@ export async function buildViewExportWorkbook(data: ViewExportData): Promise<Exc
     { header: 'Resolved', key: 'resolved', width: 12 },
     { header: 'Resolved Notes', key: 'resolvedNotes', width: 28, kind: 'multiline' },
     { header: 'Created At', key: 'createdAt', width: 22, kind: 'datetime' },
+    { header: 'Media Count', key: 'mediaCount', width: 14 },
+    { header: 'Media Files', key: 'mediaFiles', width: 40, kind: 'path' },
   ], data.incidentRows)
 
   return await workbook.xlsx.writeBuffer()

@@ -99,6 +99,7 @@ describe('constants', () => {
 
     it('media columns include file and EXIF fields', () => {
       const cols = TABLE_COLUMNS.media
+      expect(cols).toContain('incident_id')
       expect(cols).toContain('file_path')
       expect(cols).toContain('file_name')
       expect(cols).toContain('file_size')

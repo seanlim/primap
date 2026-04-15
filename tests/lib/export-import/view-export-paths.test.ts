@@ -47,6 +47,19 @@ describe('view-export-paths', () => {
     expect(second).toBe('media/Round 1/2026-03-14 - Pasir Ris Park/Tan Wei Ming/obs/photo (2).jpg')
   })
 
+  it('places incident media under an incident leaf folder', () => {
+    const path = buildReadableMediaPath({
+      roundName: 'Round 1',
+      walkDate: '2026-03-14',
+      locationName: 'Pasir Ris Park',
+      userName: 'Tan Wei Ming',
+      incidentId: 'inc-1',
+      fileName: 'incident.jpg',
+    }, new Set())
+
+    expect(path).toBe('media/Round 1/2026-03-14 - Pasir Ris Park/Tan Wei Ming/incident/incident.jpg')
+  })
+
   it('truncates long segments to keep Windows extraction paths manageable', () => {
     const path = buildReadableMediaPath({
       roundName: 'Very Long Round Name That Keeps Going Beyond Reasonable Limits',

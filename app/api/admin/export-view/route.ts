@@ -42,7 +42,9 @@ export async function GET() {
 
     const mediaWarnings: string[] = []
     for (const item of viewExportData.mediaManifest) {
-      const { data, error } = await downloadMediaFile(adminClient, item.storagePath)
+      const { data, error } = await downloadMediaFile(adminClient, item.storagePath, {
+        bucket: item.storageBucket,
+      })
       if (error || !data) {
         mediaWarnings.push(`Skipped ${item.storagePath}: ${error ?? 'no data'}`)
         continue

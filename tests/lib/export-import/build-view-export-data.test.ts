@@ -77,7 +77,7 @@ describe('buildViewExportData', () => {
       incidentType: 'OTHER',
       mediaCount: 1,
     }))
-    expect(result.incidentRows[0].mediaFiles).toContain('/Tan Wei Ming/obs/incident.jpg')
+    expect(result.incidentRows[0].mediaFiles).toContain('/Tan Wei Ming/incident/incident.jpg')
 
     expect(result.mediaRows[1].viewExportPath).toBe(
       'media/Round 1/2026-03-14 - Pasir Ris Park/Tan Wei Ming/sg-RBL-2/sighting.jpg'
@@ -87,13 +87,13 @@ describe('buildViewExportData', () => {
       observationId: '',
       sightingId: '',
       storageBucket: 'incident-media',
-      viewExportPath: 'media/Round 1/2026-03-14 - Pasir Ris Park/Tan Wei Ming/obs/incident.jpg',
+      viewExportPath: 'media/Round 1/2026-03-14 - Pasir Ris Park/Tan Wei Ming/incident/incident.jpg',
     }))
     expect(result.mediaManifest).toEqual(expect.arrayContaining([
       expect.objectContaining({
         storageBucket: 'incident-media',
         storagePath: 'u1/incidents/i1/incident.jpg',
-        zipPath: 'media/Round 1/2026-03-14 - Pasir Ris Park/Tan Wei Ming/obs/incident.jpg',
+        zipPath: 'media/Round 1/2026-03-14 - Pasir Ris Park/Tan Wei Ming/incident/incident.jpg',
       }),
     ]))
     expect(result.mediaManifest).toHaveLength(3)

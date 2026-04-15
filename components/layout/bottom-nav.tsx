@@ -8,7 +8,7 @@ const navItems = [
   { href: '/home', label: 'Home', icon: Home },
   { href: '/walk', label: 'Walks', icon: Footprints },
   { href: '/report', label: 'Reports', icon: ClipboardList },
-   { href: '/guidance', label: 'Guide', icon: BookOpen },
+  { href: '/guidance', label: 'Guide', icon: BookOpen },
   { href: '/profile', label: 'Profile', icon: User },
 ]
 

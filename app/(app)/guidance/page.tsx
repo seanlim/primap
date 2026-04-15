@@ -146,7 +146,7 @@ export default async function GuidancePage() {
               <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-indigo-50 to-white p-4 shadow-sm">
                 <div className="inline-flex items-center gap-2 rounded-2xl border border-indigo-100 bg-indigo-100/70 px-4 py-2 text-sm font-semibold text-indigo-800 shadow-sm">
                   <WifiOff className="w-4 h-4 text-indigo-600 shrink-0" />
-                  <p>If you want to write report offline during the walk...</p>
+                  <p>If you want to write report offline during the walk</p>
                 </div>
 
               <div className="mt-3 space-y-3">
@@ -345,7 +345,11 @@ export default async function GuidancePage() {
         <div className="mt-3 flex items-start gap-3">
           <HelpCircle className="w-5 h-5 text-amber-700 mt-0.5 shrink-0" />
           <p className="text-sm text-gray-500">
-            Ask an admin if you need help with access, reporting, or anything unexpected during a walk.
+            Click 
+            <Link href={"/primap_beginner_guide.pdf"}> 
+              {" "}<span className='underline text-blue-600'>here</span> {" "}
+            </Link> 
+            for a more detailed guide. Ask an admin if you need help with access, reporting, or anything unexpected during a walk.
           </p>
         </div>
       </div>

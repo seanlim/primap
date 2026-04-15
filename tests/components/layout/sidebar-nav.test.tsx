@@ -43,6 +43,7 @@ describe('SidebarNav', () => {
     render(<SidebarNav isAdmin={false} />)
     expect(screen.queryByText('Admin Dashboard')).not.toBeInTheDocument()
     expect(screen.queryByText('Admin')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /guide/i })).toHaveAttribute('href', '/guidance')
   })
 
   it('shows user avatar initial from full_name', () => {

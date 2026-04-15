@@ -130,6 +130,34 @@ describe('buildExportWorkbook', () => {
     expect(ws.getRow(3).getCell(8).value).toBe(false)
   })
 
+  it('includes incident_id in the media worksheet for backup round-tripping', async () => {
+    const data = makeTableData({
+      media: [
+        {
+          id: 'm1',
+          observation_id: null,
+          sighting_id: null,
+          incident_id: 'inc-1',
+          file_path: 'user1/incidents/inc-1/photo.jpg',
+          file_name: 'photo.jpg',
+          file_size: 1234,
+          media_type: 'PHOTO',
+          exif_lat: null,
+          exif_lng: null,
+          exif_datetime: null,
+          created_at: '2026-01-01T00:00:00Z',
+        },
+      ],
+    })
+
+    const buffer = await buildExportWorkbook(data)
+    const workbook = await parseWorkbook(buffer)
+    const ws = workbook.getWorksheet('media')!
+
+    expect(ws.getRow(1).getCell(4).value).toBe('incident_id')
+    expect(ws.getRow(2).getCell(4).value).toBe('inc-1')
+  })
+
   it('handles empty tables (only header row)', async () => {
     const buffer = await buildExportWorkbook(makeTableData())
     const workbook = await parseWorkbook(buffer)

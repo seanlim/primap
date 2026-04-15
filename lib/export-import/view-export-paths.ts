@@ -9,6 +9,7 @@ export interface ViewExportMediaPathInput {
   userId?: string | null
   species?: string | null
   count?: number | null
+  incidentId?: string | null
   sightingId?: string | null
   fileName?: string | null
 }
@@ -83,7 +84,11 @@ export function buildUserFolderName(input: Pick<ViewExportMediaPathInput, 'userN
   )
 }
 
-export function buildMediaLeafFolderName(input: Pick<ViewExportMediaPathInput, 'species' | 'count' | 'sightingId'>): string {
+export function buildMediaLeafFolderName(input: Pick<ViewExportMediaPathInput, 'species' | 'count' | 'incidentId' | 'sightingId'>): string {
+  if (input.incidentId) {
+    return 'incident'
+  }
+
   if (!input.sightingId) {
     return 'obs'
   }

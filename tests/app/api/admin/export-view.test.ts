@@ -105,6 +105,7 @@ describe('GET /api/admin/export-view', () => {
       mediaRows: [],
       mediaManifest: [
         {
+          storageBucket: 'observation-media',
           storagePath: 'u1/o1/photo.jpg',
           zipPath: 'media/Round 1/2026-03-14 - Pasir Ris Park/Tan Wei Ming/observation/photo.jpg',
         },
@@ -114,6 +115,11 @@ describe('GET /api/admin/export-view', () => {
     const response = await GET()
     const zip = await JSZip.loadAsync(await response.arrayBuffer())
     expect(zip.file('media/Round 1/2026-03-14 - Pasir Ris Park/Tan Wei Ming/observation/photo.jpg')).not.toBeNull()
+    expect(mockDownloadMediaFile).toHaveBeenCalledWith(
+      expect.anything(),
+      'u1/o1/photo.jpg',
+      { bucket: 'observation-media' }
+    )
   })
 
   it('adds export-warnings.txt when media download fails', async () => {
@@ -128,6 +134,7 @@ describe('GET /api/admin/export-view', () => {
       mediaRows: [],
       mediaManifest: [
         {
+          storageBucket: 'incident-media',
           storagePath: 'u1/o1/photo.jpg',
           zipPath: 'media/Round 1/2026-03-14 - Pasir Ris Park/Tan Wei Ming/observation/photo.jpg',
         },
@@ -137,6 +144,11 @@ describe('GET /api/admin/export-view', () => {
 
     const response = await GET()
     expect(response.headers.get('X-Export-Warning-Count')).toBe('1')
+    expect(mockDownloadMediaFile).toHaveBeenCalledWith(
+      expect.anything(),
+      'u1/o1/photo.jpg',
+      { bucket: 'incident-media' }
+    )
 
     const zip = await JSZip.loadAsync(await response.arrayBuffer())
     expect(zip.file('export-warnings.txt')).not.toBeNull()

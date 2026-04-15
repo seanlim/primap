@@ -115,6 +115,19 @@ describe('downloadMediaFile', () => {
     expect(data!.byteLength).toBeGreaterThan(0)
   })
 
+  it('uses the provided bucket for incident media downloads', async () => {
+    const blob = new Blob(['file-content'], { type: 'image/jpeg' })
+    const client = createMockClient({
+      downloadResult: { data: blob, error: null },
+    }) as unknown as {
+      storage: { from: ReturnType<typeof vi.fn> }
+    }
+
+    await downloadMediaFile(client as never, 'user1/incidents/i1/photo.jpg', { bucket: 'incident-media' })
+
+    expect(client.storage.from).toHaveBeenCalledWith('incident-media')
+  })
+
   it('returns error when download fails', async () => {
     const client = createMockClient({
       downloadResult: { data: null, error: { message: 'Object not found' } },
@@ -161,6 +174,21 @@ describe('uploadMediaFile', () => {
     )
     expect(error).toBeNull()
     expect(skipped).toBe(false)
+  })
+
+  it('uses the provided bucket for incident media uploads', async () => {
+    const client = createMockClient({ uploadResult: { error: null } }) as unknown as {
+      storage: { from: ReturnType<typeof vi.fn> }
+    }
+
+    await uploadMediaFile(
+      client as never,
+      'user1/incidents/i1/photo.jpg',
+      new Uint8Array([1, 2, 3]),
+      { bucket: 'incident-media' }
+    )
+
+    expect(client.storage.from).toHaveBeenCalledWith('incident-media')
   })
 
   it('returns skipped=true when file already exists (Duplicate)', async () => {
@@ -265,7 +293,7 @@ describe('uploadMediaFile', () => {
       },
     } as unknown as Parameters<typeof uploadMediaFile>[0]
 
-    await uploadMediaFile(client, 'file.bin', new Uint8Array([1]), 'application/pdf')
+    await uploadMediaFile(client, 'file.bin', new Uint8Array([1]), { contentType: 'application/pdf' })
 
     expect(uploadMock).toHaveBeenCalledWith(
       'file.bin',

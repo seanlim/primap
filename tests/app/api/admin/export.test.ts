@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { NextRequest } from 'next/server'
 import JSZip from 'jszip'
 
 // --- Hoisted mocks ---
@@ -149,7 +148,6 @@ describe('GET /api/admin/export', () => {
 
     const response = await GET()
     const disposition = response.headers.get('Content-Disposition')!
-    // Should match pattern primap-export-YYYY-MM-DD.zip
     expect(disposition).toMatch(/primap-export-\d{4}-\d{2}-\d{2}\.zip/)
   })
 
@@ -170,5 +168,78 @@ describe('GET /api/admin/export', () => {
       'u1/incidents/i1/photo.jpg',
       { bucket: 'incident-media' }
     )
+  })
+
+  it('downloads media files into the zip when file_path is present', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'admin1' } } })
+    mockProfileSingle.mockResolvedValue({ data: { role: 'ADMIN' } })
+    mockFetchAllRows.mockImplementation(async (_client, table) => {
+      if (table === 'media') {
+        return [{ file_path: 'observations/photo-1.jpg' }]
+      }
+      return []
+    })
+    mockDownloadMediaFile.mockResolvedValue({
+      data: Uint8Array.from([1, 2, 3, 4]),
+      error: null,
+    })
+
+    const response = await GET()
+    const zip = await JSZip.loadAsync(await response.arrayBuffer())
+
+    expect(mockDownloadMediaFile).toHaveBeenCalledWith(
+      expect.anything(),
+      'observations/photo-1.jpg',
+      { bucket: 'observation-media' }
+    )
+    expect(zip.file('media/observations/photo-1.jpg')).not.toBeNull()
+    expect(zip.file('export-warnings.txt')).toBeNull()
+  })
+
+  it('writes export warnings when media download fails or returns no data', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'admin1' } } })
+    mockProfileSingle.mockResolvedValue({ data: { role: 'ADMIN' } })
+    mockFetchAllRows.mockImplementation(async (_client, table) => {
+      if (table === 'media') {
+        return [{ file_path: 'missing/file.jpg' }]
+      }
+      return []
+    })
+    mockDownloadMediaFile.mockResolvedValue({ data: null, error: 'Missing file' })
+
+    const response = await GET()
+    const zip = await JSZip.loadAsync(await response.arrayBuffer())
+    const warnings = await zip.file('export-warnings.txt')!.async('string')
+
+    expect(warnings).toContain('Skipped missing/file.jpg: Missing file')
+  })
+
+  it('skips media rows with empty file paths without downloading them', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'admin1' } } })
+    mockProfileSingle.mockResolvedValue({ data: { role: 'ADMIN' } })
+    mockFetchAllRows.mockImplementation(async (_client, table) => {
+      if (table === 'media') {
+        return [{ file_path: '' }, { file_path: null }]
+      }
+      return []
+    })
+
+    const response = await GET()
+    const zip = await JSZip.loadAsync(await response.arrayBuffer())
+
+    expect(mockDownloadMediaFile).not.toHaveBeenCalled()
+    expect(zip.file('export-warnings.txt')).toBeNull()
+  })
+
+  it('returns a generic 500 when a non-Error value is thrown', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'admin1' } } })
+    mockProfileSingle.mockResolvedValue({ data: { role: 'ADMIN' } })
+    mockFetchAllRows.mockRejectedValueOnce('unexpected failure')
+
+    const response = await GET()
+    expect(response.status).toBe(500)
+
+    const body = await response.json()
+    expect(body.error).toBe('Export failed')
   })
 })

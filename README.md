@@ -13,6 +13,7 @@ This release includes:
   - `Group 4 SDS.pdf`
   - `Group 4 Test Report.pdf`
   - `Group 4 Intermediate Artifact.pdf`
+  - `Group 4 Final Report.pdf`
 
 ## Environment
 
@@ -47,16 +48,14 @@ npm install
 
 Copy `.env.example` to `.env.local`, then fill in the values below.
 
-Use the Supabase values provided with the submission for:
-
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-
-Use your own Mapbox token unless one is also provided for evaluation.
-If email delivery is not being tested, `RESEND_API_KEY` can be left blank.
-Set `NEXT_PUBLIC_APP_URL` to `http://localhost:3000`.
-`CRON_SECRET` can be any non-empty string unless the cron/reminder route is being tested.
+- Use the Supabase values provided with the submission for:
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+- Use your own Mapbox token unless one is also provided for evaluation.
+- If email delivery is not being tested, `RESEND_API_KEY` can be left blank.
+- Set `NEXT_PUBLIC_APP_URL` to `http://localhost:3000`.
+- `CRON_SECRET` can be any non-empty string unless the cron/reminder route is being tested.
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=

@@ -13,6 +13,7 @@ This release includes:
   - `Group 4 SDS.pdf`
   - `Group 4 Test Report.pdf`
   - `Group 4 Intermediate Artifact.pdf`
+  - `Group 4 Final Report.pdf`
 
 ## Recommended Evaluator Setup
 

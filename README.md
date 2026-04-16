@@ -29,7 +29,7 @@ This release includes:
 ### 1. Install dependencies
 
 ```bash
-git clone <your-repository-url>
+git clone https://github.com/seanlim/primap.git
 cd primap
 npm install
 ```

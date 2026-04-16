@@ -187,7 +187,11 @@ describe('GET /api/admin/export', () => {
     const response = await GET()
     const zip = await JSZip.loadAsync(await response.arrayBuffer())
 
-    expect(mockDownloadMediaFile).toHaveBeenCalledWith(expect.anything(), 'observations/photo-1.jpg')
+    expect(mockDownloadMediaFile).toHaveBeenCalledWith(
+      expect.anything(),
+      'observations/photo-1.jpg',
+      { bucket: 'observation-media' }
+    )
     expect(zip.file('media/observations/photo-1.jpg')).not.toBeNull()
     expect(zip.file('export-warnings.txt')).toBeNull()
   })

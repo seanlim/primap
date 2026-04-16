@@ -2,18 +2,6 @@
 
 Primap is a web-based survey platform for the Raffles' Banded Langur Working Group (RBLWG).
 
-## Release Contents
-
-This release includes:
-
-- Source code via the tagged GitHub release
-- This `README.md`
-- Supporting documents in [`documentation/`](documentation):
-  - `Group 4 SRS.pdf`
-  - `Group 4 SDS.pdf`
-  - `Group 4 Test Report.pdf`
-  - `Group 4 Intermediate Artifact.pdf`
-
 ## Environment
 
 This project runs against a preconfigured shared Supabase backend.

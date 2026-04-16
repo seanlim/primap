@@ -1,6 +1,6 @@
 # Primap
 
-Primap is a web-based survey platform for the Raffles' Banded Langur Working Group (RBLWG). This README is written for the project artifact rubric: it focuses on how to run the submitted release and access the key user flows with minimal setup friction.
+Primap is a web-based survey platform for the Raffles' Banded Langur Working Group (RBLWG).
 
 ## Release Contents
 
@@ -13,13 +13,12 @@ This release includes:
   - `Group 4 SDS.pdf`
   - `Group 4 Test Report.pdf`
   - `Group 4 Intermediate Artifact.pdf`
-  - `Group 4 Final Report.pdf`
 
-## Recommended Evaluator Setup
+## Environment
 
-This artifact is intended to be evaluated against a preconfigured shared Supabase backend.
+This project runs against a preconfigured shared Supabase backend.
 
-The following Supabase values are provided separately for evaluation:
+Use the following Supabase values provided separately with the submission:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
@@ -142,7 +141,7 @@ Use the provided demo credentials:
 
 ## Verification
 
-After setup, a mentor should be able to confirm the project is working with these quick checks:
+After setup, use these quick checks to confirm the project is working:
 
 - open `http://localhost:3000` and reach the login page
 - sign in as `admin@primap.demo` and open `/admin`
@@ -159,11 +158,11 @@ Optional additional checks:
 - approve `emily@primap.demo` from `/admin/users` and verify access after approval
 - run `npm run lint`, `npm test`, or `npm run test:coverage`
 
-## Notes for Evaluators
+## Notes
 
-- This submission is intended to run against a pre-seeded shared Supabase backend.
-- The required Supabase environment values and demo credentials are provided separately in the evaluator handoff note.
+- This project is intended to run against a pre-seeded shared Supabase backend.
+- The required Supabase environment values and demo credentials are provided separately in the handoff note.
 - The shared backend already contains the required schema, data, and deployed backend functionality used by the app.
-- The shared backend already includes report, incident, and media data for evaluation. Evaluators may also upload fresh files during testing if they want to verify media upload flows directly.
+- The shared backend already includes report, incident, and media data. You may also upload fresh files during testing if you want to verify media upload flows directly.
 - Map features require `NEXT_PUBLIC_MAPBOX_TOKEN`.
 - Email features require `RESEND_API_KEY` only if email delivery itself is being evaluated.

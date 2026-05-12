@@ -1,4 +1,6 @@
-const CACHE_NAME = 'primap-v2'
+const CACHE_NAME = 'primap-v3'
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1'])
+const IS_LOCALHOST = LOCAL_HOSTNAMES.has(self.location.hostname)
 const STATIC_ASSETS = [
   '/',
   '/home',
@@ -10,6 +12,11 @@ const STATIC_ASSETS = [
 
 // Install: cache app shell
 self.addEventListener('install', (event) => {
+  if (IS_LOCALHOST) {
+    self.skipWaiting()
+    return
+  }
+
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   )
@@ -21,7 +28,9 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+        keys
+          .filter((key) => key.startsWith('primap-') && (IS_LOCALHOST || key !== CACHE_NAME))
+          .map((key) => caches.delete(key))
       )
     )
   )
@@ -30,6 +39,8 @@ self.addEventListener('activate', (event) => {
 
 // Fetch: network-first for API, cache-first for assets
 self.addEventListener('fetch', (event) => {
+  if (IS_LOCALHOST) return
+
   const { request } = event
   const url = new URL(request.url)
 

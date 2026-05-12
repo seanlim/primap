@@ -67,6 +67,14 @@ afterEach(() => {
 
 describe('IncidentModal', () => {
   describe('Phase 1 (Details)', () => {
+    it('renders through document.body so the mobile bottom nav cannot cover it', () => {
+      renderModal()
+
+      expect(screen.getByTestId('incident-modal-root').parentElement).toBe(document.body)
+      expect(screen.getByTestId('incident-modal-root')).toHaveClass('fixed', 'inset-0')
+      expect(screen.getByTestId('incident-modal-root')).toHaveStyle({ zIndex: '1000' })
+    })
+
     it('renders the details form with type select and description textarea', () => {
       renderModal()
       expect(screen.getByText('Report Incident')).toBeInTheDocument()

@@ -12,6 +12,18 @@ function formatPercent(value: number) {
   return `${Math.round(value * 100)}%`
 }
 
+const currentRoundCardColors = {
+  accent: '#16a34a',
+  accentDark: '#15803d',
+  accentSoft: '#f0fdf4',
+  accentBorder: '#bbf7d0',
+  panelBorder: '#dcfce7',
+  neutralBorder: '#f3f4f6',
+  tealSoft: '#f0fdfa',
+  tealBorder: '#ccfbf1',
+  tealText: '#0f766e',
+}
+
 export default async function AdminDashboard() {
   const supabase = await createClient()
   const analyticsClient = supabase as unknown as SupabaseClientLike
@@ -48,28 +60,92 @@ export default async function AdminDashboard() {
   const targetRound = analytics.targetRound
 
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="flex flex-col gap-6 animate-fade-in">
       <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
 
       {targetRound ? (
-        <div className="overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm">
-          <div className="bg-gradient-to-r from-emerald-50 via-white to-teal-50 px-5 py-3.5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Current Round</p>
-                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
-                  <h2 className="text-lg font-semibold text-gray-900">{targetRound.name}</h2>
-                  <span className="border-l border-emerald-200 pl-4 text-sm font-medium text-gray-500">
-                    {formatDate(targetRound.start_date, 'compact')} to {formatDate(targetRound.end_date, 'compact')}
-                  </span>
+        <section
+          aria-labelledby="current-round-heading"
+          className="overflow-hidden rounded-2xl border border-l-4 bg-white shadow-sm"
+          style={{
+            borderColor: currentRoundCardColors.neutralBorder,
+            borderLeftColor: currentRoundCardColors.accent,
+          }}
+        >
+          <div
+            className="border-b px-4"
+            style={{
+              background: `linear-gradient(90deg, ${currentRoundCardColors.accentSoft}, rgba(255,255,255,0.96))`,
+              borderBottomColor: currentRoundCardColors.accentBorder,
+              paddingTop: '16px',
+              paddingBottom: '16px',
+            }}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-sm ring-1 ring-black/5"
+                  style={{
+                    backgroundColor: currentRoundCardColors.accent,
+                    color: '#ffffff',
+                  }}
+                >
+                  <Calendar className="h-5 w-5" />
                 </div>
+                <p
+                  id="current-round-heading"
+                  className="truncate text-sm font-semibold uppercase tracking-wider"
+                  style={{ color: currentRoundCardColors.accentDark }}
+                >
+                  Current Round
+                </p>
               </div>
-              <div className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+              <div
+                className="shrink-0 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide shadow-sm ring-1 ring-black/5"
+                style={{
+                  backgroundColor: currentRoundCardColors.accent,
+                  color: '#ffffff',
+                }}
+              >
                 {targetRound.status}
               </div>
             </div>
           </div>
-        </div>
+          <div className="grid gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(220px,0.6fr)]">
+            <div
+              className="rounded-xl border p-3"
+              style={{
+                backgroundColor: currentRoundCardColors.accentSoft,
+                borderColor: currentRoundCardColors.panelBorder,
+              }}
+            >
+              <div
+                className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+                style={{ color: currentRoundCardColors.accentDark }}
+              >
+                Round
+              </div>
+              <div className="mt-1 truncate text-xl font-bold text-gray-900">{targetRound.name}</div>
+            </div>
+            <div
+              className="rounded-xl border p-3"
+              style={{
+                backgroundColor: currentRoundCardColors.tealSoft,
+                borderColor: currentRoundCardColors.tealBorder,
+              }}
+            >
+              <div
+                className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+                style={{ color: currentRoundCardColors.tealText }}
+              >
+                Period
+              </div>
+              <div className="mt-1 text-sm font-medium text-gray-800">
+                {formatDate(targetRound.start_date, 'compact')} to {formatDate(targetRound.end_date, 'compact')}
+              </div>
+            </div>
+          </div>
+        </section>
       ) : null}
 
       <ReportMapCard

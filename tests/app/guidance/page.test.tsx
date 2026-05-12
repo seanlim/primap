@@ -1,4 +1,10 @@
 import { render, screen } from '@testing-library/react'
+import type { AnchorHTMLAttributes, ReactNode } from 'react'
+
+type LinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
+  href: string
+  children: ReactNode
+}
 
 const { mockSupabase, mockRedirect } = vi.hoisted(() => {
   const mockSupabase = {
@@ -11,7 +17,7 @@ const { mockSupabase, mockRedirect } = vi.hoisted(() => {
 })
 
 vi.mock('next/link', () => ({
-  default: ({ children, href, ...props }: any) => (
+  default: ({ children, href, ...props }: LinkProps) => (
     <a href={href} {...props}>
       {children}
     </a>
@@ -53,6 +59,8 @@ describe('GuidancePage', () => {
     expect(screen.getByText('Join a walk slot')).toBeInTheDocument()
     expect(screen.getByText('Open a slot and join if capacity holds.')).toBeInTheDocument()
     expect(screen.getByText('If you want to write report offline during the walk')).toBeInTheDocument()
+    expect(screen.getByText('Attend The Walk').closest('p')).toHaveClass('inline-flex', 'items-center', 'gap-2')
+    expect(screen.getByText('If you want to write report offline during the walk').closest('div')).toHaveClass('inline-flex', 'items-center', 'gap-2')
     expect(screen.getByText('Find the report for the walk')).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: /browse reports/i }).some((link) => link.getAttribute('href') === '/report')).toBe(true)
     expect(screen.getByText('This loads the page for offline use.')).toBeInTheDocument()

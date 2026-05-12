@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { reportIncident } from '@/lib/actions/incident-actions'
 import { MediaUploader } from '@/components/report/media-uploader'
 import { INCIDENT_TYPES, type IncidentType } from '@/lib/constants/incident-types'
@@ -63,10 +64,17 @@ export function IncidentModal({ walkId, onClose, onSubmitted }: IncidentModalPro
     onSubmitted()
   }
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
+  const modal = (
+    <div
+      data-testid="incident-modal-root"
+      className="fixed inset-0 flex items-end justify-center sm:items-center"
+      style={{ zIndex: 1000 }}
+    >
       <div className="fixed inset-0 bg-black/50" onClick={handleBackdropClick} />
-      <div className="relative bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-md p-6 max-h-[80vh] overflow-y-auto">
+      <div
+        className="relative max-h-[80vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-6 sm:rounded-2xl"
+        style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
+      >
         <h2 className="text-lg font-bold text-gray-900 mb-4">
           {phase === 'details' ? 'Report Incident' : 'Add Photos / Videos'}
         </h2>
@@ -158,4 +166,8 @@ export function IncidentModal({ walkId, onClose, onSubmitted }: IncidentModalPro
       </div>
     </div>
   )
+
+  if (typeof document === 'undefined') return null
+
+  return createPortal(modal, document.body)
 }

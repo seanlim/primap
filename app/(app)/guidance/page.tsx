@@ -38,8 +38,6 @@ const majorCardInnerClass = 'px-5 py-5'
 const headerStripBase = 'border-b border-gray-100 px-5 py-3.5'
 const actionIconCircleClass =
   'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-50 ring-1 ring-green-100'
-const infoIconCircleClass =
-  'flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 ring-1 ring-sky-100'
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -134,29 +132,29 @@ export default async function GuidancePage() {
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 ring-1 ring-emerald-100">
                 <UserRound className="w-5 h-5 text-emerald-600" />
               </div>
-                <div className="min-w-0">
-                  <p className={`${majorStepLabelClass} bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100`}>
-                    <span>2</span>
-                    <span>Attend The Walk</span>
-                  </p>
-                </div>
+              <div className="min-w-0">
+                <p className={`${majorStepLabelClass} bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100`}>
+                  <span>2</span>
+                  <span>Attend The Walk</span>
+                </p>
+              </div>
             </div>
           </div>
           <div className={`${majorCardInnerClass} space-y-4`}>
-              <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-indigo-50 to-white p-4 shadow-sm">
-                <div className="inline-flex items-center gap-2 rounded-2xl border border-indigo-100 bg-indigo-100/70 px-4 py-2 text-sm font-semibold text-indigo-800 shadow-sm">
-                  <WifiOff className="w-4 h-4 text-indigo-600 shrink-0" />
-                  <p>If you want to write report offline during the walk</p>
-                </div>
+            <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-indigo-50 to-white p-4 shadow-sm">
+              <div className="inline-flex items-center gap-2 rounded-2xl border border-indigo-100 bg-indigo-100/70 px-4 py-2 text-sm font-semibold text-indigo-800 shadow-sm">
+                <WifiOff className="w-4 h-4 text-indigo-600 shrink-0" />
+                <p>If you want to write report offline during the walk</p>
+              </div>
 
               <div className="mt-3 space-y-3">
                 <div className={`${compactStepCardClass} border-indigo-100 bg-gradient-to-br from-white via-indigo-50 to-white`}>
                   <div className="flex items-start gap-3">
                     <div className={`${subStepNumberClass} bg-indigo-100 text-indigo-700`}>1</div>
                     <div className={subStepContentClass}>
-                        <p className="text-sm font-semibold text-gray-900">Browse the reports</p>
-                          <div className="mt-3">
-                            <Link href="/report" className={offlineButtonClass} aria-label="Browse reports">
+                      <p className="text-sm font-semibold text-gray-900">Browse the reports</p>
+                      <div className="mt-3">
+                        <Link href="/report" className={offlineButtonClass} aria-label="Browse reports">
                           <span className={actionIconCircleClass}>
                             <ClipboardList className="w-4 h-4 text-green-600" />
                           </span>

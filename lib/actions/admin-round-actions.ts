@@ -16,6 +16,8 @@ import { findOverlappingRound } from '@/lib/utils/rounds'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
 
+const MAX_VOLUNTEERS_PER_SLOT = 3
+
 async function requireAdmin() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -370,8 +372,15 @@ function validateWalkData(data: {
   if (!data.endTime) errors.push('End time is required')
   if (data.startTime && data.endTime && data.startTime >= data.endTime)
     errors.push('Start time must be before end time')
-  if (data.maxVolunteers !== undefined && (data.maxVolunteers < 1 || data.maxVolunteers > 10))
-    errors.push('Max volunteers must be between 1 and 10')
+  if (
+    data.maxVolunteers !== undefined &&
+    (
+      !Number.isInteger(data.maxVolunteers) ||
+      data.maxVolunteers < 1 ||
+      data.maxVolunteers > MAX_VOLUNTEERS_PER_SLOT
+    )
+  )
+    errors.push(`Max volunteers must be between 1 and ${MAX_VOLUNTEERS_PER_SLOT}`)
   return errors
 }
 
@@ -432,7 +441,7 @@ export async function createWalk(data: {
       walk_date: data.walkDate,
       start_time: data.startTime,
       end_time: data.endTime,
-      max_volunteers: data.maxVolunteers || 3,
+      max_volunteers: data.maxVolunteers ?? MAX_VOLUNTEERS_PER_SLOT,
       notes: data.notes,
     })
 
@@ -472,7 +481,7 @@ export async function updateWalk(walkId: string, data: {
       walk_date: data.walkDate,
       start_time: data.startTime,
       end_time: data.endTime,
-      max_volunteers: data.maxVolunteers || 3,
+      max_volunteers: data.maxVolunteers ?? MAX_VOLUNTEERS_PER_SLOT,
       notes: data.notes,
     })
     .eq('id', walkId)

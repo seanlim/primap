@@ -5,6 +5,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const MAX_VOLUNTEERS_PER_SLOT = 3
+
 interface SlotInput {
   locationName: string
   walkDate: string
@@ -110,13 +112,25 @@ Deno.serve(async (req) => {
       )
     }
 
+    const invalidCapacitySlot = slots.find((slot) => {
+      const maxVolunteers = slot.maxVolunteers ?? MAX_VOLUNTEERS_PER_SLOT
+      return !Number.isInteger(maxVolunteers) || maxVolunteers < 1 || maxVolunteers > MAX_VOLUNTEERS_PER_SLOT
+    })
+
+    if (invalidCapacitySlot) {
+      return new Response(
+        JSON.stringify({ error: `Max volunteers must be between 1 and ${MAX_VOLUNTEERS_PER_SLOT}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     const rows = slots.map((s) => ({
       round_id: roundId,
       location_name: s.locationName,
       walk_date: s.walkDate,
       start_time: s.startTime,
       end_time: s.endTime,
-      max_volunteers: s.maxVolunteers || 3,
+      max_volunteers: s.maxVolunteers ?? MAX_VOLUNTEERS_PER_SLOT,
     }))
 
     // Batch insert all walks in a single operation

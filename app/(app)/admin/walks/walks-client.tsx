@@ -43,6 +43,7 @@ interface GeneratedWalk {
 }
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const MAX_VOLUNTEERS_PER_SLOT = 3
 
 function generateWalksFromRules(rule: BulkRule): GeneratedWalk[] {
   const walks: GeneratedWalk[] = []
@@ -350,7 +351,7 @@ export function WalksClient({ walks, rounds }: {
       </div>
       <div>
         <label className="text-xs font-medium text-gray-500 mb-1">Max Volunteers</label>
-        <input type="number" min="1" max="10" value={maxVol} onChange={e => setMaxVol(e.target.valueAsNumber)}
+        <input type="number" min="1" max={MAX_VOLUNTEERS_PER_SLOT} value={maxVol} onChange={e => setMaxVol(e.target.valueAsNumber)}
           className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
       </div>
       <div className="flex gap-3">
@@ -576,7 +577,7 @@ export function WalksClient({ walks, rounds }: {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-500 mb-1 block">Max Volunteers</label>
-                  <input type="number" min="1" max="10" value={bulkRule.maxVolunteers}
+                  <input type="number" min="1" max={MAX_VOLUNTEERS_PER_SLOT} value={bulkRule.maxVolunteers}
                     onChange={e => setBulkRule(r => ({ ...r, maxVolunteers: e.target.valueAsNumber }))}
                     className="w-full px-3 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>

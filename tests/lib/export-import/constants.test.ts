@@ -81,7 +81,9 @@ describe('constants', () => {
 
     it('profiles columns match DB schema', () => {
       expect(TABLE_COLUMNS.profiles).toEqual([
-        'id', 'email', 'full_name', 'avatar_url', 'role', 'status', 'created_at', 'updated_at',
+        'id', 'email', 'full_name', 'avatar_url', 'phone_number', 'phone_verified_at',
+        'date_of_birth', 'guardian_phone_number', 'guardian_phone_verified_at',
+        'role', 'status', 'created_at', 'updated_at',
       ])
     })
 

@@ -30,6 +30,14 @@ function makeRequest(path: string): NextRequest {
   return new NextRequest(`http://localhost:3000${path}`)
 }
 
+const completeContact = {
+  phone_number: '+6591234567',
+  phone_verified_at: '2026-01-01T00:00:00.000Z',
+  date_of_birth: '1990-01-01',
+  guardian_phone_number: null,
+  guardian_phone_verified_at: null,
+}
+
 describe('middleware-routing (integration)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -65,7 +73,7 @@ describe('middleware-routing (integration)', () => {
   it('authenticated PENDING → /home → real resolveStatusRedirect returns /pending → redirect /pending', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockSingle.mockResolvedValue({
-      data: { status: 'PENDING', role: 'VOLUNTEER' },
+      data: { status: 'PENDING', role: 'VOLUNTEER', ...completeContact },
       error: null,
     })
 
@@ -78,7 +86,7 @@ describe('middleware-routing (integration)', () => {
   it('authenticated REJECTED → /walk → real resolveStatusRedirect returns /blocked → redirect /blocked', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockSingle.mockResolvedValue({
-      data: { status: 'REJECTED', role: 'VOLUNTEER' },
+      data: { status: 'REJECTED', role: 'VOLUNTEER', ...completeContact },
       error: null,
     })
 
@@ -91,7 +99,7 @@ describe('middleware-routing (integration)', () => {
   it('authenticated ACTIVE VOLUNTEER → /admin → role check → redirect /home', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockSingle.mockResolvedValue({
-      data: { status: 'ACTIVE', role: 'VOLUNTEER' },
+      data: { status: 'ACTIVE', role: 'VOLUNTEER', ...completeContact },
       error: null,
     })
 
@@ -104,13 +112,34 @@ describe('middleware-routing (integration)', () => {
   it('authenticated ACTIVE ADMIN → /admin → pass through', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockSingle.mockResolvedValue({
-      data: { status: 'ACTIVE', role: 'ADMIN' },
+      data: { status: 'ACTIVE', role: 'ADMIN', ...completeContact },
       error: null,
     })
 
     const response = await middleware(makeRequest('/admin'))
 
     expect(response.status).toBe(200)
+  })
+
+  it('authenticated incomplete profile → /walk → redirect /complete-profile', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockSingle.mockResolvedValue({
+      data: {
+        status: 'ACTIVE',
+        role: 'VOLUNTEER',
+        phone_number: '+6591234567',
+        phone_verified_at: null,
+        date_of_birth: '1990-01-01',
+        guardian_phone_number: null,
+        guardian_phone_verified_at: null,
+      },
+      error: null,
+    })
+
+    const response = await middleware(makeRequest('/walk'))
+
+    expect(response.status).toBe(307)
+    expect(response.headers.get('location')).toContain('/complete-profile')
   })
 
   it('profile fetch error → redirect /login?error=profile_fetch_failed', async () => {

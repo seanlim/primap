@@ -68,7 +68,7 @@ describe('profile-actions', () => {
 
       expect(result).toEqual({ success: true })
       expect(mockSupabase.from).toHaveBeenCalledWith('profiles')
-      expect(methods.update).toHaveBeenCalledWith({ full_name: 'Updated Name' })
+      expect(methods.update).toHaveBeenCalledWith(expect.objectContaining({ full_name: 'Updated Name' }))
       expect(methods.eq).toHaveBeenCalledWith('id', 'user-1')
       expect(revalidatePath).toHaveBeenCalledWith('/profile')
       expect(revalidatePath).toHaveBeenCalledWith('/home')

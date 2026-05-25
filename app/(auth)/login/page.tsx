@@ -1,8 +1,13 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { withTimeout } from '@/lib/utils/with-timeout'
+import {
+  normalizeDateOfBirth,
+  normalizePhoneNumber,
+  requiresGuardianContact,
+} from '@/lib/auth/contact-profile'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -10,7 +15,13 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
+  const [fullName, setFullName] = useState('')
+  const [phoneNumber, setPhoneNumber] = useState('')
+  const [dateOfBirth, setDateOfBirth] = useState('')
+  const [guardianPhoneNumber, setGuardianPhoneNumber] = useState('')
   const supabase = createClient()
+  const dateValidation = useMemo(() => normalizeDateOfBirth(dateOfBirth), [dateOfBirth])
+  const needsGuardian = dateValidation.value ? requiresGuardianContact(dateValidation.value) : false
 
   const handleGoogleSignIn = async () => {
     setLoading(true)
@@ -58,15 +69,49 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signUp({
+    const normalizedPhone = normalizePhoneNumber(phoneNumber)
+    if (normalizedPhone.error) {
+      setError(normalizedPhone.error)
+      setLoading(false)
+      return
+    }
+
+    const normalizedDateOfBirth = normalizeDateOfBirth(dateOfBirth)
+    if (normalizedDateOfBirth.error) {
+      setError(normalizedDateOfBirth.error)
+      setLoading(false)
+      return
+    }
+
+    let normalizedGuardianPhone: string | null = null
+    if (needsGuardian) {
+      const guardianPhone = normalizePhoneNumber(guardianPhoneNumber, 'Guardian phone number')
+      if (guardianPhone.error) {
+        setError(guardianPhone.error)
+        setLoading(false)
+        return
+      }
+      normalizedGuardianPhone = guardianPhone.value ?? null
+    }
+
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
+        data: {
+          full_name: fullName.trim() || null,
+          phone_number: normalizedPhone.value,
+          date_of_birth: normalizedDateOfBirth.value,
+          guardian_phone_number: normalizedGuardianPhone,
+        },
       },
     })
     if (error) {
       setError(error.message)
+    } else if (data.session) {
+      window.location.assign('/complete-profile')
+      return
     } else {
       setError('Check your email for the confirmation link!')
     }
@@ -107,6 +152,17 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={mode === 'signin' ? handleEmailSignIn : handleEmailSignUp} className="space-y-4">
+          {mode === 'signup' && (
+            <div>
+              <input
+                type="text"
+                placeholder="Display name"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+              />
+            </div>
+          )}
           <div>
             <input
               type="email"
@@ -117,6 +173,41 @@ export default function LoginPage() {
               required
             />
           </div>
+          {mode === 'signup' && (
+            <>
+              <div>
+                <input
+                  type="tel"
+                  placeholder="Phone number"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                  required
+                />
+              </div>
+              <div>
+                <input
+                  type="date"
+                  value={dateOfBirth}
+                  onChange={(e) => setDateOfBirth(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm text-gray-500"
+                  required
+                />
+              </div>
+              {needsGuardian && (
+                <div>
+                  <input
+                    type="tel"
+                    placeholder="Guardian phone number"
+                    value={guardianPhoneNumber}
+                    onChange={(e) => setGuardianPhoneNumber(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                    required
+                  />
+                </div>
+              )}
+            </>
+          )}
           <div>
             <input
               type="password"

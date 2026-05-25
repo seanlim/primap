@@ -241,9 +241,14 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          date_of_birth: string | null
           email: string
           full_name: string | null
+          guardian_phone_number: string | null
+          guardian_phone_verified_at: string | null
           id: string
+          phone_number: string | null
+          phone_verified_at: string | null
           role: Database["public"]["Enums"]["user_role"]
           status: Database["public"]["Enums"]["user_status"]
           updated_at: string
@@ -251,9 +256,14 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          date_of_birth?: string | null
           email: string
           full_name?: string | null
+          guardian_phone_number?: string | null
+          guardian_phone_verified_at?: string | null
           id: string
+          phone_number?: string | null
+          phone_verified_at?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
@@ -261,14 +271,63 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          date_of_birth?: string | null
           email?: string
           full_name?: string | null
+          guardian_phone_number?: string | null
+          guardian_phone_verified_at?: string | null
           id?: string
+          phone_number?: string | null
+          phone_verified_at?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
         }
         Relationships: []
+      }
+      guardian_phone_otps: {
+        Row: {
+          attempts: number
+          code_hash: string
+          created_at: string
+          expires_at: string
+          id: string
+          phone_number: string
+          updated_at: string
+          user_id: string
+          verified_at: string | null
+        }
+        Insert: {
+          attempts?: number
+          code_hash: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          phone_number: string
+          updated_at?: string
+          user_id: string
+          verified_at?: string | null
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          phone_number?: string
+          updated_at?: string
+          user_id?: string
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guardian_phone_otps_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sightings: {
         Row: {
@@ -647,4 +706,3 @@ export type RoundStatus = Enums<"round_status">
 export type MembershipStatus = Enums<"membership_status">
 export type WalkCompletion = Enums<"walk_completion">
 export type SpeciesType = Enums<"species_type">
-

@@ -22,6 +22,14 @@ function makeRequest(path: string): NextRequest {
   return new NextRequest(`http://localhost:3000${path}`)
 }
 
+const completeContact = {
+  phone_number: '+6591234567',
+  phone_verified_at: '2026-01-01T00:00:00.000Z',
+  date_of_birth: '1990-01-01',
+  guardian_phone_number: null,
+  guardian_phone_verified_at: null,
+}
+
 describe('middleware', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -82,7 +90,7 @@ describe('middleware', () => {
   it('allows ACTIVE VOLUNTEER to access /home', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockSingle.mockResolvedValue({
-      data: { status: 'ACTIVE', role: 'VOLUNTEER' },
+      data: { status: 'ACTIVE', role: 'VOLUNTEER', ...completeContact },
       error: null,
     })
 
@@ -91,10 +99,31 @@ describe('middleware', () => {
     expect(response.status).toBe(200)
   })
 
+  it('redirects incomplete ACTIVE user to /complete-profile', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockSingle.mockResolvedValue({
+      data: {
+        status: 'ACTIVE',
+        role: 'VOLUNTEER',
+        phone_number: null,
+        phone_verified_at: null,
+        date_of_birth: null,
+        guardian_phone_number: null,
+        guardian_phone_verified_at: null,
+      },
+      error: null,
+    })
+
+    const response = await middleware(makeRequest('/home'))
+
+    expect(response.status).toBe(307)
+    expect(response.headers.get('location')).toContain('/complete-profile')
+  })
+
   it('redirects PENDING user from /home to /pending', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockSingle.mockResolvedValue({
-      data: { status: 'PENDING', role: 'VOLUNTEER' },
+      data: { status: 'PENDING', role: 'VOLUNTEER', ...completeContact },
       error: null,
     })
 
@@ -107,7 +136,7 @@ describe('middleware', () => {
   it('redirects REJECTED user from /home to /blocked', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockSingle.mockResolvedValue({
-      data: { status: 'REJECTED', role: 'VOLUNTEER' },
+      data: { status: 'REJECTED', role: 'VOLUNTEER', ...completeContact },
       error: null,
     })
 
@@ -120,7 +149,7 @@ describe('middleware', () => {
   it('redirects DISABLED user from /home to /blocked', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockSingle.mockResolvedValue({
-      data: { status: 'DISABLED', role: 'VOLUNTEER' },
+      data: { status: 'DISABLED', role: 'VOLUNTEER', ...completeContact },
       error: null,
     })
 
@@ -133,7 +162,7 @@ describe('middleware', () => {
   it('allows PENDING user to stay on /pending (no redirect)', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockSingle.mockResolvedValue({
-      data: { status: 'PENDING', role: 'VOLUNTEER' },
+      data: { status: 'PENDING', role: 'VOLUNTEER', ...completeContact },
       error: null,
     })
 
@@ -174,7 +203,7 @@ describe('middleware', () => {
   it('redirects non-ADMIN from /admin to /home', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockSingle.mockResolvedValue({
-      data: { status: 'ACTIVE', role: 'VOLUNTEER' },
+      data: { status: 'ACTIVE', role: 'VOLUNTEER', ...completeContact },
       error: null,
     })
 
@@ -187,7 +216,7 @@ describe('middleware', () => {
   it('allows ADMIN to access /admin', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockSingle.mockResolvedValue({
-      data: { status: 'ACTIVE', role: 'ADMIN' },
+      data: { status: 'ACTIVE', role: 'ADMIN', ...completeContact },
       error: null,
     })
 
@@ -199,7 +228,7 @@ describe('middleware', () => {
   it('allows ADMIN to access /admin/users', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockSingle.mockResolvedValue({
-      data: { status: 'ACTIVE', role: 'ADMIN' },
+      data: { status: 'ACTIVE', role: 'ADMIN', ...completeContact },
       error: null,
     })
 

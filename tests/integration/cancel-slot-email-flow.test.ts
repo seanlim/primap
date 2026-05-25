@@ -252,20 +252,31 @@ describe('cancel-walk-email-flow (integration)', () => {
 
   // ---- Admin actions -> real email module -> Resend ----
 
-  function setupAdminChain(updatedProfile: { email: string; full_name: string | null }) {
+  function setupAdminChain(updatedProfile: { email: string; full_name: string | null }, options?: { approve?: boolean }) {
     mockSupabase.auth.getUser.mockResolvedValue({
       data: { user: { id: 'admin-1' } },
     })
-    // requireAdmin: profiles.select('role').eq().single() -> ADMIN
-    // then: profiles.update().eq().select().single() -> updated profile
-    mockSingle
-      .mockResolvedValueOnce({ data: { role: 'ADMIN' }, error: null })
-      .mockResolvedValueOnce({ data: updatedProfile, error: null })
+    mockSingle.mockResolvedValueOnce({ data: { role: 'ADMIN' }, error: null })
+
+    if (options?.approve) {
+      mockSingle.mockResolvedValueOnce({
+        data: {
+          phone_number: '+6591234567',
+          phone_verified_at: '2026-01-01T00:00:00.000Z',
+          date_of_birth: '1990-01-01',
+          guardian_phone_number: null,
+          guardian_phone_verified_at: null,
+        },
+        error: null,
+      })
+    }
+
+    mockSingle.mockResolvedValueOnce({ data: updatedProfile, error: null })
   }
 
   // TC-INT-ADMIN-01 (UC-13): Approval flow triggers account-approved email side effect
   it('approveUser -> sendAccountApprovedEmail -> Resend.send with correct subject', async () => {
-    setupAdminChain({ email: 'user@test.com', full_name: 'Test User' })
+    setupAdminChain({ email: 'user@test.com', full_name: 'Test User' }, { approve: true })
 
     const result = await approveUser('user-2')
 

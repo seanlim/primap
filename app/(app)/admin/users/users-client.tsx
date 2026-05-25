@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, ChevronLeft, ChevronRight, Search, Users } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, Phone, Search, Users } from 'lucide-react'
 import { approveUser, rejectUser, disableUser, enableUser, setUserRole } from '@/lib/actions/admin-user-actions'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { ToastProvider, useToast } from '@/components/ui/toast'
@@ -11,11 +11,17 @@ import { EmptyState } from '@/components/ui/empty-state'
 import type { Enums } from '@/lib/types/database'
 import type { UserStatus } from '@/lib/auth/access-policy'
 import type { AdminUsersAnalyticsSnapshot } from '@/lib/admin-volunteer-analytics'
+import { isProfileContactComplete } from '@/lib/auth/contact-profile'
 
 interface UserData {
   id: string
   email: string
   fullName: string | null
+  phoneNumber: string | null
+  phoneVerifiedAt: string | null
+  dateOfBirth: string | null
+  guardianPhoneNumber: string | null
+  guardianPhoneVerifiedAt: string | null
   role: Enums<'user_role'>
   status: UserStatus
   createdAt: string
@@ -67,7 +73,8 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, 
     const normalized = query.trim().toLowerCase()
     const searched = !normalized ? users : users.filter((u) =>
       (u.fullName || '').toLowerCase().includes(normalized) ||
-      u.email.toLowerCase().includes(normalized)
+      u.email.toLowerCase().includes(normalized) ||
+      (u.phoneNumber || '').toLowerCase().includes(normalized)
     )
     const indicatorFiltered = indicatorFilter === 'ALL'
       ? searched
@@ -246,25 +253,41 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, 
           <div className="space-y-2">
             {filteredUsers.map((user) => {
               const stats = analytics?.userStats[user.id]
+              const contactComplete = isProfileContactComplete({
+                phone_number: user.phoneNumber,
+                phone_verified_at: user.phoneVerifiedAt,
+                date_of_birth: user.dateOfBirth,
+                guardian_phone_number: user.guardianPhoneNumber,
+                guardian_phone_verified_at: user.guardianPhoneVerifiedAt,
+              })
 
               return (
               <div key={user.id} className="overflow-hidden rounded-xl bg-white shadow-sm">
                 <div className="flex items-start justify-between gap-3 p-4">
                   <div className="min-w-0">
-                    <p className="font-medium text-gray-900">{user.fullName || user.email}</p>
-                    {user.fullName && <p className="truncate text-sm text-gray-500">{user.email}</p>}
-                    <p className="mt-1 text-xs text-gray-400">Created {new Date(user.createdAt).toLocaleDateString()}</p>
-                    <div className="mt-2 flex items-center gap-2">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+	                    <p className="font-medium text-gray-900">{user.fullName || user.email}</p>
+	                    {user.fullName && <p className="truncate text-sm text-gray-500">{user.email}</p>}
+	                    <p className="mt-1 flex items-center gap-1.5 truncate text-xs text-gray-500">
+	                      <Phone className="h-3.5 w-3.5 shrink-0" />
+	                      {user.phoneNumber || 'No phone on file'}
+	                    </p>
+	                    <p className="mt-1 text-xs text-gray-400">Created {new Date(user.createdAt).toLocaleDateString()}</p>
+	                    <div className="mt-2 flex items-center gap-2">
+	                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                         user.status === 'ACTIVE' ? 'bg-green-100 text-green-700'
                           : user.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700'
                             : 'bg-red-100 text-red-700'
                       }`}>
-                        {user.status}
-                      </span>
-                      <span className="text-xs text-gray-400 capitalize">{user.role.toLowerCase()}</span>
-                    </div>
-                  </div>
+	                        {user.status}
+	                      </span>
+	                      <span className="text-xs text-gray-400 capitalize">{user.role.toLowerCase()}</span>
+	                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+	                        contactComplete ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
+	                      }`}>
+	                        {contactComplete ? 'Contact complete' : 'Missing contact'}
+	                      </span>
+	                    </div>
+	                  </div>
 
                   <div className="flex shrink-0 gap-1">
                     {user.status === 'PENDING' && (

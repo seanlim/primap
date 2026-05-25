@@ -1,4 +1,4 @@
-export const PUBLIC_PATHS = ['/login', '/auth/callback', '/pending', '/blocked'] as const
+export const PUBLIC_PATHS = ['/login', '/auth/callback', '/complete-profile', '/pending', '/blocked'] as const
 
 export type UserStatus = 'PENDING' | 'ACTIVE' | 'REJECTED' | 'DISABLED'
 

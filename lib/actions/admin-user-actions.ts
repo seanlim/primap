@@ -10,6 +10,7 @@ import {
   sendRolePromotedEmail,
   sendRoleDemotedEmail,
 } from '@/lib/email'
+import { isProfileContactComplete } from '@/lib/auth/contact-profile'
 
 interface AdminActionResult {
   success?: true
@@ -33,6 +34,18 @@ async function requireAdmin() {
 
 export async function approveUser(userId: string): Promise<AdminActionResult> {
   const { supabase } = await requireAdmin()
+
+  const { data: targetProfile, error: targetError } = await supabase
+    .from('profiles')
+    .select('phone_number, phone_verified_at, date_of_birth, guardian_phone_number, guardian_phone_verified_at')
+    .eq('id', userId)
+    .single()
+
+  if (targetError) return { error: targetError.message }
+  if (!targetProfile) return { error: 'User not found' }
+  if (!isProfileContactComplete(targetProfile)) {
+    return { error: 'User must complete phone verification before approval' }
+  }
 
   const { data: updatedProfile, error } = await supabase
     .from('profiles')

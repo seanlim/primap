@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { isPublicPath, needsProfileCheck, resolveStatusRedirect } from '@/lib/auth/access-policy'
+import { isProfileContactComplete } from '@/lib/auth/contact-profile'
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -58,7 +59,7 @@ export async function middleware(request: NextRequest) {
   if (profileCheckRequired) {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('status, role')
+      .select('status, role, phone_number, phone_verified_at, date_of_birth, guardian_phone_number, guardian_phone_verified_at')
       .eq('id', user!.id)
       .single()
 
@@ -77,6 +78,24 @@ export async function middleware(request: NextRequest) {
     }
 
     const statusRedirect = resolveStatusRedirect(profile.status)
+    if (statusRedirect === '/blocked' && pathname !== statusRedirect) {
+      const url = request.nextUrl.clone()
+      url.pathname = statusRedirect
+      return NextResponse.redirect(url)
+    }
+
+    if (
+      profile.status !== 'REJECTED' &&
+      profile.status !== 'DISABLED' &&
+      !isProfileContactComplete(profile) &&
+      pathname !== '/complete-profile'
+    ) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/complete-profile'
+      url.searchParams.set('next', pathname)
+      return NextResponse.redirect(url)
+    }
+
     if (statusRedirect && pathname !== statusRedirect) {
       const url = request.nextUrl.clone()
       url.pathname = statusRedirect

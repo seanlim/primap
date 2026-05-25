@@ -13,7 +13,11 @@ export const TABLE_ORDER = [
 export type TableName = (typeof TABLE_ORDER)[number]
 
 export const TABLE_COLUMNS: Record<TableName, string[]> = {
-  profiles: ['id', 'email', 'full_name', 'avatar_url', 'role', 'status', 'created_at', 'updated_at'],
+  profiles: [
+    'id', 'email', 'full_name', 'avatar_url', 'phone_number', 'phone_verified_at',
+    'date_of_birth', 'guardian_phone_number', 'guardian_phone_verified_at',
+    'role', 'status', 'created_at', 'updated_at',
+  ],
   survey_rounds: ['id', 'name', 'description', 'start_date', 'end_date', 'status', 'created_by', 'created_at', 'updated_at'],
   walk_slots: ['id', 'round_id', 'location_name', 'walk_date', 'start_time', 'end_time', 'max_volunteers', 'created_at', 'updated_at'],
   slot_memberships: ['id', 'slot_id', 'user_id', 'status', 'joined_at', 'cancelled_at'],

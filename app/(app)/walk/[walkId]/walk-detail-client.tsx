@@ -38,6 +38,7 @@ interface WalkDetailProps {
 export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserId, lateCancelWarning, hasSubmittedReport }: WalkDetailProps) {
   const [error, setError] = useState('')
   const [showCancelDialog, setShowCancelDialog] = useState(false)
+  const [cancellationReason, setCancellationReason] = useState('')
   const [isPending, startTransition] = useTransition()
   const [pendingAction, setPendingAction] = useState<'join' | 'cancel' | null>(null)
   // Synchronous in-flight gate for the cancel handler. The dialog's busy
@@ -91,7 +92,7 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
     setPendingAction('cancel')
     startTransition(async () => {
       setOptimistic('cancel')
-      const result = await cancelWalk(walk.id)
+      const result = await cancelWalk(walk.id, lateCancelWarning ? cancellationReason : undefined)
       if (result.error) {
         setError(result.error)
         setPendingAction(null)
@@ -100,6 +101,7 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
         if (result.warning) {
           showToast(result.warning, 'info')
         }
+        setCancellationReason('')
         setShowCancelDialog(false)
         router.refresh()
       }
@@ -227,11 +229,18 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
           : 'Are you sure you want to cancel your participation? Other group members will be notified.'}
         confirmLabel="Yes, Cancel"
         cancelLabel="Keep"
+        textareaLabel={lateCancelWarning ? 'Reason for late cancellation' : undefined}
+        textareaPlaceholder={lateCancelWarning ? 'Share the reason for this late cancellation' : undefined}
+        textareaValue={cancellationReason}
+        textareaRequired={Boolean(lateCancelWarning)}
+        textareaMaxLength={1000}
+        onTextareaChange={setCancellationReason}
         destructive
         busy={isCancelling}
         onConfirm={confirmCancel}
         onCancel={() => {
           if (isCancelling) return
+          setCancellationReason('')
           setShowCancelDialog(false)
         }}
       />

@@ -17,6 +17,7 @@ const { mockSend, mockSingle, mockChain, mockSupabase } = vi.hoisted(() => {
     insert: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     neq: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
     single: mockSingle,
   }
   const mockSupabase = {
@@ -52,6 +53,7 @@ import {
   enableUser,
 } from '@/lib/actions/admin-user-actions'
 import { sendWalkCancellationEmail } from '@/lib/email'
+import { DEFAULT_LATE_CANCEL_HOURS } from '@/lib/constants/settings'
 
 function resetChain() {
   mockChain.select.mockReturnThis()
@@ -59,6 +61,7 @@ function resetChain() {
   mockChain.insert.mockReturnThis()
   mockChain.eq.mockReturnThis()
   mockChain.neq.mockReturnThis()
+  mockChain.limit.mockReturnThis()
   mockSingle.mockReset()
   mockSupabase.from.mockReturnValue(mockChain)
   mockSupabase.rpc.mockResolvedValue({
@@ -108,7 +111,19 @@ describe('cancel-walk-email-flow (integration)', () => {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
               single: vi.fn().mockResolvedValue({
-                data: { walk_date: '2026-04-01', start_time: '08:00', location_name: 'Bukit Timah' },
+                data: { walk_date: '2099-04-01', start_time: '08:00', location_name: 'Bukit Timah' },
+                error: null,
+              }),
+            }),
+          }),
+        }
+      }
+      if (table === 'app_settings') {
+        return {
+          select: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({
+                data: { late_cancel_hours: DEFAULT_LATE_CANCEL_HOURS },
                 error: null,
               }),
             }),
@@ -163,7 +178,19 @@ describe('cancel-walk-email-flow (integration)', () => {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
               single: vi.fn().mockResolvedValue({
-                data: { walk_date: '2026-04-01', start_time: '08:00', location_name: 'Bukit Timah' },
+                data: { walk_date: '2099-04-01', start_time: '08:00', location_name: 'Bukit Timah' },
+                error: null,
+              }),
+            }),
+          }),
+        }
+      }
+      if (table === 'app_settings') {
+        return {
+          select: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({
+                data: { late_cancel_hours: DEFAULT_LATE_CANCEL_HOURS },
                 error: null,
               }),
             }),
@@ -221,7 +248,19 @@ describe('cancel-walk-email-flow (integration)', () => {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
               single: vi.fn().mockResolvedValue({
-                data: { walk_date: '2026-04-01', start_time: '08:00', location_name: 'Bukit Timah' },
+                data: { walk_date: '2099-04-01', start_time: '08:00', location_name: 'Bukit Timah' },
+                error: null,
+              }),
+            }),
+          }),
+        }
+      }
+      if (table === 'app_settings') {
+        return {
+          select: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({
+                data: { late_cancel_hours: DEFAULT_LATE_CANCEL_HOURS },
                 error: null,
               }),
             }),

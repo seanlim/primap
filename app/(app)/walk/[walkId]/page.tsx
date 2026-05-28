@@ -3,6 +3,7 @@ import { redirect, notFound } from 'next/navigation'
 import { WalkDetailClient } from './walk-detail-client'
 import type { MembershipWithProfile } from '@/lib/types/supabase-helpers'
 import { getJoinBlockInfo, getWalkStartDateTime } from '@/lib/utils/walk-participation'
+import { DEFAULT_LATE_CANCEL_HOURS } from '@/lib/constants/settings'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,7 +67,7 @@ export default async function WalkDetailPage({
   const slotStart = getWalkStartDateTime(walk.walk_date, walk.start_time)
   const isPastOrStarted = slotStart <= new Date()
   const isFull = memberships.length >= walk.max_volunteers
-  const lateCancelHours = settings?.late_cancel_hours || 48
+  const lateCancelHours = settings?.late_cancel_hours || DEFAULT_LATE_CANCEL_HOURS
   const lateCancelCutoff = new Date(slotStart.getTime() - lateCancelHours * 60 * 60 * 1000)
   const lateCancelWarning = userMembership && new Date() >= lateCancelCutoff
     ? `This walk starts within the ${lateCancelHours}-hour late cancellation window.`

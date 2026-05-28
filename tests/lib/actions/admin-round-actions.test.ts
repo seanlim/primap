@@ -1,5 +1,6 @@
 import { revalidatePath } from 'next/cache'
 import type { Mock } from 'vitest'
+import { DEFAULT_LATE_CANCEL_HOURS } from '@/lib/constants/settings'
 
 interface MockSupabase {
   auth: { getUser: Mock }
@@ -588,7 +589,7 @@ describe('admin-round-actions', () => {
 
       const result = await updateSettings({
         requiredWalksPerRound: 4,
-        lateCancelHours: 24,
+        lateCancelHours: DEFAULT_LATE_CANCEL_HOURS,
         highParticipationThreshold: 8,
         maxMediaPerReport: 10,
       })
@@ -596,7 +597,7 @@ describe('admin-round-actions', () => {
       expect(result).toEqual({ success: true })
       expect(methods.update).toHaveBeenCalledWith({
         required_walks_per_round: 4,
-        late_cancel_hours: 24,
+        late_cancel_hours: DEFAULT_LATE_CANCEL_HOURS,
         high_participation_threshold: 8,
         max_media_per_report: 10,
       })
@@ -609,7 +610,7 @@ describe('admin-round-actions', () => {
 
       const result = await updateSettings({
         requiredWalksPerRound: 4,
-        lateCancelHours: 24,
+        lateCancelHours: DEFAULT_LATE_CANCEL_HOURS,
         highParticipationThreshold: 8,
         maxMediaPerReport: 10,
       })
@@ -630,7 +631,7 @@ describe('admin-round-actions', () => {
 
       const result = await updateSettings({
         requiredWalksPerRound: 4,
-        lateCancelHours: 24,
+        lateCancelHours: DEFAULT_LATE_CANCEL_HOURS,
         highParticipationThreshold: 8,
         maxMediaPerReport: 10,
       })
@@ -647,7 +648,7 @@ describe('admin-round-actions', () => {
 
       await updateSettings({
         requiredWalksPerRound: 4,
-        lateCancelHours: 48,
+        lateCancelHours: DEFAULT_LATE_CANCEL_HOURS,
         highParticipationThreshold: 8,
         maxMediaPerReport: 15,
       })
@@ -661,7 +662,7 @@ describe('admin-round-actions', () => {
       it('rejects maxMediaPerReport below the allowed range', async () => {
         const result = await updateSettings({
           requiredWalksPerRound: 4,
-          lateCancelHours: 48,
+          lateCancelHours: DEFAULT_LATE_CANCEL_HOURS,
           highParticipationThreshold: 8,
           maxMediaPerReport: 0,
         })
@@ -674,7 +675,7 @@ describe('admin-round-actions', () => {
       it('rejects maxMediaPerReport above the allowed range', async () => {
         const result = await updateSettings({
           requiredWalksPerRound: 4,
-          lateCancelHours: 48,
+          lateCancelHours: DEFAULT_LATE_CANCEL_HOURS,
           highParticipationThreshold: 8,
           maxMediaPerReport: 51,
         })
@@ -687,7 +688,7 @@ describe('admin-round-actions', () => {
       it('rejects non-integer maxMediaPerReport', async () => {
         const result = await updateSettings({
           requiredWalksPerRound: 4,
-          lateCancelHours: 48,
+          lateCancelHours: DEFAULT_LATE_CANCEL_HOURS,
           highParticipationThreshold: 8,
           maxMediaPerReport: 5.5,
         })
@@ -700,7 +701,7 @@ describe('admin-round-actions', () => {
       it('rejects NaN maxMediaPerReport (e.g. parseInt of empty input)', async () => {
         const result = await updateSettings({
           requiredWalksPerRound: 4,
-          lateCancelHours: 48,
+          lateCancelHours: DEFAULT_LATE_CANCEL_HOURS,
           highParticipationThreshold: 8,
           maxMediaPerReport: Number.NaN,
         })
@@ -712,7 +713,7 @@ describe('admin-round-actions', () => {
       it('rejects highParticipationThreshold out of range', async () => {
         const result = await updateSettings({
           requiredWalksPerRound: 4,
-          lateCancelHours: 48,
+          lateCancelHours: DEFAULT_LATE_CANCEL_HOURS,
           highParticipationThreshold: 101,
           maxMediaPerReport: 10,
         })
@@ -726,7 +727,7 @@ describe('admin-round-actions', () => {
       it('rejects NaN highParticipationThreshold', async () => {
         const result = await updateSettings({
           requiredWalksPerRound: 4,
-          lateCancelHours: 48,
+          lateCancelHours: DEFAULT_LATE_CANCEL_HOURS,
           highParticipationThreshold: Number.NaN,
           maxMediaPerReport: 10,
         })
@@ -739,7 +740,7 @@ describe('admin-round-actions', () => {
       it('rejects requiredWalksPerRound out of range', async () => {
         const result = await updateSettings({
           requiredWalksPerRound: 0,
-          lateCancelHours: 48,
+          lateCancelHours: DEFAULT_LATE_CANCEL_HOURS,
           highParticipationThreshold: 8,
           maxMediaPerReport: 10,
         })
@@ -776,7 +777,7 @@ describe('admin-round-actions', () => {
       it('does not call requireAdmin/db when validation fails', async () => {
         await updateSettings({
           requiredWalksPerRound: 0,
-          lateCancelHours: 48,
+          lateCancelHours: DEFAULT_LATE_CANCEL_HOURS,
           highParticipationThreshold: 8,
           maxMediaPerReport: 10,
         })

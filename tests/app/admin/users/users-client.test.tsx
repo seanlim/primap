@@ -66,6 +66,19 @@ describe('UsersClient admin indicators', () => {
     expect(screen.getByText('Late (2)')).toBeInTheDocument()
   })
 
+  it('renders a history link for each user', () => {
+    render(
+      <UsersClient {...defaultProps} />
+    )
+
+    const links = screen.getAllByRole('link', { name: /View History/i })
+    expect(links).toHaveLength(2)
+    expect(links.map((link) => link.getAttribute('href'))).toEqual([
+      '/admin/users/user-2/history',
+      '/admin/users/user-1/history',
+    ])
+  })
+
   it('filters by high participation or late cancellation indicators', async () => {
     const user = userEvent.setup()
     render(<UsersClient {...defaultProps} />)

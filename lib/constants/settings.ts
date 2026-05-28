@@ -4,7 +4,7 @@
 // attributes in `app/(app)/admin/settings/settings-client.tsx`.
 
 export const DEFAULT_REQUIRED_WALKS_PER_ROUND = 4
-export const DEFAULT_LATE_CANCEL_HOURS = 48
+export const DEFAULT_LATE_CANCEL_HOURS = 24
 export const DEFAULT_MAX_MEDIA_PER_REPORT = 10
 export const DEFAULT_HIGH_PARTICIPATION_THRESHOLD = 8
 

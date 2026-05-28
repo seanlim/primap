@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, ChevronLeft, ChevronRight, Search, Users } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, History, Search, Users } from 'lucide-react'
 import { approveUser, rejectUser, disableUser, enableUser, setUserRole } from '@/lib/actions/admin-user-actions'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { ToastProvider, useToast } from '@/components/ui/toast'
@@ -267,6 +267,13 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, 
                   </div>
 
                   <div className="flex shrink-0 gap-1">
+                    <Link
+                      href={`/admin/users/${user.id}/history`}
+                      className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-200"
+                    >
+                      <History className="h-3.5 w-3.5" />
+                      View History
+                    </Link>
                     {user.status === 'PENDING' && (
                       <>
                         <button

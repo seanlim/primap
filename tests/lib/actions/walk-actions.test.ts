@@ -41,6 +41,7 @@ vi.mock('@/lib/email', () => ({
 
 import { joinWalk, cancelWalk } from '@/lib/actions/walk-actions'
 import { sendWalkCancellationEmail } from '@/lib/email'
+import { DEFAULT_LATE_CANCEL_HOURS } from '@/lib/constants/settings'
 
 function resetChain() {
   methods.select.mockReturnThis()
@@ -97,6 +98,7 @@ function setupCancelMocks(overrides?: {
   rpcError?: { message: string } | null
   storageError?: { message: string } | null
   slot?: { walk_date: string; start_time: string; location_name: string } | null
+  settings?: { late_cancel_hours: number } | null
   profile?: { full_name: string | null; email: string | null } | null
   otherMembers?: Array<{ user_id: string; profiles: { email: string | null } }>
 }) {
@@ -108,6 +110,9 @@ function setupCancelMocks(overrides?: {
   const slot = overrides && 'slot' in overrides
     ? overrides.slot
     : { walk_date: '2026-04-15', start_time: '08:00', location_name: 'Central Park' }
+  const settings = overrides && 'settings' in overrides
+    ? overrides.settings
+    : { late_cancel_hours: DEFAULT_LATE_CANCEL_HOURS }
   const profile = overrides && 'profile' in overrides
     ? overrides.profile
     : { full_name: 'Test User', email: 'user@test.com' }
@@ -152,6 +157,19 @@ function setupCancelMocks(overrides?: {
       }
     }
 
+    if (table === 'app_settings') {
+      return {
+        select: vi.fn().mockReturnValue({
+          limit: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({
+              data: settings,
+              error: null,
+            }),
+          }),
+        }),
+      }
+    }
+
     if (table === 'profiles') {
       return {
         select: vi.fn().mockReturnValue({
@@ -172,7 +190,13 @@ function setupCancelMocks(overrides?: {
 describe('walk-actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-04-10T00:00:00.000Z'))
     resetChain()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   describe('joinWalk', () => {
@@ -287,6 +311,7 @@ describe('walk-actions', () => {
       expect(result).toEqual({ success: true })
       expect(mockSupabase.rpc).toHaveBeenCalledWith('cancel_slot_with_draft_cleanup', {
         p_slot_id: 'slot-1',
+        p_cancellation_reason: null,
       })
       expect(sendWalkCancellationEmail).toHaveBeenCalledWith(
         ['other@test.com'],
@@ -308,6 +333,42 @@ describe('walk-actions', () => {
       const result = await cancelWalk('slot-1')
 
       expect(result).toEqual({ error: 'Update failed' })
+    })
+
+    it('requires a reason for late cancellation before calling RPC', async () => {
+      vi.setSystemTime(new Date('2026-04-14T12:00:00.000Z'))
+      setupUser()
+      setupCancelMocks()
+
+      const result = await cancelWalk('slot-1')
+
+      expect(result).toEqual({ error: 'Please provide a reason for this late cancellation.' })
+      expect(mockSupabase.rpc).not.toHaveBeenCalled()
+    })
+
+    it('passes a trimmed reason for late cancellation', async () => {
+      vi.setSystemTime(new Date('2026-04-14T12:00:00.000Z'))
+      setupUser()
+      setupCancelMocks()
+
+      const result = await cancelWalk('slot-1', '  medical appointment  ')
+
+      expect(result).toEqual({ success: true })
+      expect(mockSupabase.rpc).toHaveBeenCalledWith('cancel_slot_with_draft_cleanup', {
+        p_slot_id: 'slot-1',
+        p_cancellation_reason: 'medical appointment',
+      })
+    })
+
+    it('rejects overlong cancellation reasons', async () => {
+      vi.setSystemTime(new Date('2026-04-14T12:00:00.000Z'))
+      setupUser()
+      setupCancelMocks()
+
+      const result = await cancelWalk('slot-1', 'a'.repeat(1001))
+
+      expect(result).toEqual({ error: 'Cancellation reason must be 1000 characters or fewer.' })
+      expect(mockSupabase.rpc).not.toHaveBeenCalled()
     })
 
     it('returns error when no active membership is cancelled', async () => {
@@ -343,7 +404,7 @@ describe('walk-actions', () => {
       expect(result).toEqual({ error: 'Unexpected cancellation response.' })
     })
 
-    it('still succeeds when slot is not found for email', async () => {
+    it('returns error when the walk slot is not found before cancellation', async () => {
       setupUser()
       setupCancelMocks({
         slot: null,
@@ -351,7 +412,8 @@ describe('walk-actions', () => {
 
       const result = await cancelWalk('slot-1')
 
-      expect(result).toEqual({ success: true })
+      expect(result).toEqual({ error: 'Walk slot not found.' })
+      expect(mockSupabase.rpc).not.toHaveBeenCalled()
       expect(sendWalkCancellationEmail).not.toHaveBeenCalled()
     })
 

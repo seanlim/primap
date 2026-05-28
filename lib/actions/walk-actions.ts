@@ -3,8 +3,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { sendWalkCancellationEmail } from '@/lib/email'
-import { getJoinBlockInfo, hasWalkStarted } from '@/lib/utils/walk-participation'
+import { getJoinBlockInfo, getWalkStartDateTime, hasWalkStarted } from '@/lib/utils/walk-participation'
 import { OBSERVATION_MEDIA_BUCKET } from '@/lib/utils/storage'
+import { DEFAULT_LATE_CANCEL_HOURS } from '@/lib/constants/settings'
 
 
 export async function joinWalk(walkId: string) {
@@ -74,14 +75,48 @@ export async function joinWalk(walkId: string) {
 }
 
 
-export async function cancelWalk(walkId: string) {
+const MAX_CANCELLATION_REASON_LENGTH = 1000
+
+export async function cancelWalk(walkId: string, cancellationReason?: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
   const warnings: string[] = []
+  const sanitizedReason = cancellationReason?.trim() ?? ''
+
+  const [{ data: slot, error: slotError }, { data: settings }] = await Promise.all([
+    supabase
+      .from('walk_slots')
+      .select('walk_date, start_time, location_name')
+      .eq('id', walkId)
+      .single(),
+    supabase
+      .from('app_settings')
+      .select('late_cancel_hours')
+      .limit(1)
+      .single(),
+  ])
+
+  if (slotError) return { error: slotError.message }
+  if (!slot) return { error: 'Walk slot not found.' }
+
+  const lateCancelHours = settings?.late_cancel_hours ?? DEFAULT_LATE_CANCEL_HOURS
+  const slotStart = getWalkStartDateTime(slot.walk_date, slot.start_time)
+  const lateCancelCutoff = new Date(slotStart.getTime() - lateCancelHours * 60 * 60 * 1000)
+  const isLateCancellation =
+    !Number.isNaN(slotStart.getTime()) && new Date() >= lateCancelCutoff
+
+  if (isLateCancellation && sanitizedReason.length === 0) {
+    return { error: 'Please provide a reason for this late cancellation.' }
+  }
+
+  if (sanitizedReason.length > MAX_CANCELLATION_REASON_LENGTH) {
+    return { error: `Cancellation reason must be ${MAX_CANCELLATION_REASON_LENGTH} characters or fewer.` }
+  }
 
   const { data, error } = await supabase.rpc('cancel_slot_with_draft_cleanup', {
     p_slot_id: walkId,
+    p_cancellation_reason: isLateCancellation ? sanitizedReason : null,
   })
 
   if (error) return { error: error.message }
@@ -115,14 +150,7 @@ export async function cancelWalk(walkId: string) {
 
   // Notify other members
   try {
-    // 1. Get walk info
-    const { data: slot } = await supabase
-      .from('walk_slots')
-      .select('walk_date, start_time, location_name')
-      .eq('id', walkId)
-      .single()
-
-    // 2. Get cancelling user info
+    // 1. Get cancelling user info
     const { data: cancellingProfile } = await supabase
       .from('profiles')
       .select('full_name, email')
@@ -131,7 +159,7 @@ export async function cancelWalk(walkId: string) {
 
     const cancellingName = cancellingProfile?.full_name || cancellingProfile?.email || 'A volunteer'
 
-    // 3. Get other active members
+    // 2. Get other active members
     interface MembershipRow {
       user_id: string
       profiles: { email: string } | null
@@ -145,7 +173,7 @@ export async function cancelWalk(walkId: string) {
       .neq('user_id', user.id)
 
     const otherMembers = (otherMembersRaw || []) as unknown as MembershipRow[]
-    if (slot && otherMembers.length > 0) {
+    if (otherMembers.length > 0) {
       const recipients = otherMembers
         .map(m => m.profiles?.email)
         .filter((e): e is string => Boolean(e))

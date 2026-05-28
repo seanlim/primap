@@ -14,6 +14,12 @@ interface ConfirmationDialogProps {
   busy?: boolean
   requiredConfirmationText?: string
   confirmationPrompt?: string
+  textareaLabel?: string
+  textareaValue?: string
+  textareaPlaceholder?: string
+  textareaRequired?: boolean
+  textareaMaxLength?: number
+  onTextareaChange?: (value: string) => void
 }
 
 export function ConfirmationDialog({
@@ -28,30 +34,41 @@ export function ConfirmationDialog({
   busy = false,
   requiredConfirmationText,
   confirmationPrompt,
+  textareaLabel,
+  textareaValue = '',
+  textareaPlaceholder,
+  textareaRequired = false,
+  textareaMaxLength,
+  onTextareaChange,
 }: ConfirmationDialogProps) {
   const titleId = useId()
   const cancelRef = useRef<HTMLButtonElement>(null)
   const confirmRef = useRef<HTMLButtonElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [confirmationValue, setConfirmationValue] = useState('')
   const confirmedText = !requiredConfirmationText || confirmationValue === requiredConfirmationText
+  const confirmedTextarea = !textareaRequired || textareaValue.trim().length > 0
+  const canConfirm = confirmedText && confirmedTextarea
 
   useEffect(() => {
     if (!open) return
     if (requiredConfirmationText) inputRef.current?.focus()
+    else if (textareaLabel) textareaRef.current?.focus()
     else cancelRef.current?.focus()
-  }, [open, requiredConfirmationText])
+  }, [open, requiredConfirmationText, textareaLabel])
 
   const handleCancel = useCallback(() => {
     setConfirmationValue('')
+    onTextareaChange?.('')
     onCancel()
-  }, [onCancel])
+  }, [onCancel, onTextareaChange])
 
   const handleConfirm = useCallback(() => {
-    if (!confirmedText) return
+    if (!canConfirm) return
     setConfirmationValue('')
     onConfirm()
-  }, [confirmedText, onConfirm])
+  }, [canConfirm, onConfirm])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -62,8 +79,8 @@ export function ConfirmationDialog({
 
       if (e.key !== 'Tab') return
 
-      const focusable = [inputRef.current, cancelRef.current, confirmRef.current].filter(
-        (el): el is HTMLInputElement | HTMLButtonElement => el !== null
+      const focusable = [inputRef.current, textareaRef.current, cancelRef.current, confirmRef.current].filter(
+        (el): el is HTMLInputElement | HTMLTextAreaElement | HTMLButtonElement => el !== null
       )
       if (focusable.length === 0) return
 
@@ -109,6 +126,28 @@ export function ConfirmationDialog({
             />
           </label>
         )}
+        {textareaLabel && (
+          <label className="mt-4 block text-sm text-gray-600">
+            <span className="block text-xs font-medium text-gray-500">
+              {textareaLabel}
+            </span>
+            <textarea
+              ref={textareaRef}
+              value={textareaValue}
+              onChange={(e) => onTextareaChange?.(e.target.value)}
+              disabled={busy}
+              placeholder={textareaPlaceholder}
+              maxLength={textareaMaxLength}
+              rows={4}
+              className="mt-2 w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-60"
+            />
+            {textareaMaxLength && (
+              <span className="mt-1 block text-right text-xs text-gray-400">
+                {textareaValue.length}/{textareaMaxLength}
+              </span>
+            )}
+          </label>
+        )}
         <div className="flex gap-3 mt-6">
           <button
             ref={cancelRef}
@@ -121,7 +160,7 @@ export function ConfirmationDialog({
           <button
             ref={confirmRef}
             onClick={handleConfirm}
-            disabled={busy || !confirmedText}
+            disabled={busy || !canConfirm}
             className={`flex-1 py-2.5 px-4 rounded-xl font-medium transition-colors text-sm text-white disabled:opacity-60 disabled:cursor-not-allowed ${
               destructive
                 ? 'bg-red-600 hover:bg-red-700'

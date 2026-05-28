@@ -5,6 +5,7 @@ import {
   getAdminVolunteerAnalyticsLanding,
   getAdminWalksAnalyticsPageSnapshotByRound,
 } from '@/lib/admin-volunteer-analytics'
+import { DEFAULT_LATE_CANCEL_HOURS } from '@/lib/constants/settings'
 
 describe('buildVolunteerAnalyticsSnapshot', () => {
   const round = {
@@ -235,7 +236,7 @@ describe('getAdminUsersAnalytics indicators', () => {
     }
 
     const snapshot = await getAdminUsersAnalytics(supabase as never, undefined, {
-      lateCancelHours: 24,
+      lateCancelHours: DEFAULT_LATE_CANCEL_HOURS,
       highParticipationThreshold: 10,
     })
 

@@ -3,11 +3,12 @@
 import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Trash2, Pencil, X, Layers, Search, ArrowRight, BarChart3 } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Pencil, X, Layers, Search, ArrowRight, BarChart3, UserRound } from 'lucide-react'
 import { createWalk, updateWalk, deleteWalk, bulkCreateWalks } from '@/lib/actions/admin-round-actions'
-import { formatDate, toLocalDateString } from '@/lib/utils/format-date'
+import { formatDate, formatTime_HH_MM, toLocalDateString } from '@/lib/utils/format-date'
 import { useToast } from '@/components/ui/toast'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
+import WalkCalendar from '@/components/ui/WalkCalendar'
 
 interface WalkData {
   id: string
@@ -64,6 +65,10 @@ function generateWalksFromRules(rule: BulkRule): GeneratedWalk[] {
   }
 
   return walks.sort((a, b) => a.walkDate.localeCompare(b.walkDate) || a.locationName.localeCompare(b.locationName))
+}
+
+function formatWalkTimeDisplay(walk: WalkData): string {
+  return `${formatTime_HH_MM(`${walk.walkDate}T${walk.startTime}`)} - ${formatTime_HH_MM(`${walk.walkDate}T${walk.endTime}`)}`
 }
 
 export function WalksClient({ walks, rounds }: {
@@ -177,6 +182,7 @@ export function WalksClient({ walks, rounds }: {
     : rounds
   const selectedRound = effectiveRounds.find(r => r.id === roundId)
   const selectedBulkRound = rounds.find(r => r.id === bulkRoundId)
+
 
   const handleCreate = async (e: React.SubmitEvent) => {
     e.preventDefault()
@@ -652,14 +658,31 @@ export function WalksClient({ walks, rounds }: {
                     {group.walks.length} walk{group.walks.length === 1 ? '' : 's'} in this round
                   </p>
                 </div>
-                <div className="rounded-full bg-white px-3 py-1 text-xs font-medium text-gray-500 ring-1 ring-gray-200">
-                  Sorted by date
-                </div>
               </div>
             </div>
 
             <div className="divide-y divide-gray-100">
-              {group.walks.map((walk) => (
+              <WalkCalendar 
+                events={group.walks}
+                initialMonth={group.roundStartDate ? new Date(group.roundStartDate + 'T00:00:00') : undefined}
+                getEventStartTime={(walk) => `${walk.walkDate}T${walk.startTime}`}
+                getEventEndTime={(walk) => `${walk.walkDate}T${walk.endTime}`}
+                renderEvent={(event) => (
+                  <div className='cursor-pointer'>
+                      <p className="text-xxs tracking-wide">{formatWalkTimeDisplay(event)}</p>
+                      <p className="text-xxs tracking-wide">{event.locationName}</p>
+                      <p className="text-xxs tracking-wide">{event.memberCount}/{event.maxVolunteers} volunteers</p>
+                  </div>
+                )}
+                onEventClick={(walk) => startEdit(walk)}
+              />
+              {editingWalkId && editingWalk?.roundId === group.roundId && (
+                <div className="px-4 py-4">
+                  {walkForm(handleUpdate, 'Save Changes', cancelEdit)}
+                </div>
+              )}
+
+              {/* {group.walks.map((walk) => (
                 <div key={walk.id} className="px-4 py-4">
                   {editingWalkId === walk.id ? (
                     walkForm(handleUpdate, 'Save Changes', cancelEdit)
@@ -686,7 +709,7 @@ export function WalksClient({ walks, rounds }: {
                     </div>
                   )}
                 </div>
-              ))}
+              ))} */}
             </div>
           </section>
         ))}

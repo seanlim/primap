@@ -272,80 +272,82 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
       <div className="space-y-2">
         {filteredRounds.map(round => (
           <div key={round.id} className="bg-white rounded-2xl p-4 shadow-sm">
-            {editingRoundId === round.id ? (
-              <form onSubmit={handleUpdate} className="space-y-3">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-sm font-medium text-gray-700">Edit Round</p>
-                  <button type="button" onClick={cancelEdit} className="text-gray-400 hover:text-gray-600">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                <input type="text" value={editName} onChange={e => setEditName(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required />
-                <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)}
-                  placeholder="Description (optional)"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-500" rows={2} />
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-xs font-medium text-gray-500">Start Date</label>
-                    <input type="date" value={editStartDate} onChange={e => setEditStartDate(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required />
+            <Link href={`/admin/rounds/${round.id}/walks`}>
+              {editingRoundId === round.id ? (
+                <form onSubmit={handleUpdate} className="space-y-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-medium text-gray-700">Edit Round</p>
+                    <button type="button" onClick={cancelEdit} className="text-gray-400 hover:text-gray-600">
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-500">End Date</label>
-                    <input type="date" value={editEndDate} onChange={e => setEditEndDate(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required />
+                  <input type="text" value={editName} onChange={e => setEditName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required />
+                  <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)}
+                    placeholder="Description (optional)"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-500" rows={2} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs font-medium text-gray-500">Start Date</label>
+                      <input type="date" value={editStartDate} onChange={e => setEditStartDate(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-500">End Date</label>
+                      <input type="date" value={editEndDate} onChange={e => setEditEndDate(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required />
+                    </div>
                   </div>
-                </div>
-                <div className="flex gap-2">
-                  <button type="button" onClick={cancelEdit}
-                    className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50">Cancel</button>
-                  <button type="submit" disabled={loading}
-                    className="flex-1 bg-green-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50">
-                    {loading ? 'Saving...' : 'Save'}
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-900">{round.name}</p>
-                    {round.description && <p className="text-sm text-gray-500 mt-0.5">{round.description}</p>}
-                    <p className="text-xs text-gray-400 mt-1">
-                      {formatDate(round.startDate)} - {formatDate(round.endDate)} &middot; {round.walkCount} walk(s)
-                    </p>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={cancelEdit}
+                      className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50">Cancel</button>
+                    <button type="submit" disabled={loading}
+                      className="flex-1 bg-green-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50">
+                      {loading ? 'Saving...' : 'Save'}
+                    </button>
                   </div>
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                    round.status === 'OPEN' ? 'bg-green-100 text-green-700'
-                    : round.status === 'CLOSED' ? 'bg-gray-100 text-gray-500'
-                    : 'bg-yellow-100 text-yellow-700'
-                  }`}>
-                    {round.status}
-                  </span>
-                </div>
-                <div className="flex gap-2 mt-3">
-                  <button onClick={() => startEdit(round)}
-                    className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg hover:bg-blue-200 flex items-center gap-1">
-                    <Pencil className="w-3 h-3" /> Edit
-                  </button>
-                  {round.status === 'DRAFT' && (
-                    <button onClick={() => handleStatusChange(round.id, 'OPEN')}
-                      className="text-xs bg-green-100 text-green-700 px-3 py-1.5 rounded-lg hover:bg-green-200">Open</button>
-                  )}
-                  {round.status === 'OPEN' && (
-                    <button onClick={() => handleStatusChange(round.id, 'CLOSED')}
-                      className="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-200">Close</button>
-                  )}
-                  {round.status === 'CLOSED' && (
-                    <button onClick={() => handleStatusChange(round.id, 'OPEN')}
-                      className="text-xs bg-green-100 text-green-700 px-3 py-1.5 rounded-lg hover:bg-green-200">Re-open</button>
-                  )}
-                  <button onClick={() => setDeletingRoundId(round.id)}
-                    className="text-xs bg-red-100 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-200">Delete</button>
-                </div>
-              </>
-            )}
+                </form>
+              ) : (
+                <>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold text-gray-900">{round.name}</p>
+                      {round.description && <p className="text-sm text-gray-500 mt-0.5">{round.description}</p>}
+                      <p className="text-xs text-gray-400 mt-1">
+                        {formatDate(round.startDate)} - {formatDate(round.endDate)} &middot; {round.walkCount} walk(s)
+                      </p>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                      round.status === 'OPEN' ? 'bg-green-100 text-green-700'
+                      : round.status === 'CLOSED' ? 'bg-gray-100 text-gray-500'
+                      : 'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {round.status}
+                    </span>
+                  </div>
+                  <div className="flex gap-2 mt-3">
+                    <button onClick={() => startEdit(round)}
+                      className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg hover:bg-blue-200 flex items-center gap-1">
+                      <Pencil className="w-3 h-3" /> Edit
+                    </button>
+                    {round.status === 'DRAFT' && (
+                      <button onClick={() => handleStatusChange(round.id, 'OPEN')}
+                        className="text-xs bg-green-100 text-green-700 px-3 py-1.5 rounded-lg hover:bg-green-200">Open</button>
+                    )}
+                    {round.status === 'OPEN' && (
+                      <button onClick={() => handleStatusChange(round.id, 'CLOSED')}
+                        className="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-200">Close</button>
+                    )}
+                    {round.status === 'CLOSED' && (
+                      <button onClick={() => handleStatusChange(round.id, 'OPEN')}
+                        className="text-xs bg-green-100 text-green-700 px-3 py-1.5 rounded-lg hover:bg-green-200">Re-open</button>
+                    )}
+                    <button onClick={() => setDeletingRoundId(round.id)}
+                      className="text-xs bg-red-100 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-200">Delete</button>
+                  </div>
+                </>
+              )}
+            </Link>
           </div>
         ))}
         {rounds.length === 0 ? (

@@ -30,7 +30,7 @@ export default async function AdminWalksAnalyticsPage({
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/admin/walks" className="text-gray-400 hover:text-gray-600">
+        <Link href="/admin/rounds" className="text-gray-400 hover:text-gray-600">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <h1 className="text-2xl font-bold text-gray-900">Walk Analytics</h1>

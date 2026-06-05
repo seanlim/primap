@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { WalksClient } from './walks-client'
-import type { WalkWithCount } from '@/lib/types/supabase-helpers'
+import type { WalkWithMembership } from '@/lib/types/supabase-helpers'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 
@@ -13,22 +13,18 @@ export default async function AdminWalksPage({ params }: {
   const { roundId } = await params;
   const { data: walks } = await supabase
     .from('walk_slots')
-    .select('*, survey_rounds(name, status, start_date, end_date), slot_memberships(count)')
+    .select('*, survey_rounds(name, status, start_date, end_date), slot_memberships(profiles(id, full_name), status, joined_at, cancelled_at)')
     .filter('round_id', 'eq', roundId)
     .order('walk_date', { ascending: false })
 
-  const { data: rounds } = await supabase
-    .from('survey_rounds')
-    .select('id, name, start_date, end_date')
-    .in('status', ['DRAFT', 'OPEN'])
-    .order('start_date', { ascending: false })
   const { data: selectedRound } = await supabase
     .from('survey_rounds')
     .select('id, name, start_date, end_date')
     .eq('id', roundId)
     .single()
-  const typed = (walks || []) as unknown as WalkWithCount[]
-  
+  const typed = (walks || []) as unknown as WalkWithMembership[]
+  console.log('db walks')
+  console.log(walks)
   return (
     <div>
       {selectedRound ? (
@@ -45,7 +41,14 @@ export default async function AdminWalksPage({ params }: {
             startTime: s.start_time,
             endTime: s.end_time,
             maxVolunteers: s.max_volunteers,
-            memberCount: s.slot_memberships[0]?.count,
+            volunteers: s.slot_memberships.map(m => ({
+              user_id: m.profiles.id,
+              name: m.profiles.full_name,
+              status: m.status,
+              joined_at: m.joined_at,
+              cancelled_at: m.cancelled_at,
+            })),
+            memberCount: s.slot_memberships?.length || 0,
           }))}
           round={{
             id: selectedRound.id,

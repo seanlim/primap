@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Plus, X, Layers, Search, ArrowRight, BarChart3 } from 'lucide-react'
+import { ArrowLeft, Plus, X, Layers, Search, ArrowRight, BarChart3, Icon, User, Users, UserMinus } from 'lucide-react'
 import { createWalk, updateWalk, deleteWalk, bulkCreateWalks } from '@/lib/actions/admin-round-actions'
 import { formatTime_HH_MM, toLocalDateString } from '@/lib/utils/format-date'
 import { useToast } from '@/components/ui/toast'
@@ -22,6 +22,13 @@ interface WalkData {
   startTime: string
   endTime: string
   maxVolunteers: number
+  volunteers: Array<{
+    user_id: string,
+    name: string | null,
+    status: string,
+    joined_at: string,
+    cancelled_at: string | null,
+  }>
   memberCount: number
 }
 
@@ -137,6 +144,10 @@ export function WalksClient({ walks, round }: {
   }, [filteredWalks])
 
   const hasFilters = Boolean(filterLocation || filterStatus)
+
+  const editingWalk = editingWalkId ? walks.find(w => w.id === editingWalkId) : null
+  const editingWalkVolunteers = editingWalk?.volunteers.filter(v => v.status === 'ACTIVE') || []
+  const editingWalkCancellations = editingWalk?.volunteers.filter(v => v.status === 'CANCELLED') || []
 
   const handleCreate = async (e: React.SubmitEvent) => {
     e.preventDefault()
@@ -325,7 +336,7 @@ export function WalksClient({ walks, round }: {
           <Link href="/admin/rounds" className="text-gray-400 hover:text-gray-600">
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">{round.name || ''} Walks</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{round.name} Walks</h1>
         </div>
         <div className="flex gap-2">
           <button
@@ -532,40 +543,91 @@ export function WalksClient({ walks, round }: {
       )}
 
       <div className="space-y-5">
-          <section className="overflow-hidden rounded-2xl bg-white shadow-sm">
-            <div className="border-b border-gray-100 bg-gray-50/80 px-4 py-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-sm font-semibold text-gray-900">{round.name}</h2>
-                  <p className="mt-1 text-xs text-gray-500">
-                    {walks.length} walk{walks.length === 1 ? '' : 's'} in this round
-                  </p>
-                </div>
+        <section className="overflow-hidden rounded-2xl bg-white shadow-sm">
+          <div className="border-b border-gray-100 bg-gray-50/80 px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-gray-900">{round.name}</h2>
+                <p className="mt-1 text-xs text-gray-500">
+                  {walks.length} walk{walks.length === 1 ? '' : 's'} in this round
+                </p>
               </div>
             </div>
+          </div>
 
-            <div className="divide-y divide-gray-100">
-              <WalkCalendar 
-                events={sortedWalks}
-                initialMonth={round.startDate ? new Date(round.startDate + 'T00:00:00') : undefined}
-                getEventStartTime={(walk) => `${walk.walkDate}T${walk.startTime}`}
-                getEventEndTime={(walk) => `${walk.walkDate}T${walk.endTime}`}
-                renderEvent={(event) => (
-                  <div className='cursor-pointer'>
-                      <p className="text-xxs tracking-wide">{formatWalkTimeDisplay(event)}</p>
-                      <p className="text-xxs tracking-wide">{event.locationName}</p>
-                      <p className="text-xxs tracking-wide">{event.memberCount}/{event.maxVolunteers} volunteers</p>
-                  </div>
-                )}
-                onEventClick={(walk) => startEdit(walk)}
-              />
-              {editingWalkId && (
-                <div className="px-4 py-4">
-                  {walkForm(handleUpdate, 'Save Changes', cancelEdit)}
+          <div className="divide-y divide-gray-100">
+            <WalkCalendar 
+              events={sortedWalks}
+              initialMonth={round.startDate ? new Date(round.startDate + 'T00:00:00') : undefined}
+              getEventStartTime={(walk) => `${walk.walkDate}T${walk.startTime}`}
+              getEventEndTime={(walk) => `${walk.walkDate}T${walk.endTime}`}
+              renderEvent={(event) => (
+                <div className='cursor-pointer'>
+                    <p className="text-xxs tracking-wide">{formatWalkTimeDisplay(event)}</p>
+                    <p className="text-xxs tracking-wide">{event.locationName}</p>
+                    <p className="text-xxs tracking-wide">{event.memberCount}/{event.maxVolunteers} volunteers</p>
                 </div>
               )}
-            </div>
-          </section>
+              onEventClick={(walk) => startEdit(walk)}
+            />
+            {editingWalkId && (
+              <div className="px-4 py-4 flex flex-col gap-3">
+                {walkForm(handleUpdate, 'Save Changes', cancelEdit)}
+
+                <div className="rounded-2xl shadow-sm">
+                  <div
+                    className="border-b border-gray-100 px-4 py-3 rounded-tl-2xl round3d-tr-2xl"
+                    style={{ background: `linear-gradient(90deg, #bbf7d0, rgba(255,255,255,0.96))` }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center " style={{ backgroundColor: 'transparent' }}>
+                        <Users className="h-5 w-5" style={{ color: '#15803d' }} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold uppercase tracking-wider text-gray-500">Volunteers</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {editingWalkVolunteers.length === 0 ? (
+                    <div className="p-4 text-center">
+                      <p className="text-sm text-gray-500">No volunteers have signed up for this walk yet.</p>
+                    </div>
+                  ) : (
+                    editingWalkVolunteers.map((membership) => (
+                      <div key={membership.user_id} className="px-4 py-3 border-t border-gray-100 flex items-center gap-3">
+                        {membership.name}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {editingWalkCancellations.length > 0 && (
+                  editingWalkCancellations.map((membership) => (
+                    <div className="rounded-2xl shadow-sm">
+                      <div
+                        className="border-b border-gray-100 px-4 py-3 rounded-tl-2xl round3d-tr-2xl"
+                        style={{ background: `linear-gradient(90deg, #f7bbbb, rgba(255,255,255,0.96))` }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center " style={{ backgroundColor: 'transparent' }}>
+                            <UserMinus className="h-5 w-5" style={{ color: '#801515' }} />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold uppercase tracking-wider text-gray-500">Cancellations</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div key={membership.user_id} className="px-4 py-3 border-t border-gray-100 flex items-center gap-3">
+                        {membership.name}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        </section>
         
         {walks.length === 0 ? (
           <div className="bg-white rounded-xl p-8 text-center shadow-sm">

@@ -224,6 +224,7 @@ export function WalksClient({ walks, round }: {
       showToast(result.error || 'An error occurred', 'error')
     } else router.refresh()
 
+    setEditingWalkId(null)
     setDeletingWalkId(null)
     setIsDeleting(false)
     deleteInFlightRef.current = false
@@ -239,6 +240,7 @@ export function WalksClient({ walks, round }: {
     if ('error' in result) showToast(result.error || 'An error occurred', 'error')
     else router.refresh()
 
+    setEditingWalkId(null)
     setForceDeletingWalkId(null)
     setIsDeleting(false)
     deleteInFlightRef.current = false
@@ -287,7 +289,7 @@ export function WalksClient({ walks, round }: {
     setBulkLoading(false)
   }
 
-  const walkForm = (onSubmit: (e: React.SubmitEvent) => void, submitLabel: string, onCancel: () => void) => (
+  const walkForm = (onSubmit: (e: React.SubmitEvent) => void, submitLabel: string, onCancel: () => void, onDelete?: () => void) => (
     <form onSubmit={onSubmit} className="bg-white rounded-2xl p-5 shadow-sm space-y-4">
       <label className="text-xs font-medium text-gray-500 mb-1">Location</label>
       <input type="text" placeholder="Location name" value={locationName}
@@ -322,6 +324,12 @@ export function WalksClient({ walks, round }: {
           className="flex-1 py-3 border border-gray-300 rounded-xl text-gray-700 text-sm font-medium hover:bg-gray-50">
           Cancel
         </button>
+        {onDelete && (
+          <button type="button" onClick={onDelete}
+            className="flex-1 py-3 border border-red-300 bg-red-500 rounded-xl text-white text-sm font-medium hover:bg-red-50">
+            Delete
+          </button>
+        )}
         <button type="submit" disabled={loading}
           className="flex-1 bg-green-600 text-white py-3 rounded-xl text-sm font-medium hover:bg-green-700 disabled:opacity-50">
           {loading ? 'Saving...' : submitLabel}
@@ -570,11 +578,12 @@ export function WalksClient({ walks, round }: {
                     <p className="text-xxs tracking-wide">{event.memberCount}/{event.maxVolunteers} volunteers</p>
                 </div>
               )}
+              
               onEventClick={(walk) => startEdit(walk)}
             />
             {editingWalkId && (
               <div className="px-4 py-4 flex flex-col gap-3">
-                {walkForm(handleUpdate, 'Save Changes', cancelEdit)}
+                {walkForm(handleUpdate, 'Save Changes', cancelEdit, () => setDeletingWalkId(editingWalkId))}
 
                 <div className="space-y-2">
                   <p className="text-xs text-gray-400 font-medium">Current participants ({editingWalkVolunteers.length})</p>

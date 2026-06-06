@@ -23,8 +23,7 @@ export default async function AdminWalksPage({ params }: {
     .eq('id', roundId)
     .single()
   const typed = (walks || []) as unknown as WalkWithMembership[]
-  console.log('db walks')
-  console.log(walks)
+  
   return (
     <div>
       {selectedRound ? (

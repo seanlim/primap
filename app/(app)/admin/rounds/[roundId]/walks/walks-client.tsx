@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Plus, X, Layers, Search, ArrowRight, BarChart3, Icon, User, Users, UserMinus } from 'lucide-react'
 import { createWalk, updateWalk, deleteWalk, bulkCreateWalks } from '@/lib/actions/admin-round-actions'
-import { formatTime_HH_MM, toLocalDateString } from '@/lib/utils/format-date'
+import { formatDate, formatTime_HH_MM, toLocalDateString } from '@/lib/utils/format-date'
 import { useToast } from '@/components/ui/toast'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import WalkCalendar from '@/components/ui/WalkCalendar'
@@ -549,7 +549,7 @@ export function WalksClient({ walks, round }: {
               <div>
                 <h2 className="text-sm font-semibold text-gray-900">{round.name}</h2>
                 <p className="mt-1 text-xs text-gray-500">
-                  {walks.length} walk{walks.length === 1 ? '' : 's'} in this round
+                  {formatDate(round.startDate)} - {formatDate(round.endDate)} &middot; {walks.length} walk{walks.length === 1 ? '' : 's'} in this round
                 </p>
               </div>
             </div>

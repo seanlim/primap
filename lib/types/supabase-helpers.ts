@@ -53,7 +53,7 @@ export type IncidentWithRelations = Incident & {
 export type WalkWithMembership = WalkSlot & {
   survey_rounds: Pick<SurveyRound, 'name' | 'status' | 'start_date' | 'end_date'>
   slot_memberships: {
-    profiles: Pick<Profile, "id" | "full_name">;
+    profiles: Pick<Profile, "id" | "full_name" | "email">;
     status: SlotMembership["status"];
     joined_at: string;
     cancelled_at: string | null;

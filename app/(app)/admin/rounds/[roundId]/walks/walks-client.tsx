@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Plus, X, Layers, Search, ArrowRight, BarChart3, Icon, User, Users, UserMinus } from 'lucide-react'
+import { ArrowLeft, Plus, X, Layers, Search, ArrowRight, BarChart3, Icon, User, Users, UserMinus, Mail } from 'lucide-react'
 import { createWalk, updateWalk, deleteWalk, bulkCreateWalks } from '@/lib/actions/admin-round-actions'
 import { formatDate, formatTime_HH_MM, toLocalDateString } from '@/lib/utils/format-date'
 import { useToast } from '@/components/ui/toast'
@@ -25,6 +25,7 @@ interface WalkData {
   volunteers: Array<{
     user_id: string,
     name: string | null,
+    email: string,
     status: string,
     joined_at: string,
     cancelled_at: string | null,
@@ -575,56 +576,45 @@ export function WalksClient({ walks, round }: {
               <div className="px-4 py-4 flex flex-col gap-3">
                 {walkForm(handleUpdate, 'Save Changes', cancelEdit)}
 
-                <div className="rounded-2xl shadow-sm">
-                  <div
-                    className="border-b border-gray-100 px-4 py-3 rounded-tl-2xl round3d-tr-2xl"
-                    style={{ background: `linear-gradient(90deg, #bbf7d0, rgba(255,255,255,0.96))` }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center " style={{ backgroundColor: 'transparent' }}>
-                        <Users className="h-5 w-5" style={{ color: '#15803d' }} />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold uppercase tracking-wider text-gray-500">Volunteers</p>
-                      </div>
-                    </div>
-                  </div>
-                  
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-400 font-medium">Current participants ({editingWalkVolunteers.length})</p>
                   {editingWalkVolunteers.length === 0 ? (
-                    <div className="p-4 text-center">
-                      <p className="text-sm text-gray-500">No volunteers have signed up for this walk yet.</p>
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-sm font-medium text-gray-900">None</p>
                     </div>
-                  ) : (
-                    editingWalkVolunteers.map((membership) => (
-                      <div key={membership.user_id} className="px-4 py-3 border-t border-gray-100 flex items-center gap-3">
-                        {membership.name}
+                  ) : editingWalkVolunteers.map((v) => (
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="flex flex-row items-center gap-2 text-gray-900">
+                        <User className="w-4 h-4" />
+                        <p className="text-sm font-medium">{v.name || 'Unnamed user'}</p>
                       </div>
-                    ))
-                  )}
+                      <div className="flex flex-row items-center gap-2 text-gray-500">
+                        <Mail className="w-4 h-4" />
+                        <p className="text-sm font-medium">{v.email}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
-                {editingWalkCancellations.length > 0 && (
-                  editingWalkCancellations.map((membership) => (
-                    <div className="rounded-2xl shadow-sm">
-                      <div
-                        className="border-b border-gray-100 px-4 py-3 rounded-tl-2xl round3d-tr-2xl"
-                        style={{ background: `linear-gradient(90deg, #f7bbbb, rgba(255,255,255,0.96))` }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center " style={{ backgroundColor: 'transparent' }}>
-                            <UserMinus className="h-5 w-5" style={{ color: '#801515' }} />
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold uppercase tracking-wider text-gray-500">Cancellations</p>
-                          </div>
-                        </div>
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-400 font-medium">Cancellations ({editingWalkCancellations.length})</p>
+                  {editingWalkCancellations.length === 0 ? (
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-sm font-medium text-gray-900">None</p>
+                    </div>
+                  ) : editingWalkCancellations.map((v) => (
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="flex flex-row items-center gap-2 text-gray-900">
+                        <User className="w-4 h-4" />
+                        <p className="text-sm font-medium">{v.name || 'Unnamed user'}</p>
                       </div>
-                      <div key={membership.user_id} className="px-4 py-3 border-t border-gray-100 flex items-center gap-3">
-                        {membership.name}
+                      <div className="flex flex-row items-center gap-2 text-gray-500">
+                        <Mail className="w-4 h-4" />
+                        <p className="text-sm font-medium">{v.email}</p>
                       </div>
                     </div>
-                  ))
-                )}
+                  ))}
+                </div>
               </div>
             )}
           </div>

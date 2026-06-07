@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Pencil, Search, X, ArrowRight, BarChart3 } from 'lucide-react'
+import { ArrowLeft, Plus, Pencil, Search, X, ArrowRight, BarChart3, Footprints } from 'lucide-react'
 import { createRound, updateRound, updateRoundStatus, deleteRound } from '@/lib/actions/admin-round-actions'
 import { formatDate } from '@/lib/utils/format-date'
 import { useToast } from '@/components/ui/toast'
@@ -272,7 +272,6 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
       <div className="space-y-2">
         {filteredRounds.map(round => (
           <div key={round.id} className="bg-white rounded-2xl p-4 shadow-sm">
-            <Link href={`/admin/rounds/${round.id}/walks`}>
               {editingRoundId === round.id ? (
                 <form onSubmit={handleUpdate} className="space-y-3">
                   <div className="flex items-center justify-between mb-1">
@@ -326,6 +325,11 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
                     </span>
                   </div>
                   <div className="flex gap-2 mt-3">
+                    <Link
+                      href={`/admin/rounds/${round.id}/walks`}
+                      className="text-xs bg-purple-100 text-purple-700 px-3 py-1.5 rounded-lg hover:bg-purple-200 flex items-center gap-1">
+                      <Footprints className="w-3 h-3" /> Walks
+                    </Link>
                     <button onClick={() => startEdit(round)}
                       className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg hover:bg-blue-200 flex items-center gap-1">
                       <Pencil className="w-3 h-3" /> Edit
@@ -347,7 +351,6 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
                   </div>
                 </>
               )}
-            </Link>
           </div>
         ))}
         {rounds.length === 0 ? (

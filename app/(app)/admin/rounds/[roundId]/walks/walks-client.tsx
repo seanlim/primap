@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Plus, X, Layers, Search, ArrowRight, BarChart3, Icon, User, Users, UserMinus, Mail } from 'lucide-react'
+import { ArrowLeft, Plus, X, Layers, Search, ArrowRight, BarChart3, User, Mail } from 'lucide-react'
 import { createWalk, updateWalk, deleteWalk, bulkCreateWalks } from '@/lib/actions/admin-round-actions'
 import { formatDate, formatTime_HH_MM, toLocalDateString } from '@/lib/utils/format-date'
 import { useToast } from '@/components/ui/toast'
@@ -607,7 +607,7 @@ export function WalksClient({ walks, round }: {
                       <p className="text-sm font-medium text-gray-900">None</p>
                     </div>
                   ) : editingWalkVolunteers.map((v) => (
-                    <div className="bg-gray-50 rounded-lg p-3">
+                    <div key={v.user_id} className="bg-gray-50 rounded-lg p-3">
                       <div className="flex flex-row items-center gap-2 text-gray-900">
                         <User className="w-4 h-4" />
                         <p className="text-sm font-medium">{v.name || 'Unnamed user'}</p>

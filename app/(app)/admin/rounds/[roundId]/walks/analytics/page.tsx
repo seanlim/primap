@@ -29,8 +29,6 @@ export default async function AdminWalksAnalyticsPage({
       walkId: walk ?? null,
     }
   )
-  console.log('roundid', roundId)
-  console.log(analytics)
 
   return (
     <div className="space-y-6">

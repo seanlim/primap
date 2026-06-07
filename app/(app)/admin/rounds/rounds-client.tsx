@@ -175,20 +175,6 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
         <ArrowRight className="h-4 w-4 text-gray-300" />
       </Link>
 
-      <Link
-        href="/admin/rounds/walkAnalytics"
-        className="flex items-center justify-between rounded-2xl border-l-4 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
-        style={{ borderLeftColor: '#d97706' }}
-      >
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50">
-            <BarChart3 className="h-5 w-5 text-amber-600" />
-          </div>
-          <p className="text-sm font-semibold text-gray-900">Walk Analytics</p>
-        </div>
-        <ArrowRight className="h-4 w-4 text-gray-300" />
-      </Link>
-
       <div className="rounded-xl bg-white p-4 shadow-sm space-y-3">
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">Date</label>

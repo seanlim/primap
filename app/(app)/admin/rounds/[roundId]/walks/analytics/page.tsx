@@ -12,28 +12,33 @@ function formatPercent(value: number) {
   return `${Math.round(value * 100)}%`
 }
 export default async function AdminWalksAnalyticsPage({
+  params,
   searchParams,
 }: {
-  searchParams?: Promise<{ round?: string; walk?: string }>
+  searchParams?: Promise<{ walk?: string }>
+  params: Promise<{ roundId: string }>
 }) {
-  const params = (await searchParams) ?? {}
+  const { walk} = (await searchParams) ?? {}
+  const { roundId } = await params;
   const supabase = await createClient()
   const analyticsClient = supabase as unknown as SupabaseClientLike
   const analytics = await getAdminWalksAnalyticsPageSnapshotByRound(
     analyticsClient,
     {
-      roundId: params.round ?? null,
-      walkId: params.walk ?? null,
+      roundId: roundId ?? null,
+      walkId: walk ?? null,
     }
   )
+  console.log('roundid', roundId)
+  console.log(analytics)
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/admin/rounds" className="text-gray-400 hover:text-gray-600">
+        <Link href={`/admin/rounds/${roundId}/walks`} className="text-gray-400 hover:text-gray-600">
           <ArrowLeft className="w-5 h-5" />
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Walk Analytics</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{analytics.targetRound?.name ? `${analytics.targetRound.name}: ` : ''}Walk Analytics</h1>
       </div>
 
       {analytics.availableRounds.length === 0 ? (

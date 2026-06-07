@@ -16,27 +16,6 @@ export function WalkAnalyticsFilters({
   return (
     <form className="rounded-xl bg-white p-4 shadow-sm space-y-3">
       <div>
-        <label className="mb-1 block text-xs font-medium text-gray-500">Round</label>
-        <select
-          name="round"
-          defaultValue={selectedRoundId}
-          onChange={(event) => {
-            const form = event.currentTarget.form
-            if (!form) return
-            const walkSelect = form.elements.namedItem('walk') as HTMLSelectElement | null
-            if (walkSelect) walkSelect.value = ''
-            form.requestSubmit()
-          }}
-          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-        >
-          {rounds.map((round) => (
-            <option key={round.id} value={round.id}>
-              {round.name}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div>
         <label className="mb-1 block text-xs font-medium text-gray-500">Walk</label>
         <div className="flex gap-3">
           <select

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Plus, Trash2, Pencil, X, Layers, Search, ArrowRight, BarChart3 } from 'lucide-react'
 import { createWalk, updateWalk, deleteWalk, bulkCreateWalks } from '@/lib/actions/admin-round-actions'
+import { MAX_VOLUNTEERS_PER_SLOT } from '@/lib/constants/walks'
 import { formatDate, toLocalDateString } from '@/lib/utils/format-date'
 import { useToast } from '@/components/ui/toast'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
@@ -43,7 +44,10 @@ interface GeneratedWalk {
 }
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const MAX_VOLUNTEERS_PER_SLOT = 3
+
+function readSlotCapacity(value: number) {
+  return Number.isNaN(value) ? MAX_VOLUNTEERS_PER_SLOT : value
+}
 
 function generateWalksFromRules(rule: BulkRule): GeneratedWalk[] {
   const walks: GeneratedWalk[] = []
@@ -84,14 +88,14 @@ export function WalksClient({ walks, rounds }: {
   const [walkDate, setWalkDate] = useState('')
   const [startTime, setStartTime] = useState('07:00')
   const [endTime, setEndTime] = useState('10:00')
-  const [maxVol, setMaxVol] = useState(3)
+  const [maxVol, setMaxVol] = useState(MAX_VOLUNTEERS_PER_SLOT)
   const [loading, setLoading] = useState(false)
 
   // Bulk create state
   const [bulkRoundId, setBulkRoundId] = useState(rounds[0]?.id || '')
   const [bulkRule, setBulkRule] = useState<BulkRule>({
     dateFrom: '', dateTo: '', daysOfWeek: [1, 3, 5], // Mon, Wed, Fri default
-    locations: [''], startTime: '07:00', endTime: '10:00', maxVolunteers: 3,
+    locations: [''], startTime: '07:00', endTime: '10:00', maxVolunteers: MAX_VOLUNTEERS_PER_SLOT,
   })
   const [generatedWalks, setGeneratedWalks] = useState<GeneratedWalk[]>([])
   const [bulkStep, setBulkStep] = useState<'rules' | 'preview'>('rules')
@@ -218,7 +222,7 @@ export function WalksClient({ walks, rounds }: {
     setWalkDate('')
     setStartTime('07:00')
     setEndTime('10:00')
-    setMaxVol(3)
+    setMaxVol(MAX_VOLUNTEERS_PER_SLOT)
   }
 
   const handleUpdate = async (e: React.SubmitEvent) => {
@@ -311,7 +315,7 @@ export function WalksClient({ walks, rounds }: {
     else {
       setShowBulkForm(false)
       setBulkStep('rules')
-      setBulkRule({ dateFrom: '', dateTo: '', daysOfWeek: [1, 3, 5], locations: [''], startTime: '07:00', endTime: '10:00', maxVolunteers: 3 })
+      setBulkRule({ dateFrom: '', dateTo: '', daysOfWeek: [1, 3, 5], locations: [''], startTime: '07:00', endTime: '10:00', maxVolunteers: MAX_VOLUNTEERS_PER_SLOT })
       setGeneratedWalks([])
       router.refresh()
     }
@@ -351,7 +355,7 @@ export function WalksClient({ walks, rounds }: {
       </div>
       <div>
         <label className="text-xs font-medium text-gray-500 mb-1">Max Volunteers</label>
-        <input type="number" min="1" max={MAX_VOLUNTEERS_PER_SLOT} value={maxVol} onChange={e => setMaxVol(e.target.valueAsNumber)}
+        <input type="number" min="1" max={MAX_VOLUNTEERS_PER_SLOT} step="1" value={maxVol} onChange={e => setMaxVol(readSlotCapacity(e.target.valueAsNumber))}
           className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
       </div>
       <div className="flex gap-3">
@@ -577,8 +581,8 @@ export function WalksClient({ walks, rounds }: {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-500 mb-1 block">Max Volunteers</label>
-                  <input type="number" min="1" max={MAX_VOLUNTEERS_PER_SLOT} value={bulkRule.maxVolunteers}
-                    onChange={e => setBulkRule(r => ({ ...r, maxVolunteers: e.target.valueAsNumber }))}
+                  <input type="number" min="1" max={MAX_VOLUNTEERS_PER_SLOT} step="1" value={bulkRule.maxVolunteers}
+                    onChange={e => setBulkRule(r => ({ ...r, maxVolunteers: readSlotCapacity(e.target.valueAsNumber) }))}
                     className="w-full px-3 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
               </div>

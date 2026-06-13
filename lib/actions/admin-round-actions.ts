@@ -8,6 +8,7 @@ import {
   MAX_MEDIA_PER_REPORT_RANGE,
   REQUIRED_WALKS_PER_ROUND_RANGE,
 } from '@/lib/constants/settings'
+import { MAX_VOLUNTEERS_PER_SLOT } from '@/lib/constants/walks'
 import {
   OBSERVATION_MEDIA_BUCKET,
   INCIDENT_MEDIA_BUCKET,
@@ -15,8 +16,6 @@ import {
 import { findOverlappingRound } from '@/lib/utils/rounds'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
-
-const MAX_VOLUNTEERS_PER_SLOT = 3
 
 async function requireAdmin() {
   const supabase = await createClient()

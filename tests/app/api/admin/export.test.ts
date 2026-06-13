@@ -94,13 +94,13 @@ describe('GET /api/admin/export', () => {
     expect(zip.file('primap-data.xlsx')).not.toBeNull()
   })
 
-  it('calls fetchAllRows for all 9 tables', async () => {
+  it('calls fetchAllRows for all 10 tables', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'admin1' } } })
     mockProfileSingle.mockResolvedValue({ data: { role: 'ADMIN' } })
 
     await GET()
 
-    expect(mockFetchAllRows).toHaveBeenCalledTimes(9)
+    expect(mockFetchAllRows).toHaveBeenCalledTimes(10)
   })
 
   it('calls buildExportWorkbook with table data', async () => {

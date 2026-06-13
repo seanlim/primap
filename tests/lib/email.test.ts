@@ -16,6 +16,7 @@ import {
   sendRolePromotedEmail,
   sendRoleDemotedEmail,
   sendWalkCancellationEmail,
+  sendWalkInvitationEmail,
   sendWalkReminderEmail,
   sendIncidentReportedEmail,
 } from '@/lib/email'
@@ -256,6 +257,33 @@ describe('email utilities', () => {
       expect(call.html).toContain('09:00')
       expect(call.html).toContain('Bukit Timah')
       expect(call.html).toContain('Jane Doe')
+    })
+  })
+
+  describe('sendWalkInvitationEmail', () => {
+    it('sends an invitation email with escaped details and a walk link', async () => {
+      process.env.NEXT_PUBLIC_APP_URL = 'https://staging.primap.org'
+
+      await sendWalkInvitationEmail(
+        'alex@example.com',
+        '<b>Alex</b>',
+        '<script>June</script>',
+        {
+          id: 'slot 1',
+          date: '2099-04-15',
+          time: '08:00',
+          location: '<b>Bukit Timah</b>',
+        }
+      )
+
+      const call = mockSend.mock.calls[0][0]
+      expect(call.to).toBe('alex@example.com')
+      expect(call.subject).toBe('Primap Walk Invitation')
+      expect(call.html).toContain('&lt;b&gt;Alex&lt;/b&gt;')
+      expect(call.html).toContain('&lt;script&gt;June&lt;/script&gt;')
+      expect(call.html).toContain('&lt;b&gt;Bukit Timah&lt;/b&gt;')
+      expect(call.html).toContain('https://staging.primap.org/walk/slot%201')
+      expect(call.html).not.toContain('<script>June</script>')
     })
   })
 

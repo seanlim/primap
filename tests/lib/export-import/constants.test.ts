@@ -18,8 +18,8 @@ import {
 
 describe('constants', () => {
   describe('TABLE_ORDER', () => {
-    it('contains all 9 tables', () => {
-      expect(TABLE_ORDER).toHaveLength(9)
+    it('contains all 10 tables', () => {
+      expect(TABLE_ORDER).toHaveLength(10)
     })
 
     it('lists tables in FK-dependency order (parents before children)', () => {
@@ -28,14 +28,16 @@ describe('constants', () => {
       // profiles must come before tables that reference it
       expect(indexOf('profiles')).toBeLessThan(indexOf('survey_rounds'))
       expect(indexOf('profiles')).toBeLessThan(indexOf('slot_memberships'))
+      expect(indexOf('profiles')).toBeLessThan(indexOf('slot_invitations'))
       expect(indexOf('profiles')).toBeLessThan(indexOf('observations'))
       expect(indexOf('profiles')).toBeLessThan(indexOf('incidents'))
 
       // survey_rounds before walk_slots
       expect(indexOf('survey_rounds')).toBeLessThan(indexOf('walk_slots'))
 
-      // walk_slots before slot_memberships, observations, incidents
+      // walk_slots before slot_memberships, slot_invitations, observations, incidents
       expect(indexOf('walk_slots')).toBeLessThan(indexOf('slot_memberships'))
+      expect(indexOf('walk_slots')).toBeLessThan(indexOf('slot_invitations'))
       expect(indexOf('walk_slots')).toBeLessThan(indexOf('observations'))
       expect(indexOf('walk_slots')).toBeLessThan(indexOf('incidents'))
 
@@ -50,7 +52,8 @@ describe('constants', () => {
     it('includes all expected table names', () => {
       const expected = [
         'profiles', 'survey_rounds', 'walk_slots', 'slot_memberships',
-        'observations', 'sightings', 'media', 'incidents', 'app_settings',
+        'slot_invitations', 'observations', 'sightings', 'media', 'incidents',
+        'app_settings',
       ]
       expect([...TABLE_ORDER]).toEqual(expect.arrayContaining(expected))
       expect(expected).toEqual(expect.arrayContaining([...TABLE_ORDER]))
@@ -95,6 +98,15 @@ describe('constants', () => {
       expect(cols).toContain('lng')
       expect(cols).toContain('submitted_at')
       expect(cols).toContain('client_draft_id')
+    })
+
+    it('slot invitation columns include invite state fields', () => {
+      const cols = TABLE_COLUMNS.slot_invitations
+      expect(cols).toContain('slot_id')
+      expect(cols).toContain('invited_user_id')
+      expect(cols).toContain('invited_by')
+      expect(cols).toContain('status')
+      expect(cols).toContain('responded_at')
     })
 
     it('media columns include file and EXIF fields', () => {

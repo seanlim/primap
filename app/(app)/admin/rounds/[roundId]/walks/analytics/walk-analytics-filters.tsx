@@ -1,16 +1,12 @@
 'use client'
 
 interface WalkAnalyticsFiltersProps {
-  rounds: Array<{ id: string; name: string }>
   walks: Array<{ id: string; label: string }>
-  selectedRoundId: string
   selectedWalkId: string
 }
 
 export function WalkAnalyticsFilters({
-  rounds,
   walks,
-  selectedRoundId,
   selectedWalkId,
 }: WalkAnalyticsFiltersProps) {
   return (

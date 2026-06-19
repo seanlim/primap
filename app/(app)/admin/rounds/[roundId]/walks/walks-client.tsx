@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Plus, X, Layers, Search, ArrowRight, BarChart3, User, Mail } from 'lucide-react'
+import { ArrowLeft, Plus, X, Layers, Search, ArrowRight, BarChart3, User, Mail, TriangleAlert } from 'lucide-react'
 import { createWalk, updateWalk, deleteWalk, bulkCreateWalks } from '@/lib/actions/admin-round-actions'
 import { formatDate, formatTime_HH_MM, toLocalDateString } from '@/lib/utils/format-date'
 import { MAX_VOLUNTEERS_PER_SLOT } from '@/lib/constants/walks'
@@ -572,6 +572,24 @@ export function WalksClient({ walks, round }: {
       )}
 
       <div className="space-y-5">
+        {walks.length === 0 ? (
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50">
+              <TriangleAlert className="h-5 w-5 text-amber-600" />
+            </div>
+            <p className="text-sm font-semibold text-gray-900">No walks yet.</p>
+          </div>
+        ) : filteredWalks.length === 0 ? (
+          <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50">
+                <TriangleAlert className="h-5 w-5 text-amber-600" />
+              </div>
+              <p className="text-sm font-semibold text-gray-900">No walks match current filters.</p>
+            </div>
+          </div>
+        ) : null}
+        
         <section className="overflow-hidden rounded-2xl bg-white shadow-sm">
           <div className="border-b border-gray-100 bg-gray-50/80 px-4 py-3">
             <div className="flex items-center justify-between gap-3">
@@ -632,7 +650,7 @@ export function WalksClient({ walks, round }: {
                       <p className="text-sm font-medium text-gray-900">None</p>
                     </div>
                   ) : editingWalkCancellations.map((v) => (
-                    <div className="bg-gray-50 rounded-lg p-3">
+                    <div key={v.user_id} className="bg-gray-50 rounded-lg p-3">
                       <div className="flex flex-row items-center gap-2 text-gray-900">
                         <User className="w-4 h-4" />
                         <p className="text-sm font-medium">{v.name || 'Unnamed user'}</p>
@@ -648,16 +666,6 @@ export function WalksClient({ walks, round }: {
             )}
           </div>
         </section>
-        
-        {walks.length === 0 ? (
-          <div className="bg-white rounded-xl p-8 text-center shadow-sm">
-            <p className="text-gray-500">No walks yet.</p>
-          </div>
-        ) : walks.length === 0 ? (
-          <div className="bg-white rounded-xl p-8 text-center shadow-sm">
-            <p className="text-gray-500">No walks match those filters.</p>
-          </div>
-        ) : null}
       </div>
 
       <ConfirmationDialog

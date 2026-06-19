@@ -48,7 +48,7 @@ export default async function AdminWalksPage({ params }: {
               joined_at: m.joined_at,
               cancelled_at: m.cancelled_at,
             })),
-            memberCount: s.slot_memberships?.length || 0,
+            memberCount: s.slot_memberships?.filter(m => m.status === 'ACTIVE').length || 0,
           }))}
           round={{
             id: selectedRound.id,

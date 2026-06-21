@@ -174,6 +174,9 @@ export function WalksClient({ walks, round }: {
     })
   }, [filteredWalks])
 
+  const calendarInitialMonth = sortedWalks.length > 0 ? new Date(sortedWalks[0].walkDate)
+    : round.startDate ? new Date(round.startDate + 'T00:00:00') : undefined
+
   const hasFilters = Boolean(filterLocation || filterStatus)
 
   const editingWalk = editingWalkId ? walks.find(w => w.id === editingWalkId) : null
@@ -239,6 +242,8 @@ export function WalksClient({ walks, round }: {
     }
     setLoading(false)
   }
+  console.log(sortedWalks)
+  console.log(round)
 
   const confirmDeleteWalk = async () => {
     if (!deletingWalkId) return
@@ -630,7 +635,7 @@ export function WalksClient({ walks, round }: {
           <div className="divide-y divide-gray-100">
             <WalkCalendar 
               events={sortedWalks}
-              initialMonth={round.startDate ? new Date(round.startDate + 'T00:00:00') : undefined}
+              initialMonth={calendarInitialMonth}
               getEventStartTime={(walk) => `${walk.walkDate}T${walk.startTime}`}
               getEventEndTime={(walk) => `${walk.walkDate}T${walk.endTime}`}
               eventClassName={(walk) => walk.id == editingWalkId ? 'border-2 border-green-600 bg-green-50' : ''}

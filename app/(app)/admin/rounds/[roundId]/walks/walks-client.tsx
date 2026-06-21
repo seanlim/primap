@@ -1,11 +1,36 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { 
+  useMemo, 
+  useRef, 
+  useState 
+} from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Plus, X, Layers, Search, ArrowRight, BarChart3, User, Mail, TriangleAlert } from 'lucide-react'
-import { createWalk, updateWalk, deleteWalk, bulkCreateWalks } from '@/lib/actions/admin-round-actions'
-import { formatDate, formatTime_HH_MM, toLocalDateString } from '@/lib/utils/format-date'
+import { 
+  ArrowLeft, 
+  Plus, 
+  X, 
+  Layers, 
+  Search, 
+  ArrowRight, 
+  BarChart3, 
+  User, Mail, 
+  TriangleAlert, 
+  CalendarPlus, 
+  CalendarX 
+} from 'lucide-react'
+import { 
+  createWalk, 
+  updateWalk, 
+  deleteWalk, 
+  bulkCreateWalks 
+} from '@/lib/actions/admin-round-actions'
+import { 
+  formatDate, 
+  formatTime_HH_MM, 
+  toLocalDateString 
+} from '@/lib/utils/format-date'
 import { MAX_VOLUNTEERS_PER_SLOT } from '@/lib/constants/walks'
 import { useToast } from '@/components/ui/toast'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
@@ -342,7 +367,7 @@ export function WalksClient({ walks, round }: {
       </div>
     </form>
   )
-
+  
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -639,6 +664,10 @@ export function WalksClient({ walks, round }: {
                         <Mail className="w-4 h-4" />
                         <p className="text-sm font-medium">{v.email}</p>
                       </div>
+                      <div className="flex flex-row items-center gap-2 text-gray-500">
+                        <CalendarPlus className="w-4 h-4" />
+                        <p className="text-sm font-medium">{formatDate(v.joined_at)}</p>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -659,6 +688,12 @@ export function WalksClient({ walks, round }: {
                         <Mail className="w-4 h-4" />
                         <p className="text-sm font-medium">{v.email}</p>
                       </div>
+                      {v.cancelled_at && (
+                        <div className="flex flex-row items-center gap-2 text-gray-500">
+                          <CalendarX className="w-4 h-4" />
+                          <p className="text-sm font-medium">{formatDate(v.cancelled_at)}</p>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

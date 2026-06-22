@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronDown, ChevronUp, MapPin, Eye, AlertTriangle, ArrowLeft, Pencil } from 'lucide-react'
+import { MapPin, AlertTriangle, ArrowLeft, Pencil } from 'lucide-react'
 import { submitObservation } from '@/lib/actions/observation-actions'
 import { formatDate } from '@/lib/utils/format-date'
 import { useToast } from '@/components/ui/toast'
@@ -88,7 +88,6 @@ export function GroupViewClient({
   // against future call sites that might forget.
   canReportIncident = false,
 }: Props) {
-  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set())
   const [showIncidentModal, setShowIncidentModal] = useState(false)
   const [showSubmitDialog, setShowSubmitDialog] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -97,16 +96,7 @@ export function GroupViewClient({
   const isAdminView = backHref.startsWith('/admin')
 
   const myObservation = observations.find(o => o.userId === currentUserId)
-  const othersObservations = observations.filter(o => o.userId !== currentUserId)
-
-  const toggleCard = (id: string) => {
-    setExpandedCards(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
+  
 
   const handleSubmit = () => {
     if (!myObservation) return
@@ -203,81 +193,6 @@ export function GroupViewClient({
           <ObservationDetails observation={myObservation} />
         </div>
       )}
-
-      {/* Others' Reports */}
-      {othersObservations.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-            Group Reports ({othersObservations.length})
-          </h2>
-          {othersObservations.map(obs => (
-            <div key={obs.id} className="bg-white rounded-2xl shadow-sm overflow-hidden">
-              <button
-                onClick={() => toggleCard(obs.id)}
-                className="w-full p-4 flex items-center justify-between text-left"
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-gray-900">{obs.userName}</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      obs.status === 'SUBMITTED'
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-yellow-100 text-yellow-700'
-                    }`}>
-                      {obs.status}
-                    </span>
-                  </div>
-                  {obs.outcome && (
-                    <span className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                      <Eye className="w-3 h-3" />
-                      {obs.outcome === 'SIGHTED' ? `${obs.sightings.length} sighting(s)` : 'Not Sighted'}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {isAdminView && (
-                    <Link
-                      href={`/admin/reports/${slot.id}/${obs.id}/edit`}
-                      onClick={(e) => e.stopPropagation()}
-                      className="flex items-center gap-1 text-sm bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-200 font-medium transition-colors"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                      Edit
-                    </Link>
-                  )}
-                  {expandedCards.has(obs.id) ? (
-                    <ChevronUp className="w-5 h-5 text-gray-400" />
-                  ) : (
-                    <ChevronDown className="w-5 h-5 text-gray-400" />
-                  )}
-                </div>
-              </button>
-              {expandedCards.has(obs.id) && (
-                <div className="border-t border-gray-100">
-                  <ObservationDetails observation={obs} />
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Members without reports */}
-      {(() => {
-        const reportedUserIds = new Set(observations.map(o => o.userId))
-        const noReportMembers = members.filter(m => !reportedUserIds.has(m.userId) && m.userId !== currentUserId)
-        if (noReportMembers.length === 0) return null
-        return (
-          <div className="space-y-2">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">No Report Yet</h2>
-            {noReportMembers.map(m => (
-              <div key={m.userId} className="bg-white rounded-xl p-4 shadow-sm opacity-60">
-                <p className="text-sm text-gray-500">{m.fullName || m.email}</p>
-              </div>
-            ))}
-          </div>
-        )
-      })()}
 
       {/* Incidents */}
       {incidents.length > 0 && (

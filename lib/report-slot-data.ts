@@ -63,7 +63,7 @@ interface MemberData {
 
 export interface SlotReportViewData {
   slot: SlotData
-  observations: ObservationData[]
+  observations: ObservationData
   members: MemberData[]
   incidents: IncidentData[]
   isParticipant: boolean
@@ -163,7 +163,7 @@ export async function getSlotReportViewData(
         media: s.media,
       })),
       media: obs.media,
-    })),
+    }))[0],
     members: (members || []).map(m => ({
       userId: m.user_id,
       fullName: m.profiles.full_name,

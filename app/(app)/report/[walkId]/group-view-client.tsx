@@ -50,7 +50,7 @@ interface Props {
     endTime: string
     roundName: string
   }
-  observations: ObservationData[]
+  observations: ObservationData
   members: { userId: string; fullName: string | null; email: string }[]
   incidents: {
     id: string
@@ -95,7 +95,7 @@ export function GroupViewClient({
   const { showToast } = useToast()
   const isAdminView = backHref.startsWith('/admin')
 
-  const myObservation = observations.find(o => o.userId === currentUserId)
+  const myObservation = observations
   
 
   const handleSubmit = () => {

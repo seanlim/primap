@@ -636,6 +636,8 @@ export function WalksClient({ walks, round }: {
             <WalkCalendar 
               events={sortedWalks}
               initialMonth={calendarInitialMonth}
+              minMonth={round.startDate ? new Date(round.startDate + 'T00:00:00') : undefined}
+              maxMonth={round.endDate ? new Date(round.endDate + 'T00:00:00') : undefined}
               getEventStartTime={(walk) => `${walk.walkDate}T${walk.startTime}`}
               getEventEndTime={(walk) => `${walk.walkDate}T${walk.endTime}`}
               eventClassName={(walk) => walk.id == editingWalkId ? 'border-2 border-green-600 bg-green-50' : ''}

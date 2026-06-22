@@ -24,6 +24,8 @@ function toDateKey(date: Date): string {
 type CalendarProps<T extends CalendarEventBase> = {
   events: T[],
   initialMonth?: Date
+  minMonth?: Date
+  maxMonth?: Date
   getEventStartTime?: (event: T) => string
   getEventEndTime?: (event: T) => string
   onEventClick?: (event: T) => void
@@ -35,6 +37,8 @@ type CalendarProps<T extends CalendarEventBase> = {
 export default function WalkCalendar<T extends CalendarEventBase>({ 
   events,
   initialMonth,
+  minMonth,
+  maxMonth,
   getEventStartTime,
   getEventEndTime,
   onEventClick,
@@ -48,6 +52,7 @@ export default function WalkCalendar<T extends CalendarEventBase>({
       }
       return new Date()
   });
+  console.log('minmonth', minMonth ? new Date(minMonth.getFullYear(), minMonth.getMonth(), 1) : 'none')
 
   const eventsByDay = useMemo(() => {
     const eventGroups = new Map<string, T[]>()
@@ -130,6 +135,10 @@ export default function WalkCalendar<T extends CalendarEventBase>({
     setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1))
   }
 
+  // Used to restrict navigation of months in the calendar
+  const isMinMonth = !minMonth || calendarMonth.getMonth() == minMonth.getMonth()
+  const isMaxMonth = !maxMonth || calendarMonth.getMonth() == maxMonth.getMonth()
+
   const todayKey = toDateKey(new Date())
 
   return (
@@ -139,7 +148,8 @@ export default function WalkCalendar<T extends CalendarEventBase>({
           <button
             type="button"
             onClick={() => changeMonth(-1)}
-            className="rounded-lg bg-green-600 p-2 text-white transition hover:bg-black/45 cursor-pointer"
+            className={`rounded-lg p-2 text-white transition ${isMinMonth ? 'bg-gray-400' : 'bg-green-600 hover:bg-black/45 cursor-pointer'}`}
+            disabled={isMinMonth}
           >
             <ChevronLeft className="h-3 w-3" />
           </button>
@@ -149,7 +159,8 @@ export default function WalkCalendar<T extends CalendarEventBase>({
           <button
             type="button"
             onClick={() => changeMonth(1)}
-            className="rounded-lg bg-green-600 p-2 text-white transition hover:bg-black/45 cursor-pointer"
+            className={`rounded-lg p-2 text-white transition ${isMaxMonth ? 'bg-gray-400' : 'bg-green-600 hover:bg-black/45 cursor-pointer'}`}
+            disabled={isMaxMonth}
           >
             <ChevronRight className="h-3 w-3" />
           </button>

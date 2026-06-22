@@ -52,7 +52,6 @@ export default function WalkCalendar<T extends CalendarEventBase>({
       }
       return new Date()
   });
-  console.log('minmonth', minMonth ? new Date(minMonth.getFullYear(), minMonth.getMonth(), 1) : 'none')
 
   const eventsByDay = useMemo(() => {
     const eventGroups = new Map<string, T[]>()

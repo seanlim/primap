@@ -242,9 +242,7 @@ export function WalksClient({ walks, round }: {
     }
     setLoading(false)
   }
-  console.log(sortedWalks)
-  console.log(round)
-
+  
   const confirmDeleteWalk = async () => {
     if (!deletingWalkId) return
     if (deleteInFlightRef.current) return

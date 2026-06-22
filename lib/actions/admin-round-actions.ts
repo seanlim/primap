@@ -525,7 +525,7 @@ export async function deleteWalk(
     .delete()
     .eq('id', walkId)
     .select('round_id')
-  console.log(`resolved value for walkId ${walkId}: `, data)
+  
   if (error) return { error: error.message }
   if (data?.[0]?.round_id) {
     revalidatePath(`/admin/rounds/${data[0].round_id}/walks`)

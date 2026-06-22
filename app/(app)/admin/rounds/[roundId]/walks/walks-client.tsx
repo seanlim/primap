@@ -174,8 +174,8 @@ export function WalksClient({ walks, round }: {
     })
   }, [filteredWalks])
 
-  const calendarInitialMonth = sortedWalks.length > 0 ? new Date(sortedWalks[0].walkDate)
-    : round.startDate ? new Date(round.startDate + 'T00:00:00') : undefined
+  const calendarInitialMonth = new Date() >= new Date(round.startDate + 'T00:00:00') && new Date <= new Date(round.endDate + 'T00:00:00')
+    ? new Date() : new Date(round.startDate + 'T00:00:00')
 
   const hasFilters = Boolean(filterLocation || filterStatus)
 

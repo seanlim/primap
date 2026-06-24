@@ -273,15 +273,15 @@ describe('admin-round-actions', () => {
       expect(revalidatePath).toHaveBeenCalledWith('/walk')
     })
 
-    it('creates a slot with custom maxVolunteers', async () => {
+    it('creates a slot with custom maxVolunteers under the cap', async () => {
       setupAdmin()
       mockRoundDateRange()
 
-      const result = await createWalk({ ...walkData, maxVolunteers: 5 })
+      const result = await createWalk({ ...walkData, maxVolunteers: 2 })
 
       expect(result).toEqual({ success: true })
       expect(methods.insert).toHaveBeenCalledWith(
-        expect.objectContaining({ max_volunteers: 5 })
+        expect.objectContaining({ max_volunteers: 2 })
       )
     })
 
@@ -932,9 +932,9 @@ describe('admin-round-actions', () => {
     it('returns validation error for invalid maxVolunteers', async () => {
       const result = await updateWalk('slot-1', {
         ...walkData,
-        maxVolunteers: 15,
+        maxVolunteers: 4,
       })
-      expect(result).toEqual({ error: expect.stringContaining('Max volunteers must be between 1 and 10') })
+      expect(result).toEqual({ error: expect.stringContaining('Max volunteers must be between 1 and 3') })
     })
 
     it('returns error on DB failure', async () => {
@@ -1021,6 +1021,18 @@ describe('admin-round-actions', () => {
       expect(result).toEqual({ error: expect.stringContaining('Location name is required') })
     })
 
+    it('returns error when a bulk slot exceeds the volunteer cap', async () => {
+      const result = await bulkCreateWalks({
+        roundId: 'round-1',
+        slots: [
+          { locationName: 'Park A', walkDate: '2026-04-15', startTime: '08:00', endTime: '10:00', maxVolunteers: 4 },
+        ],
+      })
+
+      expect(result).toEqual({ error: expect.stringContaining('Walk 1:') })
+      expect(result).toEqual({ error: expect.stringContaining('Max volunteers must be between 1 and 3') })
+    })
+
     it('returns error on edge function failure', async () => {
       setupAdmin()
       mockRoundDateRange()
@@ -1094,7 +1106,7 @@ describe('admin-round-actions', () => {
 
     it('returns error for maxVolunteers out of range', async () => {
       const result = await createWalk({ ...walkData, maxVolunteers: 0 })
-      expect(result).toEqual({ error: expect.stringContaining('Max volunteers must be between 1 and 10') })
+      expect(result).toEqual({ error: expect.stringContaining('Max volunteers must be between 1 and 3') })
     })
   })
 

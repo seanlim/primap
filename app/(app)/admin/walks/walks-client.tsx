@@ -23,6 +23,7 @@ interface WalkData {
   endTime: string
   maxVolunteers: number
   memberCount: number
+  reminderSentAt: string | null
 }
 
 interface BulkRule {
@@ -340,11 +341,13 @@ export function WalksClient({ walks, rounds }: {
           <input type="date" value={walkDate} onChange={e => setWalkDate(e.target.value)}
             min={selectedRound?.startDate}
             max={selectedRound?.endDate}
+            disabled={Boolean(editingWalk?.reminderSentAt)}
             className="w-full px-3 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required />
         </div>
         <div>
           <label className="text-xs font-medium text-gray-500 mb-1">Start</label>
           <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)}
+            disabled={Boolean(editingWalk?.reminderSentAt)}
             className="w-full px-3 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required />
         </div>
         <div>
@@ -353,6 +356,11 @@ export function WalksClient({ walks, rounds }: {
             className="w-full px-3 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required />
         </div>
       </div>
+      {editingWalk?.reminderSentAt && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+          Reminder emails have already been sent for this walk, so its date and start time can no longer be changed.
+        </p>
+      )}
       <div>
         <label className="text-xs font-medium text-gray-500 mb-1">Max Volunteers</label>
         <input type="number" min="1" max={MAX_VOLUNTEERS_PER_SLOT} step="1" value={maxVol} onChange={e => setMaxVol(readSlotCapacity(e.target.valueAsNumber))}
@@ -679,6 +687,11 @@ export function WalksClient({ walks, rounds }: {
                         <p className="mt-0.5 text-xs text-gray-400">
                           {walk.memberCount}/{walk.maxVolunteers} volunteers
                         </p>
+                        {walk.reminderSentAt && (
+                          <p className="mt-1 text-xs font-medium text-amber-600">
+                            Reminder sent. Late cancellation is active.
+                          </p>
+                        )}
                       </div>
                       <div className="flex shrink-0 gap-1">
                         <button onClick={() => startEdit(walk)} className="rounded-lg p-2 text-blue-400 hover:bg-blue-50 hover:text-blue-600">

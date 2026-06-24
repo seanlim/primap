@@ -1,10 +1,7 @@
 import { getWalkStartDateTime, hasWalkEnded } from '@/lib/utils/walk-participation'
 import { buildSlotPopupMeta } from '@/lib/utils/report-map'
 import { findCurrentRound } from '@/lib/utils/rounds'
-import {
-  DEFAULT_HIGH_PARTICIPATION_THRESHOLD,
-  DEFAULT_LATE_CANCEL_HOURS,
-} from '@/lib/constants/settings'
+import { DEFAULT_HIGH_PARTICIPATION_THRESHOLD } from '@/lib/constants/settings'
 import { getSpeciesShortLabel } from '@/lib/constants/species'
 
 type QueryResult<T> = { data: T | null; error: { message: string } | null }
@@ -49,6 +46,7 @@ export interface AnalyticsWalkSlot {
 }
 
 export interface AnalyticsMembership {
+  reminder_sent_at?: string | null
   slot_id: string
   user_id: string
   status: 'ACTIVE' | 'CANCELLED'
@@ -280,7 +278,7 @@ async function getAnalyticsBaseData(supabase: SupabaseClientLike) {
       .order('walk_date', { ascending: true }) as SupabaseQueryLike<AnalyticsWalkSlot[]>,
     supabase
       .from('slot_memberships')
-      .select('slot_id, user_id, status') as SupabaseQueryLike<AnalyticsMembership[]>,
+      .select('slot_id, user_id, status, walk_slots(reminder_sent_at)') as SupabaseQueryLike<AnalyticsMembership[]>,
     supabase
       .from('observations')
       .select('id, slot_id, status, outcome, lat, lng') as SupabaseQueryLike<AnalyticsObservation[]>,
@@ -482,14 +480,13 @@ export async function getAdminUsersAnalytics(
   supabase: SupabaseClientLike,
   userIds?: string[],
   options?: {
-    lateCancelHours?: number
     highParticipationThreshold?: number
   }
 ): Promise<AdminUsersAnalyticsSnapshot> {
   const profileQuery = supabase.from('profiles').select('id')
   const membershipsQuery = supabase
     .from('slot_memberships')
-    .select('user_id, status, cancelled_at, walk_slots(walk_date, start_time)')
+    .select('user_id, status, walk_slots(reminder_sent_at)')
   const observationsQuery = supabase.from('observations').select('user_id, status')
 
   const scopedProfileQuery = userIds?.length ? profileQuery.in('id', userIds) : profileQuery
@@ -501,8 +498,7 @@ export async function getAdminUsersAnalytics(
     scopedMembershipQuery as SupabaseQueryLike<Array<{
       user_id: string
       status: 'ACTIVE' | 'CANCELLED'
-      cancelled_at?: string | null
-      walk_slots?: { walk_date?: string | null; start_time?: string | null } | null
+      walk_slots?: { reminder_sent_at?: string | null } | null
     }>>,
     scopedObservationsQuery as SupabaseQueryLike<Array<{ user_id: string; status: 'DRAFT' | 'SUBMITTED' }>>,
   ])
@@ -521,7 +517,6 @@ export async function getAdminUsersAnalytics(
       },
     ])
   ) as Record<string, AdminUserActivityMetrics>
-  const lateCancelHours = options?.lateCancelHours ?? DEFAULT_LATE_CANCEL_HOURS
   const highParticipationThreshold =
     options?.highParticipationThreshold ?? DEFAULT_HIGH_PARTICIPATION_THRESHOLD
 
@@ -531,7 +526,7 @@ export async function getAdminUsersAnalytics(
     if (membership.status === 'CANCELLED') {
       const stats = userStats[membership.user_id]
       stats.cancellations += 1
-      if (isLateCancellation(membership, lateCancelHours)) {
+      if (membership.walk_slots?.reminder_sent_at) {
         stats.lateCancellations += 1
         stats.hasLateCancellationIndicator = true
       }
@@ -548,26 +543,6 @@ export async function getAdminUsersAnalytics(
   }
 
   return { userStats }
-}
-
-function isLateCancellation(
-  membership: {
-    cancelled_at?: string | null
-    walk_slots?: { walk_date?: string | null; start_time?: string | null } | null
-  },
-  lateCancelHours: number
-) {
-  const cancelledAt = membership.cancelled_at ? new Date(membership.cancelled_at) : null
-  const slot = membership.walk_slots
-  if (!cancelledAt || Number.isNaN(cancelledAt.getTime()) || !slot?.walk_date || !slot.start_time) {
-    return false
-  }
-
-  const walkStart = getWalkStartDateTime(slot.walk_date, slot.start_time)
-  if (Number.isNaN(walkStart.getTime())) return false
-
-  const cutoff = new Date(walkStart.getTime() - lateCancelHours * 60 * 60 * 1000)
-  return cancelledAt >= cutoff
 }
 
 export async function getAdminVolunteerAnalyticsLanding(

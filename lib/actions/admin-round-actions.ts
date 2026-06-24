@@ -4,8 +4,10 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import {
   HIGH_PARTICIPATION_THRESHOLD_RANGE,
-  LATE_CANCEL_HOURS_RANGE,
   MAX_MEDIA_PER_REPORT_RANGE,
+  REMINDER_SEND_WEEKDAY_RANGE,
+  REMINDER_WINDOW_LENGTH_DAYS_RANGE,
+  REMINDER_WINDOW_START_OFFSET_DAYS_RANGE,
   REQUIRED_WALKS_PER_ROUND_RANGE,
 } from '@/lib/constants/settings'
 import { MAX_VOLUNTEERS_PER_SLOT } from '@/lib/constants/walks'
@@ -464,6 +466,24 @@ export async function updateWalk(walkId: string, data: {
   if (errors.length > 0) return { error: errors.join('; ') }
 
   const { supabase } = await requireAdmin()
+  const { data: existingWalk, error: existingWalkError } = await supabase
+    .from('walk_slots')
+    .select('walk_date, start_time, reminder_sent_at')
+    .eq('id', walkId)
+    .single()
+
+  if (existingWalkError) return { error: existingWalkError.message }
+  if (!existingWalk) return { error: 'Walk not found' }
+  if (
+    existingWalk.reminder_sent_at &&
+    (
+      existingWalk.walk_date !== data.walkDate ||
+      existingWalk.start_time.slice(0, 5) !== data.startTime
+    )
+  ) {
+    return { error: 'Walk date and start time cannot be changed after reminder emails have been sent.' }
+  }
+
   const roundDateRange = await getRoundDateRange(supabase, data.roundId)
   if (roundDateRange.error) return { error: roundDateRange.error }
   const round = roundDateRange.round
@@ -573,24 +593,37 @@ export async function bulkCreateWalks(data: {
 
 export async function updateSettings(data: {
   requiredWalksPerRound: number
-  lateCancelHours: number
   highParticipationThreshold: number
   maxMediaPerReport: number
+  reminderSendWeekday: number
+  reminderSendTime: string
+  reminderWindowStartOffsetDays: number
+  reminderWindowLengthDays: number
 }) {
   const errors: string[] = []
   const inRange = (n: number, min: number, max: number) =>
     Number.isInteger(n) && n >= min && n <= max
+  const normalizedReminderTime = data.reminderSendTime?.trim()
   if (!inRange(data.requiredWalksPerRound, REQUIRED_WALKS_PER_ROUND_RANGE.min, REQUIRED_WALKS_PER_ROUND_RANGE.max)) {
     errors.push(`Required walks per round must be an integer between ${REQUIRED_WALKS_PER_ROUND_RANGE.min} and ${REQUIRED_WALKS_PER_ROUND_RANGE.max}`)
-  }
-  if (!inRange(data.lateCancelHours, LATE_CANCEL_HOURS_RANGE.min, LATE_CANCEL_HOURS_RANGE.max)) {
-    errors.push(`Late cancellation window must be an integer between ${LATE_CANCEL_HOURS_RANGE.min} and ${LATE_CANCEL_HOURS_RANGE.max} hours`)
   }
   if (!inRange(data.maxMediaPerReport, MAX_MEDIA_PER_REPORT_RANGE.min, MAX_MEDIA_PER_REPORT_RANGE.max)) {
     errors.push(`Max media per report must be an integer between ${MAX_MEDIA_PER_REPORT_RANGE.min} and ${MAX_MEDIA_PER_REPORT_RANGE.max}`)
   }
   if (!inRange(data.highParticipationThreshold, HIGH_PARTICIPATION_THRESHOLD_RANGE.min, HIGH_PARTICIPATION_THRESHOLD_RANGE.max)) {
     errors.push(`High participation threshold must be an integer between ${HIGH_PARTICIPATION_THRESHOLD_RANGE.min} and ${HIGH_PARTICIPATION_THRESHOLD_RANGE.max} participations`)
+  }
+  if (!inRange(data.reminderSendWeekday, REMINDER_SEND_WEEKDAY_RANGE.min, REMINDER_SEND_WEEKDAY_RANGE.max)) {
+    errors.push('Reminder weekday must be between Sunday (0) and Saturday (6)')
+  }
+  if (!/^\d{2}:\d{2}$/.test(normalizedReminderTime)) {
+    errors.push('Reminder send time must be in HH:MM format')
+  }
+  if (!inRange(data.reminderWindowStartOffsetDays, REMINDER_WINDOW_START_OFFSET_DAYS_RANGE.min, REMINDER_WINDOW_START_OFFSET_DAYS_RANGE.max)) {
+    errors.push(`Reminder window start offset must be an integer between ${REMINDER_WINDOW_START_OFFSET_DAYS_RANGE.min} and ${REMINDER_WINDOW_START_OFFSET_DAYS_RANGE.max} days`)
+  }
+  if (!inRange(data.reminderWindowLengthDays, REMINDER_WINDOW_LENGTH_DAYS_RANGE.min, REMINDER_WINDOW_LENGTH_DAYS_RANGE.max)) {
+    errors.push(`Reminder window length must be an integer between ${REMINDER_WINDOW_LENGTH_DAYS_RANGE.min} and ${REMINDER_WINDOW_LENGTH_DAYS_RANGE.max} days`)
   }
   if (errors.length > 0) return { error: errors.join('; ') }
 
@@ -608,9 +641,12 @@ export async function updateSettings(data: {
     .from('app_settings')
     .update({
       required_walks_per_round: data.requiredWalksPerRound,
-      late_cancel_hours: data.lateCancelHours,
       high_participation_threshold: data.highParticipationThreshold,
       max_media_per_report: data.maxMediaPerReport,
+      reminder_send_weekday: data.reminderSendWeekday,
+      reminder_send_time: `${normalizedReminderTime}:00`,
+      reminder_window_start_offset_days: data.reminderWindowStartOffsetDays,
+      reminder_window_length_days: data.reminderWindowLengthDays,
     })
     .eq('id', existing.id)
 

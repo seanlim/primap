@@ -2,7 +2,6 @@ import type { ComponentProps } from 'react'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { WalkDetailClient } from '@/app/(app)/walk/[walkId]/walk-detail-client'
-import { DEFAULT_LATE_CANCEL_HOURS } from '@/lib/constants/settings'
 
 const mockJoinWalk = vi.fn()
 const mockCancelWalk = vi.fn()
@@ -43,7 +42,7 @@ function renderWalkDetail(overrides: Partial<ComponentProps<typeof WalkDetailCli
       isJoined={false}
       isFull={false}
       currentUserId="user-1"
-      lateCancelWarning={null}
+      lateCancellationActive={false}
       hasSubmittedReport={false}
       {...overrides}
     />
@@ -164,7 +163,7 @@ describe('WalkDetailClient', () => {
   it('requires a reason in the late cancellation dialog', () => {
     renderWalkDetail({
       isJoined: true,
-      lateCancelWarning: `This walk starts within the ${DEFAULT_LATE_CANCEL_HOURS}-hour late cancellation window.`,
+      lateCancellationActive: true,
       members: [{
         userId: 'user-1',
         fullName: 'June',
@@ -191,7 +190,7 @@ describe('WalkDetailClient', () => {
 
     renderWalkDetail({
       isJoined: true,
-      lateCancelWarning: `This walk starts within the ${DEFAULT_LATE_CANCEL_HOURS}-hour late cancellation window.`,
+      lateCancellationActive: true,
       members: [{
         userId: 'user-1',
         fullName: 'June',

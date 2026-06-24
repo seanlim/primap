@@ -1,6 +1,5 @@
 import { render, screen } from '@testing-library/react'
 import AdminUserHistoryPage from '@/app/(app)/admin/users/[userId]/history/page'
-import { DEFAULT_LATE_CANCEL_HOURS } from '@/lib/constants/settings'
 
 const { mockSupabase, mockNotFound } = vi.hoisted(() => ({
   mockSupabase: { from: vi.fn() },
@@ -86,7 +85,7 @@ describe('AdminUserHistoryPage', () => {
           location_name: 'Central Park',
           walk_date: '2026-04-15',
           start_time: '08:00:00',
-          late_cancel_hours: DEFAULT_LATE_CANCEL_HOURS,
+          reminder_sent_at: '2026-04-09T05:00:00.000Z',
         },
       }],
     })
@@ -96,7 +95,7 @@ describe('AdminUserHistoryPage', () => {
     expect(screen.getByText('Late Walk Cancellation')).toBeInTheDocument()
     expect(screen.getByText('Medical appointment')).toBeInTheDocument()
     expect(screen.getByText('Central Park')).toBeInTheDocument()
-    expect(screen.getByText(`${DEFAULT_LATE_CANCEL_HOURS} hours`)).toBeInTheDocument()
+    expect(screen.getByText('Reminder Sent')).toBeInTheDocument()
   })
 
   it('calls notFound when the profile does not exist', async () => {

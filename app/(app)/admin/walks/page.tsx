@@ -35,6 +35,7 @@ export default async function AdminWalksPage() {
         endTime: s.end_time,
         maxVolunteers: s.max_volunteers,
         memberCount: s.slot_memberships[0]?.count,
+        reminderSentAt: s.reminder_sent_at,
       }))}
       rounds={(rounds || []).map(r => ({
         id: r.id,

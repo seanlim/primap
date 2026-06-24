@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { EmptyState } from '@/components/ui/empty-state'
 import { formatDate } from '@/lib/utils/format-date'
 import type { Json } from '@/lib/types/database'
+import { APP_TIME_ZONE } from '@/lib/utils/walk-participation'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,7 +21,7 @@ type AuditMetadata = {
   location_name?: string
   walk_date?: string
   start_time?: string
-  late_cancel_hours?: number
+  reminder_sent_at?: string
 }
 
 const EVENT_DISPLAY: Record<string, {
@@ -44,7 +45,7 @@ function asAuditMetadata(metadata: Json | null): AuditMetadata {
     location_name: typeof metadata.location_name === 'string' ? metadata.location_name : undefined,
     walk_date: typeof metadata.walk_date === 'string' ? metadata.walk_date : undefined,
     start_time: typeof metadata.start_time === 'string' ? metadata.start_time : undefined,
-    late_cancel_hours: typeof metadata.late_cancel_hours === 'number' ? metadata.late_cancel_hours : undefined,
+    reminder_sent_at: typeof metadata.reminder_sent_at === 'string' ? metadata.reminder_sent_at : undefined,
   }
 }
 
@@ -52,6 +53,7 @@ function formatEventTime(value: string) {
   return new Intl.DateTimeFormat('en-SG', {
     dateStyle: 'medium',
     timeStyle: 'short',
+    timeZone: APP_TIME_ZONE,
   }).format(new Date(value))
 }
 
@@ -152,10 +154,10 @@ export default async function AdminUserHistoryPage({
                           </dd>
                         </div>
                       )}
-                      {metadata.late_cancel_hours !== undefined && (
+                      {metadata.reminder_sent_at && (
                         <div>
-                          <dt className="font-medium text-gray-400">Late Window</dt>
-                          <dd className="mt-0.5 text-gray-700">{metadata.late_cancel_hours} hours</dd>
+                          <dt className="font-medium text-gray-400">Reminder Sent</dt>
+                          <dd className="mt-0.5 text-gray-700">{formatEventTime(metadata.reminder_sent_at)}</dd>
                         </div>
                       )}
                     </dl>

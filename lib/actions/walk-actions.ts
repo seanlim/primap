@@ -2,10 +2,41 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { sendWalkCancellationEmail } from '@/lib/email'
-import { getJoinBlockInfo, getWalkStartDateTime, hasWalkStarted } from '@/lib/utils/walk-participation'
+import {
+  sendWalkCancellationEmail,
+  sendWalkParticipantUpdateEmail,
+  type WalkEmailParticipant,
+} from '@/lib/email'
+import { getJoinBlockInfo, hasWalkStarted } from '@/lib/utils/walk-participation'
 import { OBSERVATION_MEDIA_BUCKET } from '@/lib/utils/storage'
-import { DEFAULT_LATE_CANCEL_HOURS } from '@/lib/constants/settings'
+import { isLateCancellationActive } from '@/lib/utils/reminder-schedule'
+
+interface ActiveParticipantRow {
+  user_id: string
+  profiles: { full_name: string | null; email: string | null } | null
+}
+
+async function getActiveParticipantContacts(supabase: Awaited<ReturnType<typeof createClient>>, walkId: string) {
+  const { data } = await supabase
+    .from('slot_memberships')
+    .select('user_id, profiles:user_id(full_name, email)')
+    .eq('slot_id', walkId)
+    .eq('status', 'ACTIVE')
+
+  const rows = (data || []) as unknown as ActiveParticipantRow[]
+  const participants = rows
+    .map((row): WalkEmailParticipant | null => {
+      const email = row.profiles?.email?.trim()
+      if (!email) return null
+      return {
+        fullName: row.profiles?.full_name || null,
+        email,
+      }
+    })
+    .filter((participant): participant is WalkEmailParticipant => participant !== null)
+
+  return participants
+}
 
 
 export async function joinWalk(walkId: string) {
@@ -14,6 +45,8 @@ export async function joinWalk(walkId: string) {
   if (!user) return { error: 'Not authenticated' }
 
   interface JoinSlotQueryRow {
+    location_name: string
+    reminder_sent_at: string | null
     walk_date: string
     start_time: string
     max_volunteers: number
@@ -23,7 +56,9 @@ export async function joinWalk(walkId: string) {
 
   const { data: slotRaw, error: slotError } = await supabase
     .from('walk_slots')
-    .select(`
+      .select(`
+      location_name,
+      reminder_sent_at,
       walk_date,
       start_time,
       max_volunteers,
@@ -65,13 +100,42 @@ export async function joinWalk(walkId: string) {
   const result = data as { success?: boolean; error?: string }
   if (result.error) return { error: result.error }
 
+  const warnings: string[] = []
+
+  if (isLateCancellationActive(slot.reminder_sent_at)) {
+    try {
+      const participants = await getActiveParticipantContacts(supabase, walkId)
+      const recipients = participants.map((participant) => participant.email)
+      const actorName = user.email || 'A volunteer'
+
+      if (recipients.length > 0) {
+        await sendWalkParticipantUpdateEmail(
+          recipients,
+          {
+            date: slot.walk_date,
+            time: slot.start_time,
+            location: slot.location_name,
+          },
+          participants,
+          'join',
+          actorName
+        )
+      }
+    } catch (err) {
+      console.error('Error sending participant update emails after join:', err)
+      warnings.push('Joined successfully, but failed to notify other participants.')
+    }
+  }
+
   revalidatePath('/walk')
   revalidatePath(`/walk/${walkId}`)
   revalidatePath('/home')
   revalidatePath('/report')
   revalidatePath(`/report/${walkId}`)
   revalidatePath('/profile')
-  return { success: true }
+  return warnings.length > 0
+    ? { success: true, warning: warnings.join(' ') }
+    : { success: true }
 }
 
 
@@ -84,27 +148,16 @@ export async function cancelWalk(walkId: string, cancellationReason?: string) {
   const warnings: string[] = []
   const sanitizedReason = cancellationReason?.trim() ?? ''
 
-  const [{ data: slot, error: slotError }, { data: settings }] = await Promise.all([
-    supabase
-      .from('walk_slots')
-      .select('walk_date, start_time, location_name')
-      .eq('id', walkId)
-      .single(),
-    supabase
-      .from('app_settings')
-      .select('late_cancel_hours')
-      .limit(1)
-      .single(),
-  ])
+  const { data: slot, error: slotError } = await supabase
+    .from('walk_slots')
+    .select('walk_date, start_time, location_name, reminder_sent_at')
+    .eq('id', walkId)
+    .single()
 
   if (slotError) return { error: slotError.message }
   if (!slot) return { error: 'Walk slot not found.' }
 
-  const lateCancelHours = settings?.late_cancel_hours ?? DEFAULT_LATE_CANCEL_HOURS
-  const slotStart = getWalkStartDateTime(slot.walk_date, slot.start_time)
-  const lateCancelCutoff = new Date(slotStart.getTime() - lateCancelHours * 60 * 60 * 1000)
-  const isLateCancellation =
-    !Number.isNaN(slotStart.getTime()) && new Date() >= lateCancelCutoff
+  const isLateCancellation = isLateCancellationActive(slot.reminder_sent_at)
 
   if (isLateCancellation && sanitizedReason.length === 0) {
     return { error: 'Please provide a reason for this late cancellation.' }
@@ -160,34 +213,33 @@ export async function cancelWalk(walkId: string, cancellationReason?: string) {
     const cancellingName = cancellingProfile?.full_name || cancellingProfile?.email || 'A volunteer'
 
     // 2. Get other active members
-    interface MembershipRow {
-      user_id: string
-      profiles: { email: string } | null
-    }
-
-    const { data: otherMembersRaw } = await supabase
-      .from('slot_memberships')
-      .select('user_id, profiles:user_id(email)')
-      .eq('slot_id', walkId)
-      .eq('status', 'ACTIVE')
-      .neq('user_id', user.id)
-
-    const otherMembers = (otherMembersRaw || []) as unknown as MembershipRow[]
-    if (otherMembers.length > 0) {
-      const recipients = otherMembers
-        .map(m => m.profiles?.email)
-        .filter((e): e is string => Boolean(e))
-
+    const participants = await getActiveParticipantContacts(supabase, walkId)
+    if (participants.length > 0) {
+      const recipients = participants.map((participant) => participant.email)
       if (recipients.length > 0) {
-        await sendWalkCancellationEmail(
-          recipients,
-          {
-            date: slot.walk_date,
-            time: slot.start_time,
-            location: slot.location_name
-          },
-          cancellingName
-        )
+        if (isLateCancellation) {
+          await sendWalkParticipantUpdateEmail(
+            recipients,
+            {
+              date: slot.walk_date,
+              time: slot.start_time,
+              location: slot.location_name,
+            },
+            participants,
+            'late-cancellation',
+            cancellingName
+          )
+        } else {
+          await sendWalkCancellationEmail(
+            recipients,
+            {
+              date: slot.walk_date,
+              time: slot.start_time,
+              location: slot.location_name,
+            },
+            cancellingName
+          )
+        }
       }
     }
   } catch (err) {

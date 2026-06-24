@@ -31,11 +31,11 @@ interface WalkDetailProps {
   isJoined: boolean
   isFull: boolean
   currentUserId: string
-  lateCancelWarning: string | null
+  lateCancellationActive: boolean
   hasSubmittedReport: boolean
 }
 
-export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserId, lateCancelWarning, hasSubmittedReport }: WalkDetailProps) {
+export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserId, lateCancellationActive, hasSubmittedReport }: WalkDetailProps) {
   const [error, setError] = useState('')
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [cancellationReason, setCancellationReason] = useState('')
@@ -68,17 +68,20 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
 
   const handleJoin = () => {
     setError('')
-    setPendingAction('join')
-    startTransition(async () => {
-      setOptimistic('join')
-      const result = await joinWalk(walk.id)
-      if (result.error) {
-        setError(result.error)
-        setPendingAction(null)
-      } else {
-        router.refresh()
-      }
-    })
+      setPendingAction('join')
+      startTransition(async () => {
+        setOptimistic('join')
+        const result = await joinWalk(walk.id)
+        if (result.error) {
+          setError(result.error)
+          setPendingAction(null)
+        } else {
+          if (result.warning) {
+            showToast(result.warning, 'info')
+          }
+          router.refresh()
+        }
+      })
   }
 
   const handleCancel = () => {
@@ -92,7 +95,7 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
     setPendingAction('cancel')
     startTransition(async () => {
       setOptimistic('cancel')
-      const result = await cancelWalk(walk.id, lateCancelWarning ? cancellationReason : undefined)
+      const result = await cancelWalk(walk.id, lateCancellationActive ? cancellationReason : undefined)
       if (result.error) {
         setError(result.error)
         setPendingAction(null)
@@ -224,15 +227,15 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
       <ConfirmationDialog
         open={showCancelDialog}
         title="Cancel Participation"
-        message={lateCancelWarning
-          ? `Are you sure you want to cancel your participation? Other group members will be notified. ${lateCancelWarning}`
+        message={lateCancellationActive
+          ? 'Are you sure you want to cancel your participation? Other group members will be notified. This walk is already in the late cancellation period because participant reminders were sent.'
           : 'Are you sure you want to cancel your participation? Other group members will be notified.'}
         confirmLabel="Yes, Cancel"
         cancelLabel="Keep"
-        textareaLabel={lateCancelWarning ? 'Reason for late cancellation' : undefined}
-        textareaPlaceholder={lateCancelWarning ? 'Share the reason for this late cancellation' : undefined}
+        textareaLabel={lateCancellationActive ? 'Reason for late cancellation' : undefined}
+        textareaPlaceholder={lateCancellationActive ? 'Share the reason for this late cancellation' : undefined}
         textareaValue={cancellationReason}
-        textareaRequired={Boolean(lateCancelWarning)}
+        textareaRequired={lateCancellationActive}
         textareaMaxLength={1000}
         onTextareaChange={setCancellationReason}
         destructive

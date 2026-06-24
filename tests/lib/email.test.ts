@@ -17,6 +17,7 @@ import {
   sendRoleDemotedEmail,
   sendWalkCancellationEmail,
   sendWalkReminderEmail,
+  sendWalkParticipantUpdateEmail,
   sendIncidentReportedEmail,
 } from '@/lib/email'
 
@@ -321,7 +322,8 @@ describe('email utilities', () => {
       await sendWalkReminderEmail(
         'user@example.com',
         '<img src=x>',
-        { date: '2025-01-01', time: '09:00', location: '<b>Bukit</b>' }
+        { date: '2025-01-01', time: '09:00', location: '<b>Bukit</b>' },
+        []
       )
       const call = mockSend.mock.calls[0][0]
       expect(call.html).not.toContain('<img src=x>')
@@ -482,9 +484,10 @@ describe('email utilities', () => {
 
   describe('sendWalkReminderEmail', () => {
     const slotInfo = { date: '2025-07-02', time: '08:00', location: 'MacRitchie' }
+    const participants = [{ fullName: 'Charlie', email: 'charlie@example.com' }]
 
     it('sends reminder with name', async () => {
-      await sendWalkReminderEmail('user@example.com', 'Charlie', slotInfo)
+      await sendWalkReminderEmail('user@example.com', 'Charlie', slotInfo, participants)
 
       const call = mockSend.mock.calls[0][0]
       expect(call.subject).toBe('Reminder: Upcoming Survey Walk')
@@ -495,17 +498,59 @@ describe('email utilities', () => {
     })
 
     it('uses "Volunteer" when name is null', async () => {
-      await sendWalkReminderEmail('user@example.com', null, slotInfo)
+      await sendWalkReminderEmail('user@example.com', null, slotInfo, participants)
 
       const call = mockSend.mock.calls[0][0]
       expect(call.html).toContain('Hi Volunteer')
     })
 
     it('includes walk link', async () => {
-      await sendWalkReminderEmail('user@example.com', 'Charlie', slotInfo)
+      await sendWalkReminderEmail('user@example.com', 'Charlie', slotInfo, participants)
 
       const call = mockSend.mock.calls[0][0]
       expect(call.html).toContain('https://primap.org/walk')
+    })
+
+    it('includes the participant roster', async () => {
+      await sendWalkReminderEmail('user@example.com', 'Charlie', slotInfo, participants)
+
+      const call = mockSend.mock.calls[0][0]
+      expect(call.html).toContain('Current participant roster')
+      expect(call.html).toContain('charlie@example.com')
+    })
+  })
+
+  describe('sendWalkParticipantUpdateEmail', () => {
+    const slotInfo = { date: '2025-07-02', time: '08:00', location: 'MacRitchie' }
+    const participants = [{ fullName: 'Charlie', email: 'charlie@example.com' }]
+
+    it('sends individually to each recipient', async () => {
+      await sendWalkParticipantUpdateEmail(
+        ['a@example.com', 'b@example.com'],
+        slotInfo,
+        participants,
+        'join',
+        'Alex'
+      )
+
+      expect(mockSend).toHaveBeenCalledTimes(2)
+      expect(mockSend.mock.calls[0][0].to).toBe('a@example.com')
+      expect(mockSend.mock.calls[1][0].to).toBe('b@example.com')
+    })
+
+    it('includes the updated roster and actor name', async () => {
+      await sendWalkParticipantUpdateEmail(
+        ['a@example.com'],
+        slotInfo,
+        participants,
+        'late-cancellation',
+        'Alex'
+      )
+
+      const call = mockSend.mock.calls[0][0]
+      expect(call.subject).toBe('Notice: Walk Participant Update')
+      expect(call.html).toContain('Alex')
+      expect(call.html).toContain('charlie@example.com')
     })
   })
 })

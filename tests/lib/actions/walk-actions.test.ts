@@ -37,11 +37,11 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('@/lib/email', () => ({
   sendWalkCancellationEmail: vi.fn(),
+  sendWalkParticipantUpdateEmail: vi.fn(),
 }))
 
 import { joinWalk, cancelWalk } from '@/lib/actions/walk-actions'
-import { sendWalkCancellationEmail } from '@/lib/email'
-import { DEFAULT_LATE_CANCEL_HOURS } from '@/lib/constants/settings'
+import { sendWalkCancellationEmail, sendWalkParticipantUpdateEmail } from '@/lib/email'
 
 function resetChain() {
   methods.select.mockReturnThis()
@@ -69,6 +69,8 @@ function setupUser(userId = 'user-1') {
 }
 
 function mockJoinableSlot(overrides?: Partial<{
+  location_name: string
+  reminder_sent_at: string | null
   walk_date: string
   start_time: string
   max_volunteers: number
@@ -77,6 +79,8 @@ function mockJoinableSlot(overrides?: Partial<{
 }>) {
   methods.single.mockResolvedValueOnce({
     data: {
+      location_name: 'Bukit Timah',
+      reminder_sent_at: null,
       walk_date: '2099-04-15',
       start_time: '08:00',
       max_volunteers: 3,
@@ -97,10 +101,9 @@ function setupCancelMocks(overrides?: {
   } | null
   rpcError?: { message: string } | null
   storageError?: { message: string } | null
-  slot?: { walk_date: string; start_time: string; location_name: string } | null
-  settings?: { late_cancel_hours: number } | null
+  slot?: { walk_date: string; start_time: string; location_name: string; reminder_sent_at: string | null } | null
   profile?: { full_name: string | null; email: string | null } | null
-  otherMembers?: Array<{ user_id: string; profiles: { email: string | null } }>
+  otherMembers?: Array<{ user_id: string; profiles: { full_name?: string | null; email: string | null } }>
 }) {
   const rpcResult = overrides && 'rpcResult' in overrides
     ? overrides.rpcResult
@@ -109,16 +112,13 @@ function setupCancelMocks(overrides?: {
   const storageError = overrides?.storageError ?? null
   const slot = overrides && 'slot' in overrides
     ? overrides.slot
-    : { walk_date: '2026-04-15', start_time: '08:00', location_name: 'Central Park' }
-  const settings = overrides && 'settings' in overrides
-    ? overrides.settings
-    : { late_cancel_hours: DEFAULT_LATE_CANCEL_HOURS }
+    : { walk_date: '2026-04-15', start_time: '08:00', location_name: 'Central Park', reminder_sent_at: null }
   const profile = overrides && 'profile' in overrides
     ? overrides.profile
     : { full_name: 'Test User', email: 'user@test.com' }
   const otherMembers = overrides && 'otherMembers' in overrides
     ? overrides.otherMembers
-    : [{ user_id: 'other-1', profiles: { email: 'other@test.com' } }]
+    : [{ user_id: 'other-1', profiles: { full_name: 'Other User', email: 'other@test.com' } }]
 
   mockSupabase.rpc.mockResolvedValue({
     data: rpcResult,
@@ -133,11 +133,9 @@ function setupCancelMocks(overrides?: {
       return {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              neq: vi.fn().mockResolvedValue({
-                data: otherMembers,
-                error: null,
-              }),
+            eq: vi.fn().mockResolvedValue({
+              data: otherMembers,
+              error: null,
             }),
           }),
         }),
@@ -150,19 +148,6 @@ function setupCancelMocks(overrides?: {
           eq: vi.fn().mockReturnValue({
             single: vi.fn().mockResolvedValue({
               data: slot,
-              error: null,
-            }),
-          }),
-        }),
-      }
-    }
-
-    if (table === 'app_settings') {
-      return {
-        select: vi.fn().mockReturnValue({
-          limit: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({
-              data: settings,
               error: null,
             }),
           }),
@@ -290,6 +275,50 @@ describe('walk-actions', () => {
         p_user_id: 'user-1',
       })
     })
+
+    it('sends a participant update email when joining a reminded walk', async () => {
+      setupUser()
+      mockJoinableSlot({
+        reminder_sent_at: '2026-04-09T05:00:00.000Z',
+      })
+      mockSupabase.rpc.mockResolvedValue({
+        data: { success: true, membership_id: 'mem-1', observation_id: 'obs-1' },
+        error: null,
+      })
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'slot_memberships') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [
+                    { user_id: 'user-1', profiles: { full_name: 'June', email: 'june@test.com' } },
+                    { user_id: 'other-1', profiles: { full_name: 'Alex', email: 'alex@test.com' } },
+                  ],
+                  error: null,
+                }),
+              }),
+            }),
+          }
+        }
+
+        return methods
+      })
+
+      const result = await joinWalk('slot-1')
+
+      expect(result).toEqual({ success: true })
+      expect(sendWalkParticipantUpdateEmail).toHaveBeenCalledWith(
+        ['june@test.com', 'alex@test.com'],
+        { date: '2099-04-15', time: '08:00', location: 'Bukit Timah' },
+        [
+          { fullName: 'June', email: 'june@test.com' },
+          { fullName: 'Alex', email: 'alex@test.com' },
+        ],
+        'join',
+        'A volunteer'
+      )
+    })
   })
 
   describe('cancelWalk', () => {
@@ -336,9 +365,15 @@ describe('walk-actions', () => {
     })
 
     it('requires a reason for late cancellation before calling RPC', async () => {
-      vi.setSystemTime(new Date('2026-04-14T12:00:00.000Z'))
       setupUser()
-      setupCancelMocks()
+      setupCancelMocks({
+        slot: {
+          walk_date: '2026-04-15',
+          start_time: '08:00',
+          location_name: 'Central Park',
+          reminder_sent_at: '2026-04-09T05:00:00.000Z',
+        },
+      })
 
       const result = await cancelWalk('slot-1')
 
@@ -347,9 +382,15 @@ describe('walk-actions', () => {
     })
 
     it('passes a trimmed reason for late cancellation', async () => {
-      vi.setSystemTime(new Date('2026-04-14T12:00:00.000Z'))
       setupUser()
-      setupCancelMocks()
+      setupCancelMocks({
+        slot: {
+          walk_date: '2026-04-15',
+          start_time: '08:00',
+          location_name: 'Central Park',
+          reminder_sent_at: '2026-04-09T05:00:00.000Z',
+        },
+      })
 
       const result = await cancelWalk('slot-1', '  medical appointment  ')
 
@@ -361,9 +402,15 @@ describe('walk-actions', () => {
     })
 
     it('rejects overlong cancellation reasons', async () => {
-      vi.setSystemTime(new Date('2026-04-14T12:00:00.000Z'))
       setupUser()
-      setupCancelMocks()
+      setupCancelMocks({
+        slot: {
+          walk_date: '2026-04-15',
+          start_time: '08:00',
+          location_name: 'Central Park',
+          reminder_sent_at: '2026-04-09T05:00:00.000Z',
+        },
+      })
 
       const result = await cancelWalk('slot-1', 'a'.repeat(1001))
 
@@ -473,6 +520,29 @@ describe('walk-actions', () => {
         warning: 'Cancelled successfully, but failed to remove your draft report media.',
       })
       expect(sendWalkCancellationEmail).toHaveBeenCalled()
+    })
+
+    it('sends participant update emails instead of cancellation emails for late cancellations', async () => {
+      setupUser()
+      setupCancelMocks({
+        slot: {
+          walk_date: '2026-04-15',
+          start_time: '08:00',
+          location_name: 'Central Park',
+          reminder_sent_at: '2026-04-09T05:00:00.000Z',
+        },
+      })
+
+      await cancelWalk('slot-1', 'Medical emergency')
+
+      expect(sendWalkParticipantUpdateEmail).toHaveBeenCalledWith(
+        ['other@test.com'],
+        { date: '2026-04-15', time: '08:00', location: 'Central Park' },
+        [{ fullName: 'Other User', email: 'other@test.com' }],
+        'late-cancellation',
+        'Test User'
+      )
+      expect(sendWalkCancellationEmail).not.toHaveBeenCalled()
     })
 
     it('uses full_name for cancellingName', async () => {

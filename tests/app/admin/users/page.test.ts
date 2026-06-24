@@ -28,7 +28,6 @@ vi.mock('../../../../app/(app)/admin/users/users-client', () => ({
 }))
 
 import AdminUsersPage from '../../../../app/(app)/admin/users/page'
-import { DEFAULT_LATE_CANCEL_HOURS } from '@/lib/constants/settings'
 
 function makeChain(index: number, resolvedValue: unknown) {
   const self: Record<string, unknown> = {}
@@ -68,7 +67,6 @@ function setupMock() {
   ]
   const settingsResult = {
     data: {
-      late_cancel_hours: DEFAULT_LATE_CANCEL_HOURS,
       high_participation_threshold: 2,
     },
     error: null,

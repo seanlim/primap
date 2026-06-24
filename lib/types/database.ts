@@ -17,28 +17,37 @@ export type Database = {
       app_settings: {
         Row: {
           created_at: string
-          id: string
           high_participation_threshold: number
-          late_cancel_hours: number
+          id: string
           max_media_per_report: number
+          reminder_send_time: string
+          reminder_send_weekday: number
+          reminder_window_length_days: number
+          reminder_window_start_offset_days: number
           required_walks_per_round: number
           updated_at: string
         }
         Insert: {
           created_at?: string
-          id?: string
           high_participation_threshold?: number
-          late_cancel_hours?: number
+          id?: string
           max_media_per_report?: number
+          reminder_send_time?: string
+          reminder_send_weekday?: number
+          reminder_window_length_days?: number
+          reminder_window_start_offset_days?: number
           required_walks_per_round?: number
           updated_at?: string
         }
         Update: {
           created_at?: string
-          id?: string
           high_participation_threshold?: number
-          late_cancel_hours?: number
+          id?: string
           max_media_per_report?: number
+          reminder_send_time?: string
+          reminder_send_weekday?: number
+          reminder_window_length_days?: number
+          reminder_window_start_offset_days?: number
           required_walks_per_round?: number
           updated_at?: string
         }
@@ -478,6 +487,7 @@ export type Database = {
           id: string
           location_name: string
           max_volunteers: number
+          reminder_sent_at: string | null
           round_id: string
           start_time: string
           updated_at: string
@@ -489,6 +499,7 @@ export type Database = {
           id?: string
           location_name: string
           max_volunteers?: number
+          reminder_sent_at?: string | null
           round_id: string
           start_time: string
           updated_at?: string
@@ -500,6 +511,7 @@ export type Database = {
           id?: string
           location_name?: string
           max_volunteers?: number
+          reminder_sent_at?: string | null
           round_id?: string
           start_time?: string
           updated_at?: string

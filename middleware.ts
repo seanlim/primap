@@ -4,6 +4,11 @@ import { isPublicPath, needsProfileCheck, resolveStatusRedirect } from '@/lib/au
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
+  const pathname = request.nextUrl.pathname
+
+  if (pathname === '/api/cron/reminders') {
+    return supabaseResponse
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,7 +32,6 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-  const pathname = request.nextUrl.pathname
 
   const requestIsPublicPath = isPublicPath(pathname)
 

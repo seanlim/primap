@@ -3,7 +3,7 @@ import { redirect, notFound } from 'next/navigation'
 import { WalkDetailClient } from './walk-detail-client'
 import type { MembershipWithProfile } from '@/lib/types/supabase-helpers'
 import { getJoinBlockInfo, getWalkStartDateTime } from '@/lib/utils/walk-participation'
-import { DEFAULT_LATE_CANCEL_HOURS } from '@/lib/constants/settings'
+import { isLateCancellationActive } from '@/lib/utils/reminder-schedule'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,7 +24,7 @@ export default async function WalkDetailPage({
     .eq('user_id', user.id)
     .limit(2)
 
-  const [{ data: walk }, { data: settings }, { data: ownObservations }] = await Promise.all([
+  const [{ data: walk }, { data: ownObservations }] = await Promise.all([
     supabase
       .from('walk_slots')
       .select(`
@@ -39,11 +39,6 @@ export default async function WalkDetailPage({
         )
       `)
       .eq('id', walkId)
-      .single(),
-    supabase
-      .from('app_settings')
-      .select('late_cancel_hours')
-      .limit(1)
       .single(),
     ownObservationQuery,
   ])
@@ -67,11 +62,7 @@ export default async function WalkDetailPage({
   const slotStart = getWalkStartDateTime(walk.walk_date, walk.start_time)
   const isPastOrStarted = slotStart <= new Date()
   const isFull = memberships.length >= walk.max_volunteers
-  const lateCancelHours = settings?.late_cancel_hours || DEFAULT_LATE_CANCEL_HOURS
-  const lateCancelCutoff = new Date(slotStart.getTime() - lateCancelHours * 60 * 60 * 1000)
-  const lateCancelWarning = userMembership && new Date() >= lateCancelCutoff
-    ? `This walk starts within the ${lateCancelHours}-hour late cancellation window.`
-    : null
+  const lateCancellationActive = Boolean(userMembership) && isLateCancellationActive(walk.reminder_sent_at)
 
   const joinBlockedInfo = !userMembership
     ? getJoinBlockInfo({
@@ -103,7 +94,7 @@ export default async function WalkDetailPage({
       isJoined={!!userMembership}
       isFull={isFull}
       currentUserId={user.id}
-      lateCancelWarning={lateCancelWarning}
+      lateCancellationActive={lateCancellationActive}
       hasSubmittedReport={hasSubmittedReport}
     />
   )

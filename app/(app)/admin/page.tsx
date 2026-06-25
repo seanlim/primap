@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { Users, Calendar, AlertTriangle, Settings, ClipboardList, CheckCircle, Gauge, ArrowRight, Footprints, Database } from 'lucide-react'
+import { Users, Calendar, AlertTriangle, Settings, ClipboardList, CheckCircle, Gauge, ArrowRight, Database } from 'lucide-react'
 import { getAdminVolunteerAnalyticsLanding, type SupabaseClientLike } from '@/lib/admin-volunteer-analytics'
 import { formatDate } from '@/lib/utils/format-date'
 import DonutMetricCard from '../../../components/ui/DonutMetricCard'
@@ -31,7 +31,6 @@ export default async function AdminDashboard() {
   const [
     { count: totalUsers },
     { count: pendingUsers },
-    { count: activeRounds },
     { count: totalWalks },
     { count: totalObservations },
     { count: openIncidents },
@@ -39,7 +38,6 @@ export default async function AdminDashboard() {
   ] = await Promise.all([
     supabase.from('profiles').select('id', { count: 'exact', head: true }),
     supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'PENDING'),
-    supabase.from('survey_rounds').select('id', { count: 'exact', head: true }).eq('status', 'OPEN'),
     supabase.from('walk_slots').select('id', { count: 'exact', head: true }),
     supabase.from('observations').select('id', { count: 'exact', head: true }).eq('status', 'SUBMITTED'),
     supabase.from('incidents').select('id', { count: 'exact', head: true }).eq('resolved', false),
@@ -48,8 +46,7 @@ export default async function AdminDashboard() {
 
   const cards = [
     { label: 'Users', value: totalUsers || 0, sub: `${pendingUsers || 0}`, subLabel: 'Pending', footerLabel: 'Total', href: '/admin/users', icon: Users, color: 'bg-blue-50 text-blue-600', accentColor: '#2563eb' },
-    { label: 'Rounds', value: activeRounds || 0, sub: 'Open', href: '/admin/rounds', icon: Calendar, color: 'bg-green-50 text-green-600', accentColor: '#16a34a' },
-    { label: 'Walks', value: totalWalks || 0, sub: 'Total', href: '/admin/walks', icon: Footprints, color: 'bg-purple-50 text-purple-600', accentColor: '#9333ea' },
+    { label: 'Rounds & Walks', value: totalWalks || 0, sub: 'Total Walks', href: '/admin/rounds', icon: Calendar, color: 'bg-green-50 text-green-600', accentColor: '#16a34a' },
     { label: 'Reports', value: totalObservations || 0, sub: 'Submitted', href: '/admin/reports', icon: ClipboardList, color: 'bg-indigo-50 text-indigo-600', accentColor: '#4f46e5' },
     { label: 'Incidents', value: openIncidents || 0, sub: 'Open', href: '/admin/incidents', icon: AlertTriangle, color: 'bg-red-50 text-red-600', accentColor: '#dc2626' },
     { label: 'Data', value: '', sub: '', href: '/admin/data', icon: Database, color: 'bg-orange-50 text-orange-600', reserveValueSpace: true, accentColor: '#f97316' },

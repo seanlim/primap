@@ -290,7 +290,7 @@ describe('getAdminWalksAnalyticsPageSnapshotByRound', () => {
       }),
     }
 
-    await expect(getAdminWalksAnalyticsPageSnapshotByRound(supabase as never)).resolves.toEqual({
+    await expect(getAdminWalksAnalyticsPageSnapshotByRound(supabase as never, null)).resolves.toEqual({
       availableRounds: [],
       targetRound: null,
       availableWalks: [],
@@ -363,8 +363,7 @@ describe('getAdminWalksAnalyticsPageSnapshotByRound', () => {
       }),
     }
 
-    const snapshot = await getAdminWalksAnalyticsPageSnapshotByRound(supabase as never, {
-      roundId: 'round-1',
+    const snapshot = await getAdminWalksAnalyticsPageSnapshotByRound(supabase as never, 'round-1', {
       walkId: 'slot-1',
       now: new Date('2026-03-20T12:00:00+08:00'),
     })
@@ -449,8 +448,7 @@ describe('getAdminWalksAnalyticsPageSnapshotByRound', () => {
       }),
     }
 
-    const snapshot = await getAdminWalksAnalyticsPageSnapshotByRound(supabase as never, {
-      roundId: 'round-1',
+    const snapshot = await getAdminWalksAnalyticsPageSnapshotByRound(supabase as never, 'round-1', {
       walkId: 'slot-1',
       now: new Date('2026-03-20T12:00:00+08:00'),
     })

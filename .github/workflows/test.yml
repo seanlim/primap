@@ -1,10 +1,10 @@
-name: Tests
+name: Lint and Test
 
 on:
   pull_request:
 
 jobs:
-  test:
+  ci:
     runs-on: ubuntu-latest
 
     steps:
@@ -17,4 +17,5 @@ jobs:
 
       - run: npm ci
 
+      - run: npm run lint
       - run: npm run test

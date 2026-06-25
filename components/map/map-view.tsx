@@ -117,10 +117,9 @@ export function MapView({
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const markersRef = useRef<mapboxgl.Marker[]>([])
   const [loaded, setLoaded] = useState(false)
-  const [online, setOnline] = useState(true)
+  const [online, setOnline] = useState(() => typeof navigator !== 'undefined' ? navigator.onLine : true)
 
   useEffect(() => {
-    setOnline(navigator.onLine)
     const goOnline = () => setOnline(true)
     const goOffline = () => setOnline(false)
     window.addEventListener('online', goOnline)

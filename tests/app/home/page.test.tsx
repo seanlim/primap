@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import type { AnchorHTMLAttributes, ReactNode } from 'react'
 
 const { mockSupabase, mockRedirect } = vi.hoisted(() => {
   const mockSupabase = {
@@ -12,7 +13,11 @@ const { mockSupabase, mockRedirect } = vi.hoisted(() => {
 })
 
 vi.mock('next/link', () => ({
-  default: ({ children, href, ...props }: any) => (
+  default: ({
+    children,
+    href,
+    ...props
+  }: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string; children: ReactNode }) => (
     <a href={href} {...props}>
       {children}
     </a>

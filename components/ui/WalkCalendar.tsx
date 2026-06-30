@@ -141,7 +141,7 @@ export default function WalkCalendar<T extends CalendarEventBase>({
   const todayKey = toDateKey(new Date())
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-3">
+    <div className="bg-white rounded-lg border border-gray-200 p-3 overflow-x-auto">
       <div className="flex flex-col gap-3 mb-3">
         <div className="flex items-center gap-3">
           <button

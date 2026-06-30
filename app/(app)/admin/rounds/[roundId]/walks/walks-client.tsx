@@ -601,11 +601,13 @@ export function WalksClient({ walks, round }: {
 
       <div className="space-y-5">
         {walks.length === 0 ? (
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50">
-              <TriangleAlert className="h-5 w-5 text-amber-600" />
+          <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50">
+                <TriangleAlert className="h-5 w-5 text-amber-600" />
+              </div>
+              <p className="text-sm font-semibold text-gray-900">No walks yet.</p>
             </div>
-            <p className="text-sm font-semibold text-gray-900">No walks yet.</p>
           </div>
         ) : filteredWalks.length === 0 ? (
           <div className="bg-white rounded-xl p-3 text-center shadow-sm">

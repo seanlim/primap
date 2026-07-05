@@ -74,7 +74,6 @@ export async function saveDraft(input: SaveDraftInput) {
         last_user_agent: input.userAgent || null,
       })
       .eq('id', observationId)
-      .eq('user_id', user.id)
       .eq('status', 'DRAFT')
 
     if (error) return { error: error.message }
@@ -84,7 +83,6 @@ export async function saveDraft(input: SaveDraftInput) {
       .from('observations')
       .insert({
         slot_id: input.walkId,
-        user_id: user.id,
         walk_completion: input.walkCompletion,
         completion_comment: input.completionComment || null,
         outcome: input.outcome,
@@ -202,7 +200,6 @@ export async function submitObservation(observationId: string, walkId: string) {
     .from('observations')
     .select('*, sightings(*)')
     .eq('id', observationId)
-    .eq('user_id', user.id)
     .eq('status', 'DRAFT')
     .single()
 
@@ -257,7 +254,6 @@ export async function submitObservation(observationId: string, walkId: string) {
       ...(obs.outcome === 'SIGHTED' ? { lat: null, lng: null } : {}),
     })
     .eq('id', observationId)
-    .eq('user_id', user.id)
 
   if (error) return { error: error.message }
 
@@ -330,7 +326,6 @@ export async function getObservationMeta(walkId: string) {
     .from('observations')
     .select('id, updated_at, last_user_agent')
     .eq('slot_id', walkId)
-    .eq('user_id', user.id)
     .single()
 
   return data ? {
@@ -349,7 +344,6 @@ export async function getObservationFull(walkId: string) {
     .from('observations')
     .select('*, sightings(*, media:media!media_sighting_id_fkey(*)), media:media!media_observation_id_fkey(*)')
     .eq('slot_id', walkId)
-    .eq('user_id', user.id)
     .single()
 
   if (!data) return null

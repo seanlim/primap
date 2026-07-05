@@ -21,8 +21,7 @@ export default async function WalkDetailPage({
     .from('observations')
     .select('id, status')
     .eq('slot_id', walkId)
-    .eq('user_id', user.id)
-    .limit(2)
+    .limit(1)
 
   const [{ data: walk }, { data: ownObservations }] = await Promise.all([
     supabase
@@ -50,15 +49,7 @@ export default async function WalkDetailPage({
     .filter(m => m.status === 'ACTIVE')
 
   const userMembership = memberships.find(m => m.user_id === user.id)
-  const observationRows = ownObservations || []
-  if (observationRows.length > 1) {
-    console.error('Expected at most one observation per user per walk slot.', {
-      walkId,
-      userId: user.id,
-      observationIds: observationRows.map((observation) => observation.id),
-    })
-  }
-  const hasSubmittedReport = observationRows.some((observation) => observation.status === 'SUBMITTED')
+  const hasSubmittedReport = (ownObservations || []).some((observation) => observation.status === 'SUBMITTED')
   const slotStart = getWalkStartDateTime(walk.walk_date, walk.start_time)
   const isPastOrStarted = slotStart <= new Date()
   const isFull = memberships.length >= walk.max_volunteers

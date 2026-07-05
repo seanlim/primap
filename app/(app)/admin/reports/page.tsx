@@ -4,7 +4,7 @@ import { ArrowLeft, Search, Users } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
-interface GroupedReport {
+interface Report {
   walkId: string
   roundId: string | null
   roundName: string | null
@@ -16,8 +16,7 @@ interface GroupedReport {
   maxVolunteers: number
   memberCount: number
   submittedAt: string
-  reporters: string[]
-  submittedCount: number
+  // submittedBy: string
 }
 
 /**
@@ -29,13 +28,12 @@ interface ObservationQueryRow {
   slot_id: string
   submitted_at: string | null
   created_at: string
-  profiles: { full_name: string | null; email: string } | null
   walk_slots: {
     location_name: string
     walk_date: string
     start_time: string
     max_volunteers: number
-    slot_memberships: { count: number }[]
+    slot_memberships: { user_id: string; status: string; profiles: { full_name: string | null; email: string } | null }[]
     survey_rounds: {
       id: string
       name: string
@@ -45,27 +43,27 @@ interface ObservationQueryRow {
   } | null
 }
 
-function matchesDateFilter(report: GroupedReport, dateFilter: string) {
+function matchesDateFilter(report: Report, dateFilter: string) {
   return !dateFilter || report.walkDate === dateFilter
 }
 
-function matchesRoundNameFilter(report: GroupedReport, query: string) {
+function matchesRoundNameFilter(report: Report, query: string) {
   const normalized = query.trim().toLowerCase()
   if (!normalized) return true
   return (report.roundName || '').toLowerCase().includes(normalized)
 }
 
-function matchesRoundStatusFilter(report: GroupedReport, status: string) {
+function matchesRoundStatusFilter(report: Report, status: string) {
   return !status || report.roundStatus === status
 }
 
-function matchesLocationFilter(report: GroupedReport, query: string) {
+function matchesLocationFilter(report: Report, query: string) {
   const normalized = query.trim().toLowerCase()
   if (!normalized) return true
   return report.locationName.toLowerCase().includes(normalized)
 }
 
-function matchesWalkStatusFilter(report: GroupedReport, status: string) {
+function matchesWalkStatusFilter(report: Report, status: string) {
   if (!status) return true
   const walkStatus = report.memberCount >= report.maxVolunteers ? 'full' : 'open'
   return walkStatus === status
@@ -98,13 +96,12 @@ export default async function AdminReportsPage({
       slot_id,
       submitted_at,
       created_at,
-      profiles:user_id(full_name, email),
       walk_slots:slot_id(
         location_name,
         walk_date,
         start_time,
         max_volunteers,
-        slot_memberships(count),
+        slot_memberships(user_id, status, profiles:user_id(full_name, email)),
         survey_rounds(id, name, status, start_date)
       )
     `)
@@ -112,19 +109,16 @@ export default async function AdminReportsPage({
     .order('submitted_at', { ascending: false })
 
   const observations = (observationsRaw || []) as unknown as ObservationQueryRow[]
-  const grouped = new Map<string, GroupedReport>()
 
-  for (const obs of observations) {
-    const slot = obs.walk_slots
-    if (!slot) continue
+  const allReports: Report[] = observations
+    .filter((obs): obs is ObservationQueryRow & { walk_slots: NonNullable<ObservationQueryRow['walk_slots']> } => obs.walk_slots !== null)
+    .map((obs) => {
+      const slot = obs.walk_slots
+      const activeMembers = (slot.slot_memberships || []).filter(m => m.status === 'ACTIVE')
+      const reporter = activeMembers[0]
+      const reporterName = reporter?.profiles?.full_name || reporter?.profiles?.email || 'Unknown'
 
-    const reporter = obs.profiles
-    const reporterName = reporter?.full_name || reporter?.email || 'Unknown'
-    const timestamp = obs.submitted_at || obs.created_at
-
-    const existing = grouped.get(obs.slot_id)
-    if (!existing) {
-      grouped.set(obs.slot_id, {
+      return {
         walkId: obs.slot_id,
         roundId: slot.survey_rounds?.id || null,
         roundName: slot.survey_rounds?.name || null,
@@ -134,24 +128,12 @@ export default async function AdminReportsPage({
         walkDate: slot.walk_date,
         startTime: slot.start_time,
         maxVolunteers: slot.max_volunteers,
-        memberCount: slot.slot_memberships?.[0]?.count || 0,
-        submittedAt: timestamp,
-        reporters: [reporterName],
-        submittedCount: 1,
-      })
-      continue
-    }
-
-    existing.submittedCount += 1
-    if (!existing.reporters.includes(reporterName)) {
-      existing.reporters.push(reporterName)
-    }
-    if (new Date(timestamp) > new Date(existing.submittedAt)) {
-      existing.submittedAt = timestamp
-    }
-  }
-
-  const allReports = Array.from(grouped.values()).sort((a, b) => {
+        memberCount: activeMembers.length,
+        submittedAt: obs.submitted_at || obs.created_at,
+        reporterName,
+      }
+    })
+    .sort((a, b) => {
     const leftTime = new Date(`${a.walkDate}T${a.startTime}`).getTime()
     const rightTime = new Date(`${b.walkDate}T${b.startTime}`).getTime()
     return leftTime - rightTime
@@ -188,7 +170,7 @@ export default async function AdminReportsPage({
       roundName: string
       roundStatus: string | null
       roundStartDate: string | null
-      reports: GroupedReport[]
+      reports: Report[]
     }>())
   )
     .map(([, group]) => ({
@@ -335,16 +317,16 @@ export default async function AdminReportsPage({
                             {report.startTime ? ` · ${report.startTime.slice(0, 5)}` : ''}
                           </p>
                           <div className="mt-3 space-y-1 text-xs text-gray-500">
-                            <p className="flex items-center gap-1">
+                            {/* <p className="flex items-center gap-1">
                               <Users className="h-3 w-3" />
-                              {report.reporters.join(', ')}
-                            </p>
-                            <p>Latest submission {new Date(report.submittedAt).toLocaleString('en-SG')}</p>
+                              {report.reporterName}
+                            </p> */}
+                            <p>Submitted {new Date(report.submittedAt).toLocaleString('en-SG')}</p>
                           </div>
                         </div>
                         <div className="shrink-0 px-1 py-1">
                           <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
-                            {report.submittedCount} submitted
+                            Submitted
                           </span>
                         </div>
                       </div>

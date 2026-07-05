@@ -40,24 +40,22 @@ export default async function HomePage() {
     .gte('walk_slots.walk_date', today)
 
   const upcomingMemberships = upcomingWalks || []
-  const activeSlotIds = upcomingMemberships
-    .map((membership) => (membership.walk_slots as unknown as WalkRef)?.id)
-    .filter(Boolean)
 
-  const { count: draftCount } = activeSlotIds.length > 0
-    ? await supabase
-        .from('observations')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('status', 'DRAFT')
-        .in('slot_id', activeSlotIds)
-    : { count: 0 }
-
-  const { count: submittedCount } = await supabase
-    .from('observations')
-    .select('id', { count: 'exact', head: true })
+  const { data: allUserMemberships } = await supabase
+    .from('slot_memberships')
+    .select('slot_id')
     .eq('user_id', user.id)
-    .eq('status', 'SUBMITTED')
+    .eq('status', 'ACTIVE')
+
+  const allUserSlotIds = (allUserMemberships || []).map(m => m.slot_id)
+
+  const { data: observationStatuses } =  await supabase
+      .from('observations')
+      .select('status')
+      .in('slot_id', allUserSlotIds)
+
+  const draftCount = (observationStatuses || []).filter((o) => o.status === 'DRAFT').length
+  const submittedCount = (observationStatuses || []).filter((o) => o.status === 'SUBMITTED').length
 
   const futureWalks = upcomingMemberships
     .map((membership) => {

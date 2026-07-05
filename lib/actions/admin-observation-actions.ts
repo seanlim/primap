@@ -57,7 +57,6 @@ export async function adminGetObservation(observationId: string) {
     .from('observations')
     .select(`
       *,
-      profiles:user_id (full_name, email),
       sightings (*, media:media!media_sighting_id_fkey(*)),
       media:media!media_observation_id_fkey(*)
     `)
@@ -66,10 +65,17 @@ export async function adminGetObservation(observationId: string) {
 
   if (error || !data) return null
 
+  const { data: memberships } = await supabase
+    .from('slot_memberships')
+    .select('user_id, status, profiles:user_id(full_name, email)')
+    .eq('slot_id', data.slot_id)
+
+  const membership = (memberships || []).find((m) => m.status === 'ACTIVE') as { user_id: string; profiles: { full_name: string | null; email: string } | null } | undefined
+
   return {
     id: data.id,
-    userId: data.user_id,
-    userName: data.profiles.full_name || data.profiles.email,
+    userId: membership?.user_id || '',
+    userName: membership?.profiles?.full_name || membership?.profiles?.email || 'Unknown',
     slotId: data.slot_id,
     walkCompletion: data.walk_completion,
     outcome: data.outcome,

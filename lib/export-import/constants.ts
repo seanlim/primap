@@ -1,6 +1,7 @@
 export const TABLE_ORDER = [
   'profiles',
   'survey_rounds',
+  'round_participation_requirements',
   'walk_slots',
   'slot_memberships',
   'observations',
@@ -12,13 +13,36 @@ export const TABLE_ORDER = [
 
 export type TableName = (typeof TABLE_ORDER)[number]
 
+export const TABLE_WORKSHEET_NAMES: Record<TableName, string> = {
+  profiles: 'profiles',
+  survey_rounds: 'survey_rounds',
+  round_participation_requirements: 'round_participation_reqs',
+  walk_slots: 'walk_slots',
+  slot_memberships: 'slot_memberships',
+  observations: 'observations',
+  sightings: 'sightings',
+  media: 'media',
+  incidents: 'incidents',
+  app_settings: 'app_settings',
+}
+
+export const WORKSHEET_TABLE_NAMES = Object.fromEntries(
+  Object.entries(TABLE_WORKSHEET_NAMES).map(([table, worksheet]) => [worksheet, table])
+) as Record<string, TableName>
+
 export const TABLE_COLUMNS: Record<TableName, string[]> = {
   profiles: [
     'id', 'email', 'full_name', 'avatar_url', 'phone_number', 'phone_verified_at',
-    'date_of_birth', 'guardian_phone_number', 'guardian_phone_verified_at',
+    'birth_month',
     'role', 'status', 'created_at', 'updated_at',
   ],
-  survey_rounds: ['id', 'name', 'description', 'start_date', 'end_date', 'status', 'created_by', 'created_at', 'updated_at'],
+  survey_rounds: ['id', 'name', 'description', 'start_date', 'end_date', 'indemnity_form_url', 'status', 'created_by', 'created_at', 'updated_at'],
+  round_participation_requirements: [
+    'id', 'user_id', 'round_id', 'indemnity_acknowledged_at',
+    'guardian_name', 'guardian_email', 'guardian_email_verified_at',
+    'guardian_phone_number', 'guardian_phone_verified_at',
+    'created_at', 'updated_at',
+  ],
   walk_slots: ['id', 'round_id', 'location_name', 'walk_date', 'start_time', 'end_time', 'max_volunteers', 'created_at', 'updated_at'],
   slot_memberships: ['id', 'slot_id', 'user_id', 'status', 'joined_at', 'cancelled_at'],
   observations: ['id', 'slot_id', 'user_id', 'status', 'outcome', 'walk_completion', 'lat', 'lng', 'notes', 'submitted_at', 'client_draft_id', 'last_user_agent', 'created_at', 'updated_at'],

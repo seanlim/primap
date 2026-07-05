@@ -25,9 +25,7 @@ function makeRequest(path: string): NextRequest {
 const completeContact = {
   phone_number: '+6591234567',
   phone_verified_at: '2026-01-01T00:00:00.000Z',
-  date_of_birth: '1990-01-01',
-  guardian_phone_number: null,
-  guardian_phone_verified_at: null,
+  birth_month: '1990-01-01',
 }
 
 describe('middleware', () => {
@@ -107,9 +105,7 @@ describe('middleware', () => {
         role: 'VOLUNTEER',
         phone_number: null,
         phone_verified_at: null,
-        date_of_birth: null,
-        guardian_phone_number: null,
-        guardian_phone_verified_at: null,
+        birth_month: null,
       },
       error: null,
     })

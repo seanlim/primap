@@ -25,7 +25,7 @@ export default async function CompleteProfilePage({
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('*')
+    .select('id, email, full_name, role, status, phone_number, phone_verified_at, birth_month')
     .eq('id', user.id)
     .single()
 
@@ -46,9 +46,7 @@ export default async function CompleteProfilePage({
         status: profile.status,
         phoneNumber: profile.phone_number,
         phoneVerifiedAt: profile.phone_verified_at,
-        dateOfBirth: profile.date_of_birth,
-        guardianPhoneNumber: profile.guardian_phone_number,
-        guardianPhoneVerifiedAt: profile.guardian_phone_verified_at,
+        birthMonth: profile.birth_month,
       }}
     />
   )

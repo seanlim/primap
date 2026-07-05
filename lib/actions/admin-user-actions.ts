@@ -37,7 +37,7 @@ export async function approveUser(userId: string): Promise<AdminActionResult> {
 
   const { data: targetProfile, error: targetError } = await supabase
     .from('profiles')
-    .select('phone_number, phone_verified_at, date_of_birth, guardian_phone_number, guardian_phone_verified_at')
+    .select('phone_number, phone_verified_at, birth_month')
     .eq('id', userId)
     .single()
 

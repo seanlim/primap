@@ -43,6 +43,7 @@ function makeObservation(overrides: Record<string, unknown> = {}) {
     lng: null,
     status: 'SUBMITTED',
     submittedAt: '2026-04-01T10:00:00Z',
+    completionComment: null,
     sightings: [
       {
         id: 'sight-1',

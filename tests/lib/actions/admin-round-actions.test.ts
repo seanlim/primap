@@ -63,6 +63,9 @@ import {
 
 function resetChain() {
   mockSupabase.from.mockReturnValue(methods)
+  for (const key of Object.keys(methods) as (keyof typeof methods)[]) {
+    methods[key].mockReset()
+  }
   methods.select.mockReturnThis()
   methods.insert.mockReturnThis()
   methods.update.mockReturnThis()
@@ -193,6 +196,12 @@ describe('admin-round-actions', () => {
       'updates round status to %s',
       async (status: 'DRAFT' | 'OPEN' | 'CLOSED') => {
         setupAdmin()
+        if (status === 'OPEN') {
+          methods.single.mockResolvedValueOnce({
+            data: { indemnity_form_url: 'https://example.com/form' },
+            error: null,
+          })
+        }
 
         const result = await updateRoundStatus('round-1', status)
 
@@ -203,12 +212,30 @@ describe('admin-round-actions', () => {
       }
     )
 
+    it('blocks opening a round without an indemnity form link', async () => {
+      setupAdmin()
+      methods.single.mockResolvedValueOnce({
+        data: { indemnity_form_url: null },
+        error: null,
+      })
+
+      const result = await updateRoundStatus('round-1', 'OPEN')
+
+      expect(result).toEqual({ error: 'Add an indemnity form link before opening this round' })
+      expect(methods.update).not.toHaveBeenCalled()
+    })
+
     it('returns error on DB failure', async () => {
       setupAdmin()
-      // requireAdmin calls eq once, then action calls eq once
+      methods.single.mockResolvedValueOnce({
+        data: { indemnity_form_url: 'https://example.com/form' },
+        error: null,
+      })
+      // requireAdmin, pre-open form lookup, then status update.
       methods.eq
         .mockReturnValueOnce(methods) // requireAdmin's eq
-        .mockReturnValueOnce({ error: { message: 'Update failed' } }) // action's eq
+        .mockReturnValueOnce(methods) // form lookup eq
+        .mockReturnValueOnce({ error: { message: 'Update failed' } }) // update eq
 
       const result = await updateRoundStatus('round-1', 'OPEN')
 

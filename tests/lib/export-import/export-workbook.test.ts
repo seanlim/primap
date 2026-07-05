@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import ExcelJS from 'exceljs'
 import { buildExportWorkbook } from '@/lib/export-import/export-workbook'
-import { TABLE_ORDER, TABLE_COLUMNS, type TableName } from '@/lib/export-import/constants'
+import { TABLE_ORDER, TABLE_COLUMNS, TABLE_WORKSHEET_NAMES, type TableName } from '@/lib/export-import/constants'
 
 function makeTableData(overrides: Partial<Record<TableName, Record<string, unknown>[]>> = {}) {
   const data = {} as Record<TableName, Record<string, unknown>[]>
@@ -24,7 +24,7 @@ describe('buildExportWorkbook', () => {
 
     expect(workbook.worksheets).toHaveLength(TABLE_ORDER.length)
     for (const table of TABLE_ORDER) {
-      expect(workbook.getWorksheet(table)).toBeDefined()
+      expect(workbook.getWorksheet(TABLE_WORKSHEET_NAMES[table])).toBeDefined()
     }
   })
 
@@ -33,7 +33,7 @@ describe('buildExportWorkbook', () => {
     const workbook = await parseWorkbook(buffer)
 
     const sheetNames = workbook.worksheets.map(ws => ws.name)
-    expect(sheetNames).toEqual([...TABLE_ORDER])
+    expect(sheetNames).toEqual(TABLE_ORDER.map(table => TABLE_WORKSHEET_NAMES[table]))
   })
 
   it('each sheet has correct header row matching TABLE_COLUMNS', async () => {
@@ -41,7 +41,7 @@ describe('buildExportWorkbook', () => {
     const workbook = await parseWorkbook(buffer)
 
     for (const table of TABLE_ORDER) {
-      const ws = workbook.getWorksheet(table)!
+      const ws = workbook.getWorksheet(TABLE_WORKSHEET_NAMES[table])!
       const headerRow = ws.getRow(1)
       const headers: string[] = []
       headerRow.eachCell((cell, colNum) => {
@@ -163,7 +163,7 @@ describe('buildExportWorkbook', () => {
     const workbook = await parseWorkbook(buffer)
 
     for (const table of TABLE_ORDER) {
-      const ws = workbook.getWorksheet(table)!
+      const ws = workbook.getWorksheet(TABLE_WORKSHEET_NAMES[table])!
       expect(ws.rowCount).toBe(1) // header only
     }
   })

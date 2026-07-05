@@ -59,7 +59,7 @@ export async function middleware(request: NextRequest) {
   if (profileCheckRequired) {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('status, role, phone_number, phone_verified_at, date_of_birth, guardian_phone_number, guardian_phone_verified_at')
+      .select('status, role, phone_number, phone_verified_at, birth_month')
       .eq('id', user!.id)
       .single()
 

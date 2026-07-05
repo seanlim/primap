@@ -77,9 +77,7 @@ function setupAdmin() {
 const completeContact = {
   phone_number: '+6591234567',
   phone_verified_at: '2026-01-01T00:00:00.000Z',
-  date_of_birth: '1990-01-01',
-  guardian_phone_number: null,
-  guardian_phone_verified_at: null,
+  birth_month: '1990-01-01',
 }
 
 describe('admin-user-actions', () => {
@@ -158,9 +156,7 @@ describe('admin-user-actions', () => {
         data: {
           phone_number: '+6591234567',
           phone_verified_at: null,
-          date_of_birth: '1990-01-01',
-          guardian_phone_number: null,
-          guardian_phone_verified_at: null,
+          birth_month: '1990-01-01',
         },
         error: null,
       })

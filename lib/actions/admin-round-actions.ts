@@ -73,6 +73,21 @@ async function validateRoundDateAvailability(
   }
 }
 
+function normalizeFormUrl(value?: string | null): { value: string | null; error?: string } {
+  const trimmed = value?.trim() || ''
+  if (!trimmed) return { value: null }
+
+  try {
+    const url = new URL(trimmed)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return { value: null, error: 'Indemnity form link must use http or https' }
+    }
+    return { value: url.toString() }
+  } catch {
+    return { value: null, error: 'Enter a valid indemnity form link' }
+  }
+}
+
 type ObservationDeleteStatus = 'DRAFT' | 'SUBMITTED'
 
 async function deleteObservationsForSlots(
@@ -216,6 +231,7 @@ export async function createRound(data: {
   description?: string
   startDate: string
   endDate: string
+  indemnityFormUrl?: string
 }) {
   const errors: string[] = []
   if (!data.name?.trim()) errors.push('Round name is required')
@@ -223,6 +239,8 @@ export async function createRound(data: {
   if (!data.endDate) errors.push('End date is required')
   if (data.startDate && data.endDate && data.startDate > data.endDate)
     errors.push('Start date must be before end date')
+  const indemnityFormUrl = normalizeFormUrl(data.indemnityFormUrl)
+  if (indemnityFormUrl.error) errors.push(indemnityFormUrl.error)
   if (errors.length > 0) return { error: errors.join('; ') }
 
   const { supabase, userId } = await requireAdmin()
@@ -236,6 +254,7 @@ export async function createRound(data: {
       description: data.description,
       start_date: data.startDate,
       end_date: data.endDate,
+      indemnity_form_url: indemnityFormUrl.value,
       status: 'DRAFT',
       created_by: userId,
     })
@@ -250,6 +269,7 @@ export async function updateRound(roundId: string, data: {
   description?: string
   startDate: string
   endDate: string
+  indemnityFormUrl?: string
 }) {
   const errors: string[] = []
   if (!roundId) errors.push('Round ID is required')
@@ -258,6 +278,8 @@ export async function updateRound(roundId: string, data: {
   if (!data.endDate) errors.push('End date is required')
   if (data.startDate && data.endDate && data.startDate > data.endDate)
     errors.push('Start date must be before end date')
+  const indemnityFormUrl = normalizeFormUrl(data.indemnityFormUrl)
+  if (indemnityFormUrl.error) errors.push(indemnityFormUrl.error)
   if (errors.length > 0) return { error: errors.join('; ') }
 
   const { supabase } = await requireAdmin()
@@ -271,6 +293,7 @@ export async function updateRound(roundId: string, data: {
       description: data.description,
       start_date: data.startDate,
       end_date: data.endDate,
+      indemnity_form_url: indemnityFormUrl.value,
     })
     .eq('id', roundId)
 
@@ -282,6 +305,19 @@ export async function updateRound(roundId: string, data: {
 
 export async function updateRoundStatus(roundId: string, status: 'DRAFT' | 'OPEN' | 'CLOSED') {
   const { supabase } = await requireAdmin()
+
+  if (status === 'OPEN') {
+    const { data: round, error: roundError } = await supabase
+      .from('survey_rounds')
+      .select('indemnity_form_url')
+      .eq('id', roundId)
+      .single()
+
+    if (roundError) return { error: roundError.message }
+    if (!round?.indemnity_form_url) {
+      return { error: 'Add an indemnity form link before opening this round' }
+    }
+  }
 
   const { error } = await supabase
     .from('survey_rounds')

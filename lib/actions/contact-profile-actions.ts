@@ -1,26 +1,19 @@
 'use server'
 
-import { createHash, randomInt } from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 import {
   type ContactDetailsInput,
   normalizePhoneNumber,
-  requiresGuardianContact,
   validateContactDetails,
 } from '@/lib/auth/contact-profile'
-import { sendSms } from '@/lib/sms/twilio'
 
 interface ActionResult {
   success?: true
   error?: string
   phoneNumber?: string
+  alreadyVerified?: boolean
 }
-
-const OTP_EXPIRY_MINUTES = 10
-const OTP_RESEND_SECONDS = 60
-const OTP_MAX_ATTEMPTS = 5
 
 function revalidateContactPaths() {
   revalidatePath('/complete-profile')
@@ -34,23 +27,42 @@ function normalizeOtpToken(token: string): string | null {
   return /^\d{6}$/.test(trimmed) ? trimmed : null
 }
 
-function createOtpCode(): string {
-  if (process.env.GUARDIAN_OTP_TEST_CODE && process.env.NODE_ENV !== 'production') {
-    return process.env.GUARDIAN_OTP_TEST_CODE
-  }
-
-  return randomInt(0, 1_000_000).toString().padStart(6, '0')
+function hasPendingPhoneChange(user: unknown): boolean {
+  return Boolean(getPendingPhoneChange(user))
 }
 
-function hashGuardianOtp(userId: string, phoneNumber: string, code: string): string {
-  const secret =
-    process.env.GUARDIAN_OTP_SECRET ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    'local-guardian-otp-secret'
+function getPendingPhoneChange(user: unknown): string | null {
+  if (!user || typeof user !== 'object') return null
+  const pendingPhone = user as { new_phone?: unknown; phone_change?: unknown }
+  const phone = [pendingPhone.new_phone, pendingPhone.phone_change].find(
+    (value) => typeof value === 'string' && value.length > 0
+  )
+  return typeof phone === 'string' ? phone : null
+}
 
-  return createHash('sha256')
-    .update(`${secret}:${userId}:${phoneNumber}:${code}`)
-    .digest('hex')
+function phoneDigits(value: string | null | undefined): string {
+  return value?.replace(/\D/g, '') ?? ''
+}
+
+function hasPendingPhoneChangeForPhone(user: unknown, phone: string): boolean {
+  const pendingPhone = getPendingPhoneChange(user)
+  return Boolean(pendingPhone && phoneDigits(pendingPhone) === phoneDigits(phone))
+}
+
+function getConfirmedAuthPhoneAt(
+  user: { phone?: string | null; phone_confirmed_at?: string | null } | null | undefined,
+  phone: string
+): string | null {
+  if (!user?.phone_confirmed_at) return null
+  return phoneDigits(user.phone) === phoneDigits(phone) ? user.phone_confirmed_at : null
+}
+
+function formatSmsProviderError(message: string): string {
+  const normalized = message.toLowerCase()
+  if (normalized.includes('sms') || normalized.includes('provider')) {
+    return 'Unable to send SMS provider. Check Supabase Auth SMS settings.'
+  }
+  return message
 }
 
 async function getAuthenticatedUser() {
@@ -71,28 +83,20 @@ export async function saveContactDetails(input: ContactDetailsInput): Promise<Ac
 
   const { data: currentProfile, error: fetchError } = await auth.supabase
     .from('profiles')
-    .select('phone_number, phone_verified_at, guardian_phone_number, guardian_phone_verified_at')
+    .select('phone_number, phone_verified_at')
     .eq('id', auth.user.id)
     .single()
 
   if (fetchError) return { error: fetchError.message }
 
   const currentPhoneStillVerified = currentProfile?.phone_number === contact.phoneNumber
-  const currentGuardianStillVerified =
-    contact.guardianPhoneNumber !== null &&
-    currentProfile?.guardian_phone_number === contact.guardianPhoneNumber
-
   const { error } = await auth.supabase
     .from('profiles')
     .update({
       full_name: contact.fullName,
       phone_number: contact.phoneNumber,
       phone_verified_at: currentPhoneStillVerified ? currentProfile.phone_verified_at : null,
-      date_of_birth: contact.dateOfBirth,
-      guardian_phone_number: contact.guardianPhoneNumber,
-      guardian_phone_verified_at: currentGuardianStillVerified
-        ? currentProfile.guardian_phone_verified_at
-        : null,
+      birth_month: contact.birthMonth,
       updated_at: new Date().toISOString(),
     })
     .eq('id', auth.user.id)
@@ -112,11 +116,74 @@ export async function sendAccountPhoneOtp(phoneNumber: string): Promise<ActionRe
   const phone = normalized.value
   if (!phone) return { error: 'Invalid phone number.' }
 
-  const { error: authError } = await auth.supabase.auth.updateUser({
+  const existingConfirmedAt = getConfirmedAuthPhoneAt(auth.user, phone)
+  if (existingConfirmedAt) {
+    const { error: profileError } = await auth.supabase
+      .from('profiles')
+      .update({
+        phone_number: phone,
+        phone_verified_at: existingConfirmedAt,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', auth.user.id)
+
+    if (profileError) return { error: profileError.message }
+
+    revalidateContactPaths()
+    return { success: true, phoneNumber: phone, alreadyVerified: true }
+  }
+
+  if (hasPendingPhoneChangeForPhone(auth.user, phone)) {
+    const { error: resendError } = await auth.supabase.auth.resend({
+      type: 'phone_change',
+      phone,
+    })
+
+    if (resendError) return { error: formatSmsProviderError(resendError.message) }
+
+    const { error: profileError } = await auth.supabase
+      .from('profiles')
+      .update({
+        phone_number: phone,
+        phone_verified_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', auth.user.id)
+
+    if (profileError) return { error: profileError.message }
+
+    revalidateContactPaths()
+    return { success: true, phoneNumber: phone }
+  }
+
+  const { data: authData, error: authError } = await auth.supabase.auth.updateUser({
     phone,
   })
 
-  if (authError) return { error: authError.message }
+  if (authError) return { error: formatSmsProviderError(authError.message) }
+
+  const updatedConfirmedAt = getConfirmedAuthPhoneAt(authData.user, phone)
+  if (updatedConfirmedAt) {
+    const { error: profileError } = await auth.supabase
+      .from('profiles')
+      .update({
+        phone_number: phone,
+        phone_verified_at: updatedConfirmedAt,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', auth.user.id)
+
+    if (profileError) return { error: profileError.message }
+
+    revalidateContactPaths()
+    return { success: true, phoneNumber: phone, alreadyVerified: true }
+  }
+
+  if (!hasPendingPhoneChange(authData.user)) {
+    return {
+      error: 'Phone verification SMS was not created. Check Supabase Auth phone confirmations and SMS provider settings.',
+    }
+  }
 
   const { error: profileError } = await auth.supabase
     .from('profiles')
@@ -159,153 +226,6 @@ export async function verifyAccountPhoneOtp(phoneNumber: string, token: string):
     .update({
       phone_number: phone,
       phone_verified_at: verifiedAt,
-      updated_at: verifiedAt,
-    })
-    .eq('id', auth.user.id)
-
-  if (profileError) return { error: profileError.message }
-
-  revalidateContactPaths()
-  return { success: true, phoneNumber: phone }
-}
-
-export async function sendGuardianPhoneOtp(phoneNumber: string): Promise<ActionResult> {
-  const auth = await getAuthenticatedUser()
-  if ('error' in auth) return { error: auth.error }
-
-  const normalized = normalizePhoneNumber(phoneNumber, 'Guardian phone number')
-  if (normalized.error) return { error: normalized.error }
-  const phone = normalized.value
-  if (!phone) return { error: 'Invalid guardian phone number.' }
-
-  const { data: profile, error: profileError } = await auth.supabase
-    .from('profiles')
-    .select('date_of_birth')
-    .eq('id', auth.user.id)
-    .single()
-
-  if (profileError) return { error: profileError.message }
-  if (!profile?.date_of_birth || !requiresGuardianContact(profile.date_of_birth)) {
-    return { error: 'Guardian verification is only required for users under 18.' }
-  }
-
-  const admin = createAdminClient()
-  const { data: recentOtp } = await admin
-    .from('guardian_phone_otps')
-    .select('created_at')
-    .eq('user_id', auth.user.id)
-    .eq('phone_number', phone)
-    .is('verified_at', null)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (recentOtp?.created_at) {
-    const secondsSinceLast = (Date.now() - new Date(recentOtp.created_at).getTime()) / 1000
-    if (secondsSinceLast < OTP_RESEND_SECONDS) {
-      return { error: 'Please wait before requesting another guardian code.' }
-    }
-  }
-
-  const code = createOtpCode()
-  const sent = await sendSms({
-    to: phone,
-    body: `Your Primap guardian verification code is ${code}. It expires in ${OTP_EXPIRY_MINUTES} minutes.`,
-  })
-  if (sent.error) return { error: sent.error }
-
-  const now = new Date()
-  const expiresAt = new Date(now.getTime() + OTP_EXPIRY_MINUTES * 60 * 1000).toISOString()
-  const { error: insertError } = await admin
-    .from('guardian_phone_otps')
-    .insert({
-      user_id: auth.user.id,
-      phone_number: phone,
-      code_hash: hashGuardianOtp(auth.user.id, phone, code),
-      expires_at: expiresAt,
-      attempts: 0,
-      created_at: now.toISOString(),
-      updated_at: now.toISOString(),
-    })
-
-  if (insertError) return { error: insertError.message }
-
-  const { error: profileUpdateError } = await auth.supabase
-    .from('profiles')
-    .update({
-      guardian_phone_number: phone,
-      guardian_phone_verified_at: null,
-      updated_at: now.toISOString(),
-    })
-    .eq('id', auth.user.id)
-
-  if (profileUpdateError) return { error: profileUpdateError.message }
-
-  revalidateContactPaths()
-  return { success: true, phoneNumber: phone }
-}
-
-export async function verifyGuardianPhoneOtp(phoneNumber: string, token: string): Promise<ActionResult> {
-  const auth = await getAuthenticatedUser()
-  if ('error' in auth) return { error: auth.error }
-
-  const normalized = normalizePhoneNumber(phoneNumber, 'Guardian phone number')
-  if (normalized.error) return { error: normalized.error }
-  const phone = normalized.value
-  if (!phone) return { error: 'Invalid guardian phone number.' }
-
-  const otp = normalizeOtpToken(token)
-  if (!otp) return { error: 'Enter the 6-digit guardian verification code.' }
-
-  const admin = createAdminClient()
-  const { data: otpRow, error: fetchError } = await admin
-    .from('guardian_phone_otps')
-    .select('id, code_hash, attempts, expires_at')
-    .eq('user_id', auth.user.id)
-    .eq('phone_number', phone)
-    .is('verified_at', null)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (fetchError) return { error: fetchError.message }
-  if (!otpRow) return { error: 'Request a guardian verification code first.' }
-  if (new Date(otpRow.expires_at).getTime() < Date.now()) {
-    return { error: 'Guardian verification code has expired.' }
-  }
-  if (otpRow.attempts >= OTP_MAX_ATTEMPTS) {
-    return { error: 'Too many incorrect attempts. Request a new guardian code.' }
-  }
-
-  const expectedHash = hashGuardianOtp(auth.user.id, phone, otp)
-  if (otpRow.code_hash !== expectedHash) {
-    await admin
-      .from('guardian_phone_otps')
-      .update({
-        attempts: otpRow.attempts + 1,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', otpRow.id)
-
-    return { error: 'Guardian verification code is incorrect.' }
-  }
-
-  const verifiedAt = new Date().toISOString()
-  const { error: otpUpdateError } = await admin
-    .from('guardian_phone_otps')
-    .update({
-      verified_at: verifiedAt,
-      updated_at: verifiedAt,
-    })
-    .eq('id', otpRow.id)
-
-  if (otpUpdateError) return { error: otpUpdateError.message }
-
-  const { error: profileError } = await auth.supabase
-    .from('profiles')
-    .update({
-      guardian_phone_number: phone,
-      guardian_phone_verified_at: verifiedAt,
       updated_at: verifiedAt,
     })
     .eq('id', auth.user.id)

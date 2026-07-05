@@ -22,6 +22,7 @@ export default async function AdminRoundsPage() {
         description: r.description,
         startDate: r.start_date,
         endDate: r.end_date,
+        indemnityFormUrl: r.indemnity_form_url,
         status: r.status,
         walkCount: r.walk_slots[0]?.count,
       }))}

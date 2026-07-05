@@ -240,12 +240,10 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          birth_month: string | null
           created_at: string
-          date_of_birth: string | null
           email: string
           full_name: string | null
-          guardian_phone_number: string | null
-          guardian_phone_verified_at: string | null
           id: string
           phone_number: string | null
           phone_verified_at: string | null
@@ -255,12 +253,10 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          birth_month?: string | null
           created_at?: string
-          date_of_birth?: string | null
           email: string
           full_name?: string | null
-          guardian_phone_number?: string | null
-          guardian_phone_verified_at?: string | null
           id: string
           phone_number?: string | null
           phone_verified_at?: string | null
@@ -270,12 +266,10 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          birth_month?: string | null
           created_at?: string
-          date_of_birth?: string | null
           email?: string
           full_name?: string | null
-          guardian_phone_number?: string | null
-          guardian_phone_verified_at?: string | null
           id?: string
           phone_number?: string | null
           phone_verified_at?: string | null
@@ -285,43 +279,113 @@ export type Database = {
         }
         Relationships: []
       }
-      guardian_phone_otps: {
+      round_participation_requirements: {
+        Row: {
+          created_at: string
+          guardian_email: string | null
+          guardian_email_verified_at: string | null
+          guardian_name: string | null
+          guardian_phone_number: string | null
+          guardian_phone_verified_at: string | null
+          id: string
+          indemnity_acknowledged_at: string | null
+          round_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          guardian_email?: string | null
+          guardian_email_verified_at?: string | null
+          guardian_name?: string | null
+          guardian_phone_number?: string | null
+          guardian_phone_verified_at?: string | null
+          id?: string
+          indemnity_acknowledged_at?: string | null
+          round_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          guardian_email?: string | null
+          guardian_email_verified_at?: string | null
+          guardian_name?: string | null
+          guardian_phone_number?: string | null
+          guardian_phone_verified_at?: string | null
+          id?: string
+          indemnity_acknowledged_at?: string | null
+          round_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "round_participation_requirements_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "survey_rounds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "round_participation_requirements_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      guardian_contact_otps: {
         Row: {
           attempts: number
+          channel: string
           code_hash: string
           created_at: string
+          destination: string
           expires_at: string
           id: string
-          phone_number: string
+          round_id: string
           updated_at: string
           user_id: string
           verified_at: string | null
         }
         Insert: {
           attempts?: number
+          channel: string
           code_hash: string
           created_at?: string
+          destination: string
           expires_at: string
           id?: string
-          phone_number: string
+          round_id: string
           updated_at?: string
           user_id: string
           verified_at?: string | null
         }
         Update: {
           attempts?: number
+          channel?: string
           code_hash?: string
           created_at?: string
+          destination?: string
           expires_at?: string
           id?: string
-          phone_number?: string
+          round_id?: string
           updated_at?: string
           user_id?: string
           verified_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "guardian_phone_otps_user_id_fkey"
+            foreignKeyName: "guardian_contact_otps_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "survey_rounds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guardian_contact_otps_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -425,6 +489,7 @@ export type Database = {
           description: string | null
           end_date: string
           id: string
+          indemnity_form_url: string | null
           name: string
           start_date: string
           status: Database["public"]["Enums"]["round_status"]
@@ -436,6 +501,7 @@ export type Database = {
           description?: string | null
           end_date: string
           id?: string
+          indemnity_form_url?: string | null
           name: string
           start_date: string
           status?: Database["public"]["Enums"]["round_status"]
@@ -447,6 +513,7 @@ export type Database = {
           description?: string | null
           end_date?: string
           id?: string
+          indemnity_form_url?: string | null
           name?: string
           start_date?: string
           status?: Database["public"]["Enums"]["round_status"]
@@ -690,6 +757,8 @@ export const Constants = {
 export type Profile = Tables<"profiles">
 export type AppSettings = Tables<"app_settings">
 export type SurveyRound = Tables<"survey_rounds">
+export type RoundParticipationRequirement = Tables<"round_participation_requirements">
+export type GuardianContactOtp = Tables<"guardian_contact_otps">
 export type WalkSlot = Tables<"walk_slots">
 export type SlotMembership = Tables<"slot_memberships">
 export type Observation = Tables<"observations">

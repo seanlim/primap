@@ -1,7 +1,7 @@
 import { revalidatePath } from 'next/cache'
 
-const { mockSupabase, methods } = vi.hoisted(() => {
-  const methods = {
+const { mockSupabase, methods, mockAdminClient, adminProfileMethods, adminRequirementMethods } = vi.hoisted(() => {
+  const makeMethods = () => ({
     select: vi.fn(),
     insert: vi.fn(),
     update: vi.fn(),
@@ -14,7 +14,8 @@ const { mockSupabase, methods } = vi.hoisted(() => {
     maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
     single: vi.fn().mockResolvedValue({ data: null, error: null }),
     rpc: vi.fn(),
-  }
+  })
+  const methods = makeMethods()
   for (const key of Object.keys(methods) as (keyof typeof methods)[]) {
     if (key !== 'single' && key !== 'maybeSingle' && key !== 'rpc') methods[key].mockReturnThis()
   }
@@ -28,11 +29,29 @@ const { mockSupabase, methods } = vi.hoisted(() => {
     from: vi.fn().mockReturnValue(methods),
     rpc: vi.fn(),
   }
-  return { mockSupabase, methods }
+  const adminProfileMethods = makeMethods()
+  const adminRequirementMethods = makeMethods()
+  for (const query of [adminProfileMethods, adminRequirementMethods]) {
+    for (const key of Object.keys(query) as (keyof typeof query)[]) {
+      if (key !== 'single' && key !== 'maybeSingle' && key !== 'rpc') query[key].mockReturnValue(query)
+    }
+  }
+  const mockAdminClient = {
+    from: vi.fn((table: string) => {
+      if (table === 'profiles') return adminProfileMethods
+      if (table === 'round_participation_requirements') return adminRequirementMethods
+      return methods
+    }),
+  }
+  return { mockSupabase, methods, mockAdminClient, adminProfileMethods, adminRequirementMethods }
 })
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => mockSupabase),
+}))
+
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: vi.fn(() => mockAdminClient),
 }))
 
 vi.mock('@/lib/email', () => ({
@@ -54,6 +73,12 @@ function resetChain() {
   methods.limit.mockReturnThis()
   methods.maybeSingle.mockResolvedValue({ data: null, error: null })
   methods.single.mockResolvedValue({ data: null, error: null })
+  adminProfileMethods.select.mockReturnValue(adminProfileMethods)
+  adminProfileMethods.eq.mockReturnValue(adminProfileMethods)
+  adminProfileMethods.single.mockResolvedValue({ data: null, error: null })
+  adminRequirementMethods.select.mockReturnValue(adminRequirementMethods)
+  adminRequirementMethods.eq.mockReturnValue(adminRequirementMethods)
+  adminRequirementMethods.maybeSingle.mockResolvedValue({ data: null, error: null })
   mockSupabase.rpc.mockResolvedValue({ data: null, error: null })
   mockSupabase.from.mockReturnValue(methods)
   mockSupabase.storage.from.mockReturnValue({
@@ -71,7 +96,13 @@ function mockJoinableSlot(overrides?: Partial<{
   walk_date: string
   start_time: string
   max_volunteers: number
-  survey_rounds: { status: string }
+  survey_rounds: {
+    id: string
+    status: string
+    start_date: string
+    end_date: string
+    indemnity_form_url: string | null
+  }
   slot_memberships: Array<{ user_id: string; status: string }>
 }>) {
   methods.single.mockResolvedValueOnce({
@@ -79,9 +110,38 @@ function mockJoinableSlot(overrides?: Partial<{
       walk_date: '2099-04-15',
       start_time: '08:00',
       max_volunteers: 3,
-      survey_rounds: { status: 'OPEN' },
+      round_id: 'round-1',
+      survey_rounds: {
+        id: 'round-1',
+        status: 'OPEN',
+        start_date: '2099-01-01',
+        end_date: '2099-12-31',
+        indemnity_form_url: 'https://example.com/form',
+      },
       slot_memberships: [],
       ...overrides,
+    },
+    error: null,
+  })
+}
+
+function setupCompleteRoundRequirements() {
+  adminProfileMethods.single.mockResolvedValue({
+    data: {
+      phone_number: '+6591234567',
+      phone_verified_at: '2026-01-01T00:00:00.000Z',
+      birth_month: '1990-01-01',
+    },
+    error: null,
+  })
+  adminRequirementMethods.maybeSingle.mockResolvedValue({
+    data: {
+      indemnity_acknowledged_at: '2026-01-01T00:00:00.000Z',
+      guardian_name: null,
+      guardian_email: null,
+      guardian_email_verified_at: null,
+      guardian_phone_number: null,
+      guardian_phone_verified_at: null,
     },
     error: null,
   })
@@ -188,6 +248,7 @@ describe('walk-actions', () => {
     it('calls RPC and returns success', async () => {
       setupUser()
       mockJoinableSlot()
+      setupCompleteRoundRequirements()
       mockSupabase.rpc.mockResolvedValue({
         data: { success: true, membership_id: 'mem-1', observation_id: 'obs-1' },
         error: null,
@@ -238,6 +299,7 @@ describe('walk-actions', () => {
     it('returns generic DB error from RPC', async () => {
       setupUser()
       mockJoinableSlot()
+      setupCompleteRoundRequirements()
       mockSupabase.rpc.mockResolvedValue({
         data: null,
         error: { message: 'Unexpected error' },
@@ -248,11 +310,31 @@ describe('walk-actions', () => {
       expect(result).toEqual({ error: 'Unexpected error' })
     })
 
+    it('blocks joining when round requirements are incomplete', async () => {
+      setupUser()
+      mockJoinableSlot()
+      adminProfileMethods.single.mockResolvedValue({
+        data: {
+          phone_number: '+6591234567',
+          phone_verified_at: '2026-01-01T00:00:00.000Z',
+          birth_month: '1990-01-01',
+        },
+        error: null,
+      })
+      adminRequirementMethods.maybeSingle.mockResolvedValue({ data: null, error: null })
+
+      const result = await joinWalk('slot-1')
+
+      expect(result).toEqual({ error: 'Complete the round requirements before joining this walk.' })
+      expect(mockSupabase.rpc).not.toHaveBeenCalled()
+    })
+
     it('handles re-join after cancel (RPC reactivates membership)', async () => {
       setupUser()
       mockJoinableSlot({
         slot_memberships: [{ user_id: 'user-1', status: 'CANCELLED' }],
       })
+      setupCompleteRoundRequirements()
       mockSupabase.rpc.mockResolvedValue({
         data: { success: true, membership_id: 'mem-1', observation_id: 'obs-1' },
         error: null,

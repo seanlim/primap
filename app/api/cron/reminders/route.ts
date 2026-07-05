@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { sendWalkReminderEmail } from '@/lib/email';
+import { sendGuardianWalkReminderEmail, sendWalkReminderEmail } from '@/lib/email';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   // Fetch slots for tomorrow
   const { data: slots, error: slotsError } = await supabase
     .from('walk_slots')
-    .select('id, walk_date, start_time, location_name')
+    .select('id, round_id, walk_date, start_time, location_name')
     .eq('walk_date', dateStr);
 
   if (slotsError) {
@@ -63,10 +63,36 @@ export async function GET(req: NextRequest) {
     membersBySlot.set(member.slot_id, list);
   }
 
+  const userIds = [...new Set((allMembers || []).map(member => member.user_id))];
+  const roundIds = [...new Set(slots.map(slot => slot.round_id))];
+  const { data: guardianRequirements, error: guardianRequirementsError } =
+    userIds.length > 0 && roundIds.length > 0
+      ? await supabase
+          .from('round_participation_requirements')
+          .select('user_id, round_id, guardian_name, guardian_email, guardian_email_verified_at')
+          .in('user_id', userIds)
+          .in('round_id', roundIds)
+          .not('guardian_email_verified_at', 'is', null)
+      : { data: [], error: null };
+
+  if (guardianRequirementsError) {
+    console.error('[Cron] Error fetching guardian requirements:', guardianRequirementsError);
+    return NextResponse.json({ error: guardianRequirementsError.message }, { status: 500 });
+  }
+
+  const guardianRequirementByUserRound = new Map(
+    (guardianRequirements || []).map((requirement) => [
+      `${requirement.user_id}:${requirement.round_id}`,
+      requirement,
+    ])
+  );
+
   let emailCount = 0;
+  let guardianEmailCount = 0;
 
   for (const slot of slots) {
     const members = membersBySlot.get(slot.id) || [];
+    const guardianEmailsByAddress = new Map<string, { guardianName: string | null; volunteerNames: string[] }>();
 
     for (const member of members) {
       const profile = member.profiles as unknown as { full_name: string | null; email: string };
@@ -82,8 +108,38 @@ export async function GET(req: NextRequest) {
         );
         emailCount++;
       }
+
+      const guardianRequirement = guardianRequirementByUserRound.get(`${member.user_id}:${slot.round_id}`);
+      if (guardianRequirement?.guardian_email) {
+        const existing = guardianEmailsByAddress.get(guardianRequirement.guardian_email) || {
+          guardianName: guardianRequirement.guardian_name,
+          volunteerNames: [],
+        };
+        existing.volunteerNames.push(profile?.full_name || profile?.email || 'Volunteer');
+        guardianEmailsByAddress.set(guardianRequirement.guardian_email, existing);
+      }
+    }
+
+    for (const [guardianEmail, guardianReminder] of guardianEmailsByAddress) {
+      await sendGuardianWalkReminderEmail(
+        guardianEmail,
+        guardianReminder.guardianName,
+        {
+          date: slot.walk_date,
+          time: slot.start_time,
+          location: slot.location_name,
+        },
+        guardianReminder.volunteerNames
+      );
+      guardianEmailCount++;
+      emailCount++;
     }
   }
 
-  return NextResponse.json({ success: true, emailsSent: emailCount, date: dateStr });
+  return NextResponse.json({
+    success: true,
+    emailsSent: emailCount,
+    guardianEmailsSent: guardianEmailCount,
+    date: dateStr,
+  });
 }

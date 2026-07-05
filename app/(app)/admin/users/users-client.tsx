@@ -19,9 +19,7 @@ interface UserData {
   fullName: string | null
   phoneNumber: string | null
   phoneVerifiedAt: string | null
-  dateOfBirth: string | null
-  guardianPhoneNumber: string | null
-  guardianPhoneVerifiedAt: string | null
+  birthMonth: string | null
   role: Enums<'user_role'>
   status: UserStatus
   createdAt: string
@@ -256,9 +254,7 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, 
               const contactComplete = isProfileContactComplete({
                 phone_number: user.phoneNumber,
                 phone_verified_at: user.phoneVerifiedAt,
-                date_of_birth: user.dateOfBirth,
-                guardian_phone_number: user.guardianPhoneNumber,
-                guardian_phone_verified_at: user.guardianPhoneVerifiedAt,
+                birth_month: user.birthMonth,
               })
 
               return (

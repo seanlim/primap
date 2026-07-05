@@ -15,14 +15,14 @@ Use the following Supabase values provided separately with the submission:
 Demo account credentials are also provided separately.
 
 Phone verification requires Supabase Auth SMS configuration for the account holder phone.
-Under-18 guardian verification uses the app's Twilio environment variables listed below.
+Round participation requires an indemnity form acknowledgement. Under-18 guardian verification uses Resend for guardian email OTPs and Twilio for guardian phone OTPs.
 
 ## Prerequisites
 
 - `Node.js 20+`
 - `npm`
 - A `Mapbox` access token
-- Optional: `Resend` API key for email delivery
+- Optional: `Resend` API key for email delivery and real guardian email OTPs
 - Optional: `Twilio` credentials for guardian phone OTP delivery
 
 ## Setup
@@ -172,4 +172,5 @@ Optional additional checks:
 - Map features require `NEXT_PUBLIC_MAPBOX_TOKEN`.
 - Email features require `RESEND_API_KEY` only if email delivery itself is being evaluated.
 - Account phone verification depends on Supabase Auth SMS settings in the backend.
-- Guardian phone verification uses Twilio directly; `GUARDIAN_OTP_TEST_CODE` bypasses SMS outside production.
+- Guardian email verification uses Resend, guardian phone verification uses Twilio directly, and `GUARDIAN_OTP_TEST_CODE` bypasses both outside production.
+- Admins can configure each round's indemnity form link from `/admin/rounds`; new rounds default to the supplied programme form.

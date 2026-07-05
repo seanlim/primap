@@ -201,3 +201,47 @@ export async function sendWalkReminderEmail(
     <a href="${APP_URL()}/walk" class="button">View My Walks</a>
   `));
 }
+
+export async function sendGuardianEmailVerificationEmail(
+  email: string,
+  guardianName: string | null,
+  volunteerName: string | null,
+  code: string
+) {
+  const displayGuardianName = escapeHtml(guardianName || 'Guardian');
+  const displayVolunteerName = escapeHtml(volunteerName || 'a Primap volunteer');
+  const displayCode = escapeHtml(code);
+
+  await sendEmail(email, 'Primap Guardian Verification Code', wrapHtml(`
+    <p>Hi ${displayGuardianName},</p>
+    <p>${displayVolunteerName} has listed you as their guardian for an upcoming Primap survey round.</p>
+    <p>Use this code to verify your email address:</p>
+    <div style="font-size: 28px; letter-spacing: 6px; font-weight: bold; background-color: #f9fafb; padding: 14px 18px; border-radius: 5px; border: 1px solid #e5e7eb; display: inline-block;">
+      ${displayCode}
+    </div>
+    <p>This code expires in 10 minutes.</p>
+  `));
+}
+
+export async function sendGuardianWalkReminderEmail(
+  email: string,
+  guardianName: string | null,
+  slotInfo: { date: string; time: string; location: string },
+  volunteerNames: string[]
+) {
+  const displayGuardianName = escapeHtml(guardianName || 'Guardian');
+  const names = volunteerNames.length > 0
+    ? volunteerNames.map(name => escapeHtml(name || 'Volunteer')).join(', ')
+    : 'your volunteer';
+
+  await sendEmail(email, 'Reminder: Guardian Volunteer Survey Walk', wrapHtml(`
+    <p>Hi ${displayGuardianName},</p>
+    <p>This is a reminder that ${names} has an upcoming Primap survey walk tomorrow.</p>
+    <div style="background-color: #f0fdf4; padding: 15px; border-radius: 5px; margin: 15px 0; border: 1px solid #bbf7d0;">
+      <p><strong>Date:</strong> ${escapeHtml(slotInfo.date)}</p>
+      <p><strong>Time:</strong> ${escapeHtml(slotInfo.time)}</p>
+      <p><strong>Location:</strong> ${escapeHtml(slotInfo.location)}</p>
+    </div>
+    <p>Please coordinate with the volunteer if plans change.</p>
+  `));
+}

@@ -3,11 +3,12 @@
 import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Pencil, Search, X, ArrowRight, BarChart3, Footprints } from 'lucide-react'
+import { ArrowLeft, Plus, Pencil, Search, X, ArrowRight, BarChart3, Footprints, ExternalLink, FileText } from 'lucide-react'
 import { createRound, updateRound, updateRoundStatus, deleteRound } from '@/lib/actions/admin-round-actions'
 import { formatDate } from '@/lib/utils/format-date'
 import { useToast } from '@/components/ui/toast'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
+import { DEFAULT_INDEMNITY_FORM_URL } from '@/lib/constants/settings'
 
 interface RoundData {
   id: string
@@ -15,6 +16,7 @@ interface RoundData {
   description: string | null
   startDate: string
   endDate: string
+  indemnityFormUrl: string | null
   status: string
   walkCount: number
 }
@@ -28,12 +30,14 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
   const [description, setDescription] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [indemnityFormUrl, setIndemnityFormUrl] = useState(DEFAULT_INDEMNITY_FORM_URL)
   const [loading, setLoading] = useState(false)
   const [editingRoundId, setEditingRoundId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [editStartDate, setEditStartDate] = useState('')
   const [editEndDate, setEditEndDate] = useState('')
+  const [editIndemnityFormUrl, setEditIndemnityFormUrl] = useState('')
   const [deletingRoundId, setDeletingRoundId] = useState<string | null>(null)
   const [forceDeletingRoundId, setForceDeletingRoundId] = useState<string | null>(null)
   // Tracks an in-flight delete so the user can't double-submit by clicking
@@ -65,11 +69,11 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
   const handleCreate = async (e: React.SubmitEvent) => {
     e.preventDefault()
     setLoading(true)
-    const result = await createRound({ name, description, startDate, endDate })
+    const result = await createRound({ name, description, startDate, endDate, indemnityFormUrl })
     if (result.error) showToast(result.error, 'error')
     else {
       setShowForm(false)
-      setName(''); setDescription(''); setStartDate(''); setEndDate('')
+      setName(''); setDescription(''); setStartDate(''); setEndDate(''); setIndemnityFormUrl(DEFAULT_INDEMNITY_FORM_URL)
       router.refresh()
     }
     setLoading(false)
@@ -81,6 +85,7 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
     setEditDescription(round.description || '')
     setEditStartDate(round.startDate)
     setEditEndDate(round.endDate)
+    setEditIndemnityFormUrl(round.indemnityFormUrl || '')
   }
 
   const cancelEdit = () => setEditingRoundId(null)
@@ -94,6 +99,7 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
       description: editDescription,
       startDate: editStartDate,
       endDate: editEndDate,
+      indemnityFormUrl: editIndemnityFormUrl,
     })
     if (result.error) showToast(result.error, 'error')
     else {
@@ -256,6 +262,16 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required />
             </div>
           </div>
+          <div>
+            <label className="text-xs font-medium text-gray-500 mb-1">Indemnity form link</label>
+            <input
+              type="url"
+              value={indemnityFormUrl}
+              onChange={e => setIndemnityFormUrl(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="https://docs.google.com/forms/..."
+            />
+          </div>
           <div className="flex gap-3">
             <button type="button" onClick={() => setShowForm(false)}
               className="flex-1 py-3 border border-gray-300 rounded-xl text-gray-700 text-sm font-medium hover:bg-gray-50">
@@ -297,6 +313,16 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required />
                   </div>
                 </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500">Indemnity form link</label>
+                  <input
+                    type="url"
+                    value={editIndemnityFormUrl}
+                    onChange={e => setEditIndemnityFormUrl(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="https://docs.google.com/forms/..."
+                  />
+                </div>
                 <div className="flex gap-2">
                   <button type="button" onClick={cancelEdit}
                     className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50">Cancel</button>
@@ -315,6 +341,12 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
                     <p className="text-xs text-gray-400 mt-1">
                       {formatDate(round.startDate)} - {formatDate(round.endDate)} &middot; {round.walkCount} walk(s)
                     </p>
+                    <p className={`mt-2 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium ${
+                      round.indemnityFormUrl ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
+                    }`}>
+                      <FileText className="h-3.5 w-3.5" />
+                      {round.indemnityFormUrl ? 'Indemnity form set' : 'Missing indemnity form'}
+                    </p>
                   </div>
                   <span className={`text-xs px-2 py-1 rounded-full font-medium ${
                     round.status === 'OPEN' ? 'bg-green-100 text-green-700'
@@ -330,6 +362,16 @@ export function RoundsClient({ rounds }: { rounds: RoundData[] }) {
                     className="text-xs bg-purple-100 text-purple-700 px-3 py-1.5 rounded-lg hover:bg-purple-200 flex items-center gap-1">
                     <Footprints className="w-3 h-3" /> Walks
                   </Link>
+                  {round.indemnityFormUrl && (
+                    <a
+                      href={round.indemnityFormUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-200 flex items-center gap-1"
+                    >
+                      <ExternalLink className="w-3 h-3" /> Form
+                    </a>
+                  )}
                   <button onClick={() => startEdit(round)}
                     className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg hover:bg-blue-200 flex items-center gap-1">
                     <Pencil className="w-3 h-3" /> Edit

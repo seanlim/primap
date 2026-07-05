@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { LogOut, Check, Pencil, MapPin, Calendar, Footprints, ClipboardList, Eye, Phone, Cake, ShieldCheck } from 'lucide-react'
+import { LogOut, Check, Pencil, MapPin, Calendar, Footprints, ClipboardList, Eye, Phone, CalendarDays } from 'lucide-react'
 import { formatDate } from '@/lib/utils/format-date'
 import { updateProfile } from '@/lib/actions/profile-actions'
 import { signOut } from '@/lib/actions/auth-actions'
@@ -11,7 +11,7 @@ import { SightingLegend } from '@/components/admin/analytics-shared'
 import { EmptyState } from '@/components/ui/empty-state'
 import { MapView } from '@/components/map/map-view'
 import { NOT_SIGHTED_COLOR, getSpeciesColor } from '@/lib/constants/species'
-import { requiresGuardianContact } from '@/lib/auth/contact-profile'
+import { birthMonthToInput } from '@/lib/auth/contact-profile'
 
 interface Props {
   profile: {
@@ -21,9 +21,7 @@ interface Props {
     avatarUrl: string | null
     phoneNumber: string | null
     phoneVerifiedAt: string | null
-    dateOfBirth: string | null
-    guardianPhoneNumber: string | null
-    guardianPhoneVerifiedAt: string | null
+    birthMonth: string | null
     role: string
     status: string
     createdAt: string
@@ -97,7 +95,6 @@ export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: 
   const [name, setName] = useState(profile.fullName || '')
   const [saving, setSaving] = useState(false)
   const router = useRouter()
-  const needsGuardian = profile.dateOfBirth ? requiresGuardianContact(profile.dateOfBirth) : false
 
   const handleSaveName = async () => {
     setSaving(true)
@@ -201,26 +198,14 @@ export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: 
             </div>
           </div>
           <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-3">
-            <Cake className="h-4 w-4 shrink-0 text-gray-500" />
+            <CalendarDays className="h-4 w-4 shrink-0 text-gray-500" />
             <div className="min-w-0">
-              <p className="text-xs text-gray-500">Date of birth</p>
+              <p className="text-xs text-gray-500">Birth month</p>
               <p className="truncate text-sm font-medium text-gray-900">
-                {profile.dateOfBirth ? formatDate(`${profile.dateOfBirth}T00:00:00`, 'compact') : 'Not set'}
+                {birthMonthToInput(profile.birthMonth) || 'Not set'}
               </p>
             </div>
           </div>
-          {(needsGuardian || profile.guardianPhoneNumber) && (
-            <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-3 md:col-span-2">
-              <ShieldCheck className="h-4 w-4 shrink-0 text-gray-500" />
-              <div className="min-w-0">
-                <p className="text-xs text-gray-500">Guardian phone</p>
-                <p className="truncate text-sm font-medium text-gray-900">{profile.guardianPhoneNumber || 'Not set'}</p>
-                <p className={`text-xs ${profile.guardianPhoneVerifiedAt ? 'text-green-600' : 'text-yellow-600'}`}>
-                  {profile.guardianPhoneVerifiedAt ? 'Verified' : 'Verification needed'}
-                </p>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 

@@ -17,6 +17,8 @@ import {
   sendRoleDemotedEmail,
   sendWalkCancellationEmail,
   sendWalkReminderEmail,
+  sendGuardianEmailVerificationEmail,
+  sendGuardianWalkReminderEmail,
   sendIncidentReportedEmail,
 } from '@/lib/email'
 
@@ -506,6 +508,41 @@ describe('email utilities', () => {
 
       const call = mockSend.mock.calls[0][0]
       expect(call.html).toContain('https://primap.org/walk')
+    })
+  })
+
+  describe('guardian emails', () => {
+    const slotInfo = { date: '2025-07-02', time: '08:00', location: 'MacRitchie' }
+
+    it('sends guardian verification code email with escaped names', async () => {
+      await sendGuardianEmailVerificationEmail(
+        'parent@example.com',
+        '<Parent>',
+        'Minor & Volunteer',
+        '123456'
+      )
+
+      const call = mockSend.mock.calls[0][0]
+      expect(call.subject).toBe('Primap Guardian Verification Code')
+      expect(call.to).toBe('parent@example.com')
+      expect(call.html).toContain('&lt;Parent&gt;')
+      expect(call.html).toContain('Minor &amp; Volunteer')
+      expect(call.html).toContain('123456')
+    })
+
+    it('sends guardian walk reminder with volunteer names', async () => {
+      await sendGuardianWalkReminderEmail(
+        'parent@example.com',
+        'Parent One',
+        slotInfo,
+        ['Minor One', 'Minor Two']
+      )
+
+      const call = mockSend.mock.calls[0][0]
+      expect(call.subject).toBe('Reminder: Guardian Volunteer Survey Walk')
+      expect(call.html).toContain('Hi Parent One')
+      expect(call.html).toContain('Minor One, Minor Two')
+      expect(call.html).toContain('MacRitchie')
     })
   })
 })

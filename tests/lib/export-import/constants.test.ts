@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   TABLE_ORDER,
   TABLE_COLUMNS,
+  TABLE_WORKSHEET_NAMES,
   STORAGE_BUCKET,
   EXPORT_XLSX_FILENAME,
   MEDIA_DIR,
@@ -18,8 +19,8 @@ import {
 
 describe('constants', () => {
   describe('TABLE_ORDER', () => {
-    it('contains all 9 tables', () => {
-      expect(TABLE_ORDER).toHaveLength(9)
+    it('contains all 10 exported tables', () => {
+      expect(TABLE_ORDER).toHaveLength(10)
     })
 
     it('lists tables in FK-dependency order (parents before children)', () => {
@@ -33,6 +34,7 @@ describe('constants', () => {
 
       // survey_rounds before walk_slots
       expect(indexOf('survey_rounds')).toBeLessThan(indexOf('walk_slots'))
+      expect(indexOf('survey_rounds')).toBeLessThan(indexOf('round_participation_requirements'))
 
       // walk_slots before slot_memberships, observations, incidents
       expect(indexOf('walk_slots')).toBeLessThan(indexOf('slot_memberships'))
@@ -49,11 +51,19 @@ describe('constants', () => {
 
     it('includes all expected table names', () => {
       const expected = [
-        'profiles', 'survey_rounds', 'walk_slots', 'slot_memberships',
+        'profiles', 'survey_rounds', 'round_participation_requirements', 'walk_slots', 'slot_memberships',
         'observations', 'sightings', 'media', 'incidents', 'app_settings',
       ]
       expect([...TABLE_ORDER]).toEqual(expect.arrayContaining(expected))
       expect(expected).toEqual(expect.arrayContaining([...TABLE_ORDER]))
+    })
+
+    it('defines unique Excel-safe worksheet names for exported tables', () => {
+      const worksheetNames = TABLE_ORDER.map(table => TABLE_WORKSHEET_NAMES[table])
+      expect(new Set(worksheetNames).size).toBe(TABLE_ORDER.length)
+      for (const worksheetName of worksheetNames) {
+        expect(worksheetName.length).toBeLessThanOrEqual(31)
+      }
     })
   })
 
@@ -81,7 +91,18 @@ describe('constants', () => {
 
     it('profiles columns match DB schema', () => {
       expect(TABLE_COLUMNS.profiles).toEqual([
-        'id', 'email', 'full_name', 'avatar_url', 'role', 'status', 'created_at', 'updated_at',
+        'id', 'email', 'full_name', 'avatar_url', 'phone_number', 'phone_verified_at',
+        'birth_month',
+        'role', 'status', 'created_at', 'updated_at',
+      ])
+    })
+
+    it('round requirement columns include indemnity and guardian verification fields', () => {
+      expect(TABLE_COLUMNS.round_participation_requirements).toEqual([
+        'id', 'user_id', 'round_id', 'indemnity_acknowledged_at',
+        'guardian_name', 'guardian_email', 'guardian_email_verified_at',
+        'guardian_phone_number', 'guardian_phone_verified_at',
+        'created_at', 'updated_at',
       ])
     })
 

@@ -1,5 +1,5 @@
 import ExcelJS from 'exceljs'
-import { TABLE_ORDER, TABLE_COLUMNS, type TableName } from './constants'
+import { TABLE_ORDER, TABLE_COLUMNS, TABLE_WORKSHEET_NAMES, type TableName } from './constants'
 
 export async function buildExportWorkbook(
   tableData: Record<TableName, Record<string, unknown>[]>
@@ -11,7 +11,7 @@ export async function buildExportWorkbook(
   for (const table of TABLE_ORDER) {
     const columns = TABLE_COLUMNS[table]
     const rows = tableData[table] ?? []
-    const worksheet = workbook.addWorksheet(table)
+    const worksheet = workbook.addWorksheet(TABLE_WORKSHEET_NAMES[table])
 
     // Header row
     worksheet.addRow(columns)

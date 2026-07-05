@@ -1,8 +1,13 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { withTimeout } from '@/lib/utils/with-timeout'
+import {
+  formatPhoneNumberInput,
+  normalizeBirthMonth,
+  normalizePhoneNumber,
+} from '@/lib/auth/contact-profile'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -10,7 +15,11 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
+  const [fullName, setFullName] = useState('')
+  const [phoneNumber, setPhoneNumber] = useState('')
+  const [birthMonth, setBirthMonth] = useState('')
   const supabase = createClient()
+  const birthMonthValidation = useMemo(() => normalizeBirthMonth(birthMonth), [birthMonth])
 
   const handleGoogleSignIn = async () => {
     setLoading(true)
@@ -58,15 +67,37 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signUp({
+    const normalizedPhone = normalizePhoneNumber(phoneNumber)
+    if (normalizedPhone.error) {
+      setError(normalizedPhone.error)
+      setLoading(false)
+      return
+    }
+
+    const normalizedBirthMonth = normalizeBirthMonth(birthMonth)
+    if (normalizedBirthMonth.error) {
+      setError(normalizedBirthMonth.error)
+      setLoading(false)
+      return
+    }
+
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
+        data: {
+          full_name: fullName.trim() || null,
+          phone_number: normalizedPhone.value,
+          birth_month: normalizedBirthMonth.value,
+        },
       },
     })
     if (error) {
       setError(error.message)
+    } else if (data.session) {
+      window.location.assign('/complete-profile')
+      return
     } else {
       setError('Check your email for the confirmation link!')
     }
@@ -74,11 +105,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="bg-white p-8 rounded-2xl shadow-lg max-w-sm w-full">
-        <div className="text-center mb-8">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+      <div className="w-full max-w-sm rounded-lg bg-white p-8 shadow-lg">
+        <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-green-700">Primap</h1>
-          <p className="text-gray-500 mt-2 text-sm">
+          <p className="mt-2 text-sm text-gray-500">
             Primate Survey Walks Platform
           </p>
         </div>
@@ -86,9 +117,9 @@ export default function LoginPage() {
         <button
           onClick={handleGoogleSignIn}
           disabled={loading}
-          className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 text-gray-700 py-3 px-4 rounded-xl hover:bg-gray-50 disabled:opacity-50 font-medium transition-colors"
+          className="flex w-full items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-3 font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
         >
-          <svg className="w-5 h-5" viewBox="0 0 24 24">
+          <svg className="h-5 w-5" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
@@ -107,26 +138,54 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={mode === 'signin' ? handleEmailSignIn : handleEmailSignUp} className="space-y-4">
-          <div>
+          {mode === 'signup' && (
             <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
-              required
+              type="text"
+              placeholder="Display name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-green-500"
             />
-          </div>
-          <div>
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
-              required
-            />
-          </div>
+          )}
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-green-500"
+            required
+          />
+          {mode === 'signup' && (
+            <>
+              <input
+                type="tel"
+                placeholder="Phone number"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(formatPhoneNumberInput(e.target.value))}
+                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-green-500"
+                required
+              />
+              <input
+                type="month"
+                aria-label="Birth month"
+                value={birthMonth}
+                onChange={(e) => setBirthMonth(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-500 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-green-500"
+                required
+              />
+              {birthMonth && birthMonthValidation.error && (
+                <p className="text-sm text-red-500">{birthMonthValidation.error}</p>
+              )}
+            </>
+          )}
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-green-500"
+            required
+          />
           {error && (
             <p className={`text-sm ${error.includes('Check your email') ? 'text-green-600' : 'text-red-500'}`}>
               {error}
@@ -135,24 +194,24 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-green-600 text-white py-3 px-4 rounded-xl hover:bg-green-700 disabled:opacity-50 font-medium transition-colors"
+            className="w-full rounded-lg bg-green-600 px-4 py-3 font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
           >
             {loading ? 'Loading...' : mode === 'signin' ? 'Sign In' : 'Sign Up'}
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-500 mt-6">
+        <p className="mt-6 text-center text-sm text-gray-500">
           {mode === 'signin' ? (
             <>
               Don&apos;t have an account?{' '}
-              <button onClick={() => setMode('signup')} className="text-green-600 font-medium hover:underline">
+              <button onClick={() => setMode('signup')} className="font-medium text-green-600 hover:underline">
                 Sign Up
               </button>
             </>
           ) : (
             <>
               Already have an account?{' '}
-              <button onClick={() => setMode('signin')} className="text-green-600 font-medium hover:underline">
+              <button onClick={() => setMode('signin')} className="font-medium text-green-600 hover:underline">
                 Sign In
               </button>
             </>

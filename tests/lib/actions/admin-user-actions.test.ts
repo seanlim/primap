@@ -74,6 +74,12 @@ function setupAdmin() {
   methods.single.mockResolvedValueOnce({ data: { role: 'ADMIN' }, error: null })
 }
 
+const completeContact = {
+  phone_number: '+6591234567',
+  phone_verified_at: '2026-01-01T00:00:00.000Z',
+  birth_month: '1990-01-01',
+}
+
 describe('admin-user-actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -105,6 +111,10 @@ describe('admin-user-actions', () => {
     it('approves user, sends email, and revalidates', async () => {
       setupAdmin()
       methods.single.mockResolvedValueOnce({
+        data: completeContact,
+        error: null,
+      })
+      methods.single.mockResolvedValueOnce({
         data: { email: 'user@test.com', full_name: 'Test User' },
         error: null,
       })
@@ -126,6 +136,10 @@ describe('admin-user-actions', () => {
     it('returns error on DB failure', async () => {
       setupAdmin()
       methods.single.mockResolvedValueOnce({
+        data: completeContact,
+        error: null,
+      })
+      methods.single.mockResolvedValueOnce({
         data: null,
         error: { message: 'DB error' },
       })
@@ -133,6 +147,24 @@ describe('admin-user-actions', () => {
       const result = await approveUser('user-2')
 
       expect(result).toEqual({ error: 'DB error' })
+      expect(sendAccountApprovedEmail).not.toHaveBeenCalled()
+    })
+
+    it('blocks approval when contact verification is incomplete', async () => {
+      setupAdmin()
+      methods.single.mockResolvedValueOnce({
+        data: {
+          phone_number: '+6591234567',
+          phone_verified_at: null,
+          birth_month: '1990-01-01',
+        },
+        error: null,
+      })
+
+      const result = await approveUser('user-2')
+
+      expect(result).toEqual({ error: 'User must complete phone verification before approval' })
+      expect(methods.update).not.toHaveBeenCalled()
       expect(sendAccountApprovedEmail).not.toHaveBeenCalled()
     })
   })

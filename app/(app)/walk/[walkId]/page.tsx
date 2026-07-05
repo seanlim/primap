@@ -1,8 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect, notFound } from 'next/navigation'
 import { WalkDetailClient } from './walk-detail-client'
-import type { MembershipWithProfile } from '@/lib/types/supabase-helpers'
 import { getJoinBlockInfo, getWalkStartDateTime } from '@/lib/utils/walk-participation'
+import { getRoundRequirementStatus } from '@/lib/auth/round-requirements'
+import type { RoundRequirementViewModel } from './round-requirements-panel'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,13 +30,13 @@ export default async function WalkDetailPage({
       .from('walk_slots')
       .select(`
         *,
-        survey_rounds (name, status),
+        survey_rounds (id, name, status, start_date, end_date, indemnity_form_url),
         slot_memberships (
           id,
           user_id,
           status,
           joined_at,
-          profiles:user_id (full_name, email, avatar_url)
+          profiles:user_id (full_name, email, avatar_url, phone_number, phone_verified_at)
         )
       `)
       .eq('id', walkId)
@@ -49,8 +51,31 @@ export default async function WalkDetailPage({
 
   if (!walk) notFound()
 
-  const round = walk.survey_rounds as unknown as { name: string; status: string }
-  const memberships = (walk.slot_memberships as unknown as MembershipWithProfile[])
+  interface WalkRoundRef {
+    id: string
+    name: string
+    status: string
+    start_date: string
+    end_date: string
+    indemnity_form_url: string | null
+  }
+
+  interface MembershipWithContactProfile {
+    id: string
+    user_id: string
+    status: string
+    joined_at: string
+    profiles: {
+      full_name: string | null
+      email: string
+      avatar_url: string | null
+      phone_number: string | null
+      phone_verified_at: string | null
+    } | null
+  }
+
+  const round = walk.survey_rounds as unknown as WalkRoundRef
+  const memberships = (walk.slot_memberships as unknown as MembershipWithContactProfile[])
     .filter(m => m.status === 'ACTIVE')
 
   const userMembership = memberships.find(m => m.user_id === user.id)
@@ -80,6 +105,41 @@ export default async function WalkDetailPage({
       })
     : null
 
+  const admin = createAdminClient()
+  const [{ data: contactProfile }, { data: requirement }] = await Promise.all([
+    admin
+      .from('profiles')
+      .select('birth_month')
+      .eq('id', user.id)
+      .single(),
+    admin
+      .from('round_participation_requirements')
+      .select('indemnity_acknowledged_at, guardian_name, guardian_email, guardian_email_verified_at, guardian_phone_number, guardian_phone_verified_at')
+      .eq('user_id', user.id)
+      .eq('round_id', round.id)
+      .maybeSingle(),
+  ])
+
+  const requirementStatus = getRoundRequirementStatus(
+    { birth_month: contactProfile?.birth_month ?? null },
+    round,
+    requirement ?? null
+  )
+
+  const roundRequirement: RoundRequirementViewModel = {
+    roundId: round.id,
+    formUrl: round.indemnity_form_url,
+    requiresGuardian: requirementStatus.requiresGuardian,
+    complete: requirementStatus.complete,
+    missingFields: requirementStatus.missingFields,
+    indemnityAcknowledgedAt: requirement?.indemnity_acknowledged_at ?? null,
+    guardianName: requirement?.guardian_name ?? null,
+    guardianEmail: requirement?.guardian_email ?? null,
+    guardianEmailVerifiedAt: requirement?.guardian_email_verified_at ?? null,
+    guardianPhoneNumber: requirement?.guardian_phone_number ?? null,
+    guardianPhoneVerifiedAt: requirement?.guardian_phone_verified_at ?? null,
+  }
+
   return (
     <WalkDetailClient
       walk={{
@@ -97,8 +157,12 @@ export default async function WalkDetailPage({
         userId: m.user_id,
         fullName: m.profiles?.full_name || null,
         email: m.profiles?.email || '',
+        phoneNumber: userMembership && m.profiles?.phone_verified_at
+          ? m.profiles.phone_number
+          : null,
         joinedAt: m.joined_at,
       }))}
+      roundRequirement={roundRequirement}
       isJoined={!!userMembership}
       isFull={isFull}
       currentUserId={user.id}

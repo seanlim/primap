@@ -14,12 +14,16 @@ Use the following Supabase values provided separately with the submission:
 
 Demo account credentials are also provided separately.
 
+Phone verification requires Supabase Auth SMS configuration for the account holder phone.
+Round participation requires an indemnity form acknowledgement. Under-18 guardian verification uses Resend for guardian email OTPs and Twilio for guardian phone OTPs.
+
 ## Prerequisites
 
 - `Node.js 20+`
 - `npm`
 - A `Mapbox` access token
-- Optional: `Resend` API key for email delivery
+- Optional: `Resend` API key for email delivery and real guardian email OTPs
+- Optional: `Twilio` credentials for guardian phone OTP delivery
 
 ## Setup
 
@@ -45,6 +49,8 @@ Additional setup notes:
 
 - Use your own Mapbox token unless one is also provided for evaluation.
 - If email delivery is not being tested, `RESEND_API_KEY` can be left blank.
+- If guardian OTP delivery is not being tested, set `GUARDIAN_OTP_TEST_CODE` for local verification.
+- Supabase Auth SMS must be configured in the shared backend for account phone verification.
 - Set `NEXT_PUBLIC_APP_URL` to `http://localhost:3000`.
 - `CRON_SECRET` can be any non-empty string unless the cron reminder route is being tested.
 
@@ -55,6 +61,12 @@ SUPABASE_SERVICE_ROLE_KEY=
 NEXT_PUBLIC_MAPBOX_TOKEN=
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=Primap <no-reply@primap.org>
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_MESSAGING_SERVICE_SID=
+TWILIO_FROM_PHONE=
+GUARDIAN_OTP_SECRET=
+GUARDIAN_OTP_TEST_CODE=
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 CRON_SECRET=
 ```
@@ -159,3 +171,6 @@ Optional additional checks:
 - The shared backend already includes report, incident, and media data. Fresh uploads may also be performed during testing if media upload flows are being evaluated directly.
 - Map features require `NEXT_PUBLIC_MAPBOX_TOKEN`.
 - Email features require `RESEND_API_KEY` only if email delivery itself is being evaluated.
+- Account phone verification depends on Supabase Auth SMS settings in the backend.
+- Guardian email verification uses Resend, guardian phone verification uses Twilio directly, and `GUARDIAN_OTP_TEST_CODE` bypasses both outside production.
+- Admins can configure each round's indemnity form link from `/admin/rounds`; new rounds default to the supplied programme form.

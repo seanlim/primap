@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs'
+import { WORKSHEET_TABLE_NAMES } from './constants'
 
 export async function parseWorkbookToTableData(
   buffer: Buffer | ArrayBuffer
@@ -9,7 +10,7 @@ export async function parseWorkbookToTableData(
   const result: Record<string, Record<string, unknown>[]> = {}
 
   workbook.eachSheet(worksheet => {
-    const sheetName = worksheet.name
+    const sheetName = WORKSHEET_TABLE_NAMES[worksheet.name] ?? worksheet.name
     result[sheetName] = parseSheetRows(worksheet)
   })
 

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { LogOut, Check, Pencil, MapPin, Calendar, Footprints, ClipboardList, Eye } from 'lucide-react'
+import { LogOut, Check, Pencil, MapPin, Calendar, Footprints, ClipboardList, Eye, Phone, CalendarDays } from 'lucide-react'
 import { formatDate } from '@/lib/utils/format-date'
 import { updateProfile } from '@/lib/actions/profile-actions'
 import { signOut } from '@/lib/actions/auth-actions'
@@ -11,6 +11,7 @@ import { SightingLegend } from '@/components/admin/analytics-shared'
 import { EmptyState } from '@/components/ui/empty-state'
 import { MapView } from '@/components/map/map-view'
 import { NOT_SIGHTED_COLOR, getSpeciesColor } from '@/lib/constants/species'
+import { birthMonthToInput } from '@/lib/auth/contact-profile'
 
 interface Props {
   profile: {
@@ -18,6 +19,9 @@ interface Props {
     email: string
     fullName: string | null
     avatarUrl: string | null
+    phoneNumber: string | null
+    phoneVerifiedAt: string | null
+    birthMonth: string | null
     role: string
     status: string
     createdAt: string
@@ -94,7 +98,7 @@ export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: 
 
   const handleSaveName = async () => {
     setSaving(true)
-    await updateProfile(name)
+    await updateProfile({ fullName: name })
     setEditingName(false)
     setSaving(false)
     router.refresh()
@@ -165,6 +169,42 @@ export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: 
             <p className="text-sm font-medium text-white">
               {formatDate(profile.createdAt, 'monthYear')}
             </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Contact Details</h2>
+            <p className="mt-1 text-sm text-gray-500">Used by coordinators for walk and safety follow-up.</p>
+          </div>
+          <Link
+            href="/complete-profile"
+            className="shrink-0 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-200"
+          >
+            Manage
+          </Link>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-3">
+            <Phone className="h-4 w-4 shrink-0 text-gray-500" />
+            <div className="min-w-0">
+              <p className="text-xs text-gray-500">Account phone</p>
+              <p className="truncate text-sm font-medium text-gray-900">{profile.phoneNumber || 'Not set'}</p>
+              <p className={`text-xs ${profile.phoneVerifiedAt ? 'text-green-600' : 'text-yellow-600'}`}>
+                {profile.phoneVerifiedAt ? 'Verified' : 'Verification needed'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-3">
+            <CalendarDays className="h-4 w-4 shrink-0 text-gray-500" />
+            <div className="min-w-0">
+              <p className="text-xs text-gray-500">Birth month</p>
+              <p className="truncate text-sm font-medium text-gray-900">
+                {birthMonthToInput(profile.birthMonth) || 'Not set'}
+              </p>
+            </div>
           </div>
         </div>
       </div>

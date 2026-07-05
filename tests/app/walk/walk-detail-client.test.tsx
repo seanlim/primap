@@ -25,6 +25,20 @@ function createDeferred<T>() {
 }
 
 function renderWalkDetail(overrides: Partial<ComponentProps<typeof WalkDetailClient>> = {}) {
+  const completeRoundRequirement = {
+    roundId: 'round-1',
+    formUrl: 'https://example.com/form',
+    requiresGuardian: false,
+    complete: true,
+    missingFields: [],
+    indemnityAcknowledgedAt: '2026-01-01T00:00:00.000Z',
+    guardianName: null,
+    guardianEmail: null,
+    guardianEmailVerifiedAt: null,
+    guardianPhoneNumber: null,
+    guardianPhoneVerifiedAt: null,
+  }
+
   return render(
     <WalkDetailClient
       walk={{
@@ -39,6 +53,7 @@ function renderWalkDetail(overrides: Partial<ComponentProps<typeof WalkDetailCli
         joinBlockedInfo: null,
       }}
       members={[]}
+      roundRequirement={completeRoundRequirement}
       isJoined={false}
       isFull={false}
       currentUserId="user-1"
@@ -80,6 +95,7 @@ describe('WalkDetailClient', () => {
         userId: 'user-1',
         fullName: 'June',
         email: 'june@example.com',
+        phoneNumber: null,
         joinedAt: '2099-04-01T08:00:00.000Z',
       }],
     })
@@ -108,6 +124,7 @@ describe('WalkDetailClient', () => {
         userId: 'user-1',
         fullName: 'June',
         email: 'june@example.com',
+        phoneNumber: null,
         joinedAt: '2099-04-01T08:00:00.000Z',
       }],
     })
@@ -136,6 +153,7 @@ describe('WalkDetailClient', () => {
         userId: 'user-1',
         fullName: 'June',
         email: 'june@example.com',
+        phoneNumber: null,
         joinedAt: '2099-04-01T08:00:00.000Z',
       }],
     })
@@ -180,5 +198,26 @@ describe('WalkDetailClient', () => {
 
     expect(screen.getByRole('button', { name: 'Round Closed' })).toBeDisabled()
     expect(screen.getByText('This survey round is no longer open for volunteer signup.')).toBeInTheDocument()
+  })
+
+  it('blocks joining until round requirements are complete', () => {
+    renderWalkDetail({
+      roundRequirement: {
+        roundId: 'round-1',
+        formUrl: 'https://example.com/form',
+        requiresGuardian: false,
+        complete: false,
+        missingFields: ['indemnity_acknowledgement'],
+        indemnityAcknowledgedAt: null,
+        guardianName: null,
+        guardianEmail: null,
+        guardianEmailVerifiedAt: null,
+        guardianPhoneNumber: null,
+        guardianPhoneVerifiedAt: null,
+      },
+    })
+
+    expect(screen.getByRole('button', { name: 'Complete Requirements' })).toBeDisabled()
+    expect(screen.getByText('Round requirements')).toBeInTheDocument()
   })
 })

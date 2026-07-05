@@ -51,6 +51,20 @@ describe('parseWorkbookToTableData', () => {
     expect(result.empty_table).toEqual([])
   })
 
+  it('maps worksheet aliases back to table names', async () => {
+    const buffer = await createTestWorkbook({
+      round_participation_reqs: {
+        headers: ['id', 'user_id', 'round_id'],
+        rows: [['req-1', 'user-1', 'round-1']],
+      },
+    })
+
+    const result = await parseWorkbookToTableData(buffer)
+
+    expect(result.round_participation_requirements).toHaveLength(1)
+    expect(result.round_participation_requirements[0].id).toBe('req-1')
+  })
+
   it('handles workbook with no sheets', async () => {
     const workbook = new ExcelJS.Workbook()
     const arrayBuffer = await workbook.xlsx.writeBuffer()

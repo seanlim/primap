@@ -3,12 +3,13 @@
 import { useRef, useState, useOptimistic, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { joinWalk, cancelWalk } from '@/lib/actions/walk-actions'
-import { MapPin, Calendar, Clock, Users } from 'lucide-react'
+import { MapPin, Calendar, Clock, Users, Phone } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { Breadcrumb } from '@/components/ui/breadcrumb'
 import { useToast } from '@/components/ui/toast'
 import { formatDate } from '@/lib/utils/format-date'
 import type { JoinBlockInfo } from '@/lib/utils/walk-participation'
+import { RoundRequirementsPanel, type RoundRequirementViewModel } from './round-requirements-panel'
 
 interface WalkDetailProps {
   walk: {
@@ -26,8 +27,10 @@ interface WalkDetailProps {
     userId: string
     fullName: string | null
     email: string
+    phoneNumber: string | null
     joinedAt: string
   }[]
+  roundRequirement: RoundRequirementViewModel
   isJoined: boolean
   isFull: boolean
   currentUserId: string
@@ -35,7 +38,7 @@ interface WalkDetailProps {
   hasSubmittedReport: boolean
 }
 
-export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserId, lateCancelWarning, hasSubmittedReport }: WalkDetailProps) {
+export function WalkDetailClient({ walk, members, roundRequirement, isJoined, isFull, currentUserId, lateCancelWarning, hasSubmittedReport }: WalkDetailProps) {
   const [error, setError] = useState('')
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -63,7 +66,7 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
   const isJoining = isPending && pendingAction === 'join'
   const isCancelling = isPending && pendingAction === 'cancel'
   const displayIsJoined = isCancelling ? true : isJoining ? false : optimistic.isJoined
-  const joinDisabled = isPending || optimistic.isFull || !!walk.joinBlockedInfo
+  const joinDisabled = isPending || optimistic.isFull || !!walk.joinBlockedInfo || !roundRequirement.complete
 
   const handleJoin = () => {
     setError('')
@@ -145,6 +148,10 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
           <p className="text-sm text-red-500 bg-red-50 p-3 rounded-lg">{error}</p>
         )}
 
+        {!roundRequirement.complete && (
+          <RoundRequirementsPanel requirement={roundRequirement} />
+        )}
+
         {displayIsJoined ? (
           <div className="space-y-2">
             <div className="bg-green-50 border border-green-200 p-3 rounded-lg text-center">
@@ -171,7 +178,7 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
               disabled={joinDisabled}
               className="w-full bg-green-600 text-white py-3 px-4 rounded-xl hover:bg-green-700 disabled:opacity-50 font-medium transition-colors"
             >
-              {isJoining ? 'Joining...' : walk.joinBlockedInfo?.label || 'Join Walk'}
+              {isJoining ? 'Joining...' : walk.joinBlockedInfo?.label || (!roundRequirement.complete ? 'Complete Requirements' : 'Join Walk')}
             </button>
             {walk.joinBlockedInfo && (
               <p className="text-xs text-gray-500 text-center">{walk.joinBlockedInfo.description}</p>
@@ -212,6 +219,15 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
                   <p className="text-xs text-gray-400">
                     Joined {formatDate(member.joinedAt)}
                   </p>
+                  {member.phoneNumber && (
+                    <a
+                      href={`tel:${member.phoneNumber}`}
+                      className="mt-1 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-green-700"
+                    >
+                      <Phone className="h-3.5 w-3.5" />
+                      {member.phoneNumber}
+                    </a>
+                  )}
                 </div>
               </div>
             ))}

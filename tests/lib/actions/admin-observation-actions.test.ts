@@ -204,7 +204,39 @@ describe('admin-observation-actions', () => {
 
   // ─── adminGetObservation ─────────────────────────────────────────────
 
+  // adminGetObservation makes TWO queries: observations (select+single), then
+  // slot_memberships (select, filtered client-side to the ACTIVE member) to
+  // resolve userId/userName, since `observations` no longer has a user_id column.
+  function setupGetObservationMocks(
+    observationData: Record<string, unknown> | null,
+    memberships: Array<{ user_id: string; status: string; profiles: { full_name: string | null; email: string } | null }> = []
+  ) {
+    mockAdminSupabase.from.mockImplementation((table: string) => {
+      if (table === 'observations') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({ data: observationData, error: null }),
+            }),
+          }),
+        }
+      }
+      if (table === 'slot_memberships') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ data: memberships, error: null }),
+          }),
+        }
+      }
+      return adminMethods
+    })
+  }
+
   describe('adminGetObservation', () => {
+    afterEach(() => {
+      mockAdminSupabase.from.mockReturnValue(adminMethods)
+    })
+
     it('returns null when observation is not found', async () => {
       setupAdmin()
       adminMethods.single.mockResolvedValueOnce({
@@ -220,10 +252,9 @@ describe('admin-observation-actions', () => {
 
     it('returns the full observation with sightings and media', async () => {
       setupAdmin()
-      adminMethods.single.mockResolvedValueOnce({
-        data: {
+      setupGetObservationMocks(
+        {
           id: 'obs-1',
-          user_id: 'user-1',
           slot_id: 'slot-1',
           walk_completion: 'COMPLETED',
           outcome: 'SIGHTED',
@@ -231,7 +262,6 @@ describe('admin-observation-actions', () => {
           lat: null,
           lng: null,
           status: 'SUBMITTED',
-          profiles: { full_name: 'Alice', email: 'alice@test.com' },
           sightings: [
             {
               id: 'sight-1',
@@ -247,8 +277,8 @@ describe('admin-observation-actions', () => {
           ],
           media: [],
         },
-        error: null,
-      })
+        [{ user_id: 'user-1', status: 'ACTIVE', profiles: { full_name: 'Alice', email: 'alice@test.com' } }]
+      )
 
       const result = await adminGetObservation('obs-1')
 
@@ -269,10 +299,9 @@ describe('admin-observation-actions', () => {
 
     it('uses email as userName when full_name is null', async () => {
       setupAdmin()
-      adminMethods.single.mockResolvedValueOnce({
-        data: {
+      setupGetObservationMocks(
+        {
           id: 'obs-1',
-          user_id: 'user-1',
           slot_id: 'slot-1',
           walk_completion: 'COMPLETED',
           outcome: 'NOT_SIGHTED',
@@ -280,16 +309,39 @@ describe('admin-observation-actions', () => {
           lat: 1.35,
           lng: 103.82,
           status: 'SUBMITTED',
-          profiles: { full_name: null, email: 'alice@test.com' },
           sightings: [],
           media: [],
         },
-        error: null,
-      })
+        [{ user_id: 'user-1', status: 'ACTIVE', profiles: { full_name: null, email: 'alice@test.com' } }]
+      )
 
       const result = await adminGetObservation('obs-1')
 
       expect(result!.userName).toBe('alice@test.com')
+    })
+
+    it('falls back to "Unknown" when no ACTIVE membership is found', async () => {
+      setupAdmin()
+      setupGetObservationMocks(
+        {
+          id: 'obs-1',
+          slot_id: 'slot-1',
+          walk_completion: 'COMPLETED',
+          outcome: 'NOT_SIGHTED',
+          notes: null,
+          lat: 1.35,
+          lng: 103.82,
+          status: 'SUBMITTED',
+          sightings: [],
+          media: [],
+        },
+        [{ user_id: 'user-cancelled', status: 'CANCELLED', profiles: { full_name: 'Bob', email: 'bob@test.com' } }]
+      )
+
+      const result = await adminGetObservation('obs-1')
+
+      expect(result!.userId).toBe('')
+      expect(result!.userName).toBe('Unknown')
     })
 
     it('slices observed_at to 16 chars for datetime-local input', async () => {
@@ -297,7 +349,6 @@ describe('admin-observation-actions', () => {
       adminMethods.single.mockResolvedValueOnce({
         data: {
           id: 'obs-1',
-          user_id: 'user-1',
           slot_id: 'slot-1',
           walk_completion: 'COMPLETED',
           outcome: 'SIGHTED',
@@ -305,7 +356,6 @@ describe('admin-observation-actions', () => {
           lat: null,
           lng: null,
           status: 'SUBMITTED',
-          profiles: { full_name: 'Alice', email: 'alice@test.com' },
           sightings: [
             {
               id: 'sight-1',
@@ -334,7 +384,6 @@ describe('admin-observation-actions', () => {
       adminMethods.single.mockResolvedValueOnce({
         data: {
           id: 'obs-1',
-          user_id: 'user-1',
           slot_id: 'slot-1',
           walk_completion: 'COMPLETED',
           outcome: 'SIGHTED',
@@ -342,7 +391,6 @@ describe('admin-observation-actions', () => {
           lat: null,
           lng: null,
           status: 'SUBMITTED',
-          profiles: { full_name: 'Alice', email: 'alice@test.com' },
           sightings: [
             {
               id: 'sight-1',

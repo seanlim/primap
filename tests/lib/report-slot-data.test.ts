@@ -29,23 +29,31 @@ function createOrderedQueryResult<T>(data: T) {
   }
 }
 
-function createMembershipQueryResult<T>(data: T) {
+// Mimics Supabase's .eq() filtering so callers can verify e.g. `.eq('status', 'ACTIVE')`
+// behavior without needing a real query engine. Filters on columns absent from a row
+// (e.g. `slot_id`, which isn't modeled on these membership fixtures) are ignored.
+function createMembershipQueryResult<T extends Record<string, unknown>[]>(data: T) {
+  const filters: Record<string, unknown> = {}
   return {
     select() {
       return this
     },
-    eq() {
+    eq(column: string, value: unknown) {
+      filters[column] = value
       return this
     },
     then(resolve: (value: { data: T; error: null }) => unknown) {
-      return Promise.resolve(resolve({ data, error: null }))
+      const filtered = data.filter((row) =>
+        Object.entries(filters).every(([key, value]) => !(key in row) || row[key] === value)
+      ) as T
+      return Promise.resolve(resolve({ data: filtered, error: null }))
     },
   }
 }
 
 describe('getSlotReportViewData', () => {
-  it('shows drafts for active members but hides drafts for cancelled members', async () => {
-    const supabase = {
+  it('shows a draft observation for an active member but hides it for a cancelled member', async () => {
+    const buildSupabase = () => ({
       from(table: string) {
         if (table === 'walk_slots') {
           return createSingleQueryResult({
@@ -61,44 +69,14 @@ describe('getSlotReportViewData', () => {
         if (table === 'observations') {
           return createOrderedQueryResult([
             {
-              id: 'obs-draft-cancelled',
-              user_id: 'user-a',
-              walk_completion: 'COMPLETED',
-              outcome: 'NOT_SIGHTED',
-              notes: 'Old draft',
-              lat: 1.3,
-              lng: 103.8,
-              status: 'DRAFT',
-              submitted_at: null,
-              profiles: { full_name: 'User A', email: 'a@example.com', avatar_url: null },
-              sightings: [],
-              media: [],
-            },
-            {
-              id: 'obs-draft-active',
-              user_id: 'user-b',
+              id: 'obs-draft',
               walk_completion: 'PARTIAL',
               outcome: 'NOT_SIGHTED',
-              notes: 'Current active draft',
+              notes: 'Current draft',
               lat: 1.31,
               lng: 103.81,
               status: 'DRAFT',
               submitted_at: null,
-              profiles: { full_name: 'User B', email: 'b@example.com', avatar_url: null },
-              sightings: [],
-              media: [],
-            },
-            {
-              id: 'obs-submitted-active',
-              user_id: 'user-c',
-              walk_completion: 'COMPLETED',
-              outcome: 'SIGHTED',
-              notes: 'Submitted report',
-              lat: null,
-              lng: null,
-              status: 'SUBMITTED',
-              submitted_at: '2026-04-12T03:00:00Z',
-              profiles: { full_name: 'User C', email: 'c@example.com', avatar_url: null },
               sightings: [],
               media: [],
             },
@@ -108,12 +86,14 @@ describe('getSlotReportViewData', () => {
         if (table === 'slot_memberships') {
           return createMembershipQueryResult([
             {
-              user_id: 'user-b',
-              profiles: { full_name: 'User B', email: 'b@example.com' },
+              user_id: 'user-active',
+              status: 'ACTIVE',
+              profiles: { full_name: 'User Active', email: 'active@example.com' },
             },
             {
-              user_id: 'user-c',
-              profiles: { full_name: 'User C', email: 'c@example.com' },
+              user_id: 'user-cancelled',
+              status: 'CANCELLED',
+              profiles: { full_name: 'User Cancelled', email: 'cancelled@example.com' },
             },
           ])
         }
@@ -124,20 +104,15 @@ describe('getSlotReportViewData', () => {
 
         throw new Error(`Unexpected table: ${table}`)
       },
-    }
-
-    const result = await getSlotReportViewData(supabase as never, 'slot-1', 'admin-user')
-
-    expect(result).not.toBeNull()
-    expect(result?.observations.map((observation) => observation.id)).toEqual([
-      'obs-draft-active',
-      'obs-submitted-active',
-    ])
-    expect(result?.observations.find((observation) => observation.id === 'obs-draft-active')).toMatchObject({
-      userId: 'user-b',
-      status: 'DRAFT',
     })
-    expect(result?.observations.find((observation) => observation.id === 'obs-draft-cancelled')).toBeUndefined()
+
+    const activeResult = await getSlotReportViewData(buildSupabase() as never, 'slot-1', 'user-active')
+    expect(activeResult?.isParticipant).toBe(true)
+    expect(activeResult?.observations).toMatchObject({ id: 'obs-draft', status: 'DRAFT' })
+
+    const cancelledResult = await getSlotReportViewData(buildSupabase() as never, 'slot-1', 'user-cancelled')
+    expect(cancelledResult?.isParticipant).toBe(false)
+    expect(cancelledResult?.observations).toBeUndefined()
   })
 
   it('maps participant visibility, name fallbacks, and incident media correctly', async () => {
@@ -158,7 +133,6 @@ describe('getSlotReportViewData', () => {
           return createOrderedQueryResult([
             {
               id: 'obs-submitted-self',
-              user_id: 'user-self',
               walk_completion: 'COMPLETED',
               completion_comment: null,
               outcome: 'SIGHTED',
@@ -167,7 +141,6 @@ describe('getSlotReportViewData', () => {
               lng: 103.8,
               status: 'SUBMITTED',
               submitted_at: '2026-04-12T03:00:00Z',
-              profiles: { full_name: null, email: 'self@example.com', avatar_url: null },
               sightings: [
                 {
                   id: 's-1',
@@ -190,6 +163,7 @@ describe('getSlotReportViewData', () => {
           return createMembershipQueryResult([
             {
               user_id: 'user-self',
+              status: 'ACTIVE',
               profiles: { full_name: null, email: 'self@example.com' },
             },
           ])
@@ -225,7 +199,7 @@ describe('getSlotReportViewData', () => {
     expect(result).not.toBeNull()
     expect(result?.isParticipant).toBe(true)
     expect(result?.hasSubmittedOwnObservation).toBe(true)
-    expect(result?.observations[0]).toMatchObject({
+    expect(result?.observations).toMatchObject({
       userName: 'self@example.com',
       completionComment: null,
       sightings: [
@@ -281,7 +255,7 @@ describe('getSlotReportViewData', () => {
         }
 
         if (table === 'slot_memberships') {
-          return createMembershipQueryResult(null)
+          return createMembershipQueryResult([])
         }
 
         if (table === 'incidents') {
@@ -295,7 +269,7 @@ describe('getSlotReportViewData', () => {
     const result = await getSlotReportViewData(supabase as never, 'slot-1', 'outsider')
 
     expect(result).not.toBeNull()
-    expect(result?.observations).toEqual([])
+    expect(result?.observations).toBeUndefined()
     expect(result?.members).toEqual([])
     expect(result?.incidents).toEqual([])
     expect(result?.isParticipant).toBe(false)

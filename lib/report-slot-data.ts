@@ -138,7 +138,7 @@ export async function getSlotReportViewData(
       endTime: slot.end_time,
       roundName: round.name,
     },
-    observations: visibleObservations.map(obs => { // TODO: Currently, we select a random member, to fix in issue #105
+    observations: visibleObservations.map(obs => { // TODO: Currently, we select a random primary member, to fix in issue #105
       const primaryMember = (members || [])[0]
       return {
       id: obs.id,

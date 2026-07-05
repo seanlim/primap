@@ -122,7 +122,7 @@ These steps assume the shared backend and demo credentials provided with the sub
 3. Open the admin users page (`/admin/users`) and verify that `emily@primap.demo` appears as `PENDING`.
 4. Open the admin reports page (`/admin/reports`) to review the seeded submitted reports.
 5. Open the admin incidents page (`/admin/incidents`) to review the seeded incident.
-6. Open the survey rounds page (`/admin/rounds`) and walk management page (`/admin/walks`) to inspect the seeded schedule data.
+6. Open the survey rounds page (`/admin/rounds`) and walk management page and select round to inspect the seeded schedule data for the round.
 7. Open the data management page (`/admin/data`) to access export and import features.
 
 ### Pending-user flow
@@ -139,8 +139,7 @@ These steps assume the shared backend and demo credentials provided with the sub
 - `/report` for volunteer reporting
 - `/admin` for admin features
 - `/admin/users` for user approval and role management
-- `/admin/rounds` for survey-round management
-- `/admin/walks` for walk-slot management
+- `/admin/rounds` for survey-round management and walk management
 - `/admin/reports` for report review
 - `/admin/incidents` for incident review
 - `/admin/data` for data export and import

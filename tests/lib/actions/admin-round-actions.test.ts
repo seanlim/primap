@@ -268,19 +268,19 @@ describe('admin-round-actions', () => {
       expect(methods.insert).toHaveBeenCalledWith(
         expect.objectContaining({ max_volunteers: 3 })
       )
-      expect(revalidatePath).toHaveBeenCalledWith('/admin/walks')
+      expect(revalidatePath).toHaveBeenCalledWith(`/admin/rounds/${walkData.roundId}/walks`)
       expect(revalidatePath).toHaveBeenCalledWith('/walk')
     })
 
-    it('creates a slot with custom maxVolunteers', async () => {
+    it('creates a slot with custom maxVolunteers under the cap', async () => {
       setupAdmin()
       mockRoundDateRange()
 
-      const result = await createWalk({ ...walkData, maxVolunteers: 5 })
+      const result = await createWalk({ ...walkData, maxVolunteers: 2 })
 
       expect(result).toEqual({ success: true })
       expect(methods.insert).toHaveBeenCalledWith(
-        expect.objectContaining({ max_volunteers: 5 })
+        expect.objectContaining({ max_volunteers: 2 })
       )
     })
 
@@ -315,12 +315,25 @@ describe('admin-round-actions', () => {
   describe('deleteWalk', () => {
     it('deletes a slot and revalidates', async () => {
       setupAdmin()
-
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'walk_slots') {
+          return {
+            ...methods,
+            delete: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                select: vi.fn().mockResolvedValue({ data: [{ round_id: 'round-1' }] })
+              }),
+            }),
+          }
+        }
+        return methods
+      })
+      
       const result = await deleteWalk('slot-1')
 
       expect(result).toEqual({ success: true })
       expect(mockSupabase.from).toHaveBeenCalledWith('walk_slots')
-      expect(revalidatePath).toHaveBeenCalledWith('/admin/walks')
+      expect(revalidatePath).toHaveBeenCalledWith('/admin/rounds/round-1/walks')
       expect(revalidatePath).toHaveBeenCalledWith('/walk')
     })
 
@@ -330,7 +343,7 @@ describe('admin-round-actions', () => {
         data: [{ id: 'obs-1' }],
         error: null,
       })
-
+      
       const result = await deleteWalk('slot-1')
 
       expect(result).toEqual({
@@ -346,6 +359,19 @@ describe('admin-round-actions', () => {
         data: [{ id: 'obs-1' }],
         error: null,
       })
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'walk_slots') {
+          return {
+            ...methods,
+            delete: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                select: vi.fn().mockResolvedValue({ data: [{ round_id: 'round-1' }] })
+              }),
+            }),
+          }
+        }
+        return methods
+      })
 
       const result = await deleteWalk('slot-1', { deleteSubmittedReports: true })
 
@@ -353,7 +379,7 @@ describe('admin-round-actions', () => {
       expect(mockSupabase.from).toHaveBeenCalledWith('incidents')
       expect(mockSupabase.from).toHaveBeenCalledWith('slot_memberships')
       expect(mockSupabase.from).toHaveBeenCalledWith('walk_slots')
-      expect(revalidatePath).toHaveBeenCalledWith('/admin/walks')
+      expect(revalidatePath).toHaveBeenCalledWith('/admin/rounds/round-1/walks')
       expect(revalidatePath).toHaveBeenCalledWith('/walk')
     })
 
@@ -364,7 +390,9 @@ describe('admin-round-actions', () => {
           return {
             ...methods,
             delete: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ error: { message: 'Delete failed' } }),
+              eq: vi.fn().mockReturnValue({
+                select: vi.fn().mockResolvedValue({ error: { message: 'Delete failed' } })
+              }),
             }),
           }
         }
@@ -910,7 +938,7 @@ describe('admin-round-actions', () => {
           max_volunteers: 3,
         })
       )
-      expect(revalidatePath).toHaveBeenCalledWith('/admin/walks')
+      expect(revalidatePath).toHaveBeenCalledWith(`/admin/rounds/${walkData.roundId}/walks`)
       expect(revalidatePath).toHaveBeenCalledWith('/walk')
     })
 
@@ -931,9 +959,9 @@ describe('admin-round-actions', () => {
     it('returns validation error for invalid maxVolunteers', async () => {
       const result = await updateWalk('slot-1', {
         ...walkData,
-        maxVolunteers: 15,
+        maxVolunteers: 4,
       })
-      expect(result).toEqual({ error: expect.stringContaining('Max volunteers must be between 1 and 10') })
+      expect(result).toEqual({ error: expect.stringContaining('Max volunteers must be between 1 and 3') })
     })
 
     it('returns error on DB failure', async () => {
@@ -995,7 +1023,7 @@ describe('admin-round-actions', () => {
       expect(mockSupabase.functions.invoke).toHaveBeenCalledWith('bulk-create-walks', {
         body: expect.objectContaining({ roundId: 'round-1' }),
       })
-      expect(revalidatePath).toHaveBeenCalledWith('/admin/walks')
+      expect(revalidatePath).toHaveBeenCalledWith('/admin/rounds/round-1/walks')
       expect(revalidatePath).toHaveBeenCalledWith('/walk')
     })
 
@@ -1018,6 +1046,18 @@ describe('admin-round-actions', () => {
       })
       expect(result).toEqual({ error: expect.stringContaining('Walk 1:') })
       expect(result).toEqual({ error: expect.stringContaining('Location name is required') })
+    })
+
+    it('returns error when a bulk slot exceeds the volunteer cap', async () => {
+      const result = await bulkCreateWalks({
+        roundId: 'round-1',
+        slots: [
+          { locationName: 'Park A', walkDate: '2026-04-15', startTime: '08:00', endTime: '10:00', maxVolunteers: 4 },
+        ],
+      })
+
+      expect(result).toEqual({ error: expect.stringContaining('Walk 1:') })
+      expect(result).toEqual({ error: expect.stringContaining('Max volunteers must be between 1 and 3') })
     })
 
     it('returns error on edge function failure', async () => {
@@ -1093,7 +1133,7 @@ describe('admin-round-actions', () => {
 
     it('returns error for maxVolunteers out of range', async () => {
       const result = await createWalk({ ...walkData, maxVolunteers: 0 })
-      expect(result).toEqual({ error: expect.stringContaining('Max volunteers must be between 1 and 10') })
+      expect(result).toEqual({ error: expect.stringContaining('Max volunteers must be between 1 and 3') })
     })
   })
 

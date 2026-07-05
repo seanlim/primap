@@ -1,0 +1,1 @@
+export const MAX_VOLUNTEERS_PER_SLOT = 3

@@ -302,11 +302,12 @@ async function getAnalyticsBaseData(supabase: SupabaseClientLike) {
 
 export async function getAdminWalksAnalyticsPageSnapshotByRound(
   supabase: SupabaseClientLike,
+  roundId: string | null,
   options?: { roundId?: string | null; walkId?: string | null; now?: Date }
 ): Promise<AdminWalksAnalyticsPageSnapshot> {
   const base = await getAnalyticsBaseData(supabase)
 
-  if (base.rounds.length === 0 || base.slots.length === 0) {
+  if (base.rounds.length === 0 || base.slots.length === 0 || roundId === null) {
     return {
       availableRounds: base.rounds,
       targetRound: null,
@@ -318,12 +319,9 @@ export async function getAdminWalksAnalyticsPageSnapshotByRound(
     }
   }
 
-  const targetRound =
-    (options?.roundId ? base.rounds.find((round) => round.id === options.roundId) ?? null : null) ??
-    base.rounds.find((round) => round.status === 'OPEN') ??
-    base.rounds[0]
+  const targetRound = base.rounds.find((round) => round.id === roundId) ?? null
 
-  const scopedSlots = base.slots.filter((slot) => slot.round_id === targetRound.id)
+  const scopedSlots = targetRound ? base.slots.filter((slot) => slot.round_id === targetRound.id) : []
   const slotsById = new Map(scopedSlots.map((slot) => [slot.id, slot]))
   const targetWalk =
     (options?.walkId ? slotsById.get(options.walkId) ?? null : null) ??
@@ -340,7 +338,7 @@ export async function getAdminWalksAnalyticsPageSnapshotByRound(
       targetRound,
       availableWalks: [],
       targetWalk: null,
-      targetWalkRoundName: targetRound.name,
+      targetWalkRoundName: targetRound?.name ?? null,
       overview: null,
       reportMapPoints: [],
     }

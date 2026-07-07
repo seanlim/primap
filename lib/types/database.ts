@@ -7,10 +7,30 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.1"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -52,6 +72,53 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      guardian_contact_otps: {
+        Row: {
+          attempts: number
+          channel: string
+          code_hash: string
+          created_at: string
+          destination: string
+          expires_at: string
+          id: string
+          updated_at: string
+          user_id: string
+          verified_at: string | null
+        }
+        Insert: {
+          attempts?: number
+          channel: string
+          code_hash: string
+          created_at?: string
+          destination: string
+          expires_at: string
+          id?: string
+          updated_at?: string
+          user_id: string
+          verified_at?: string | null
+        }
+        Update: {
+          attempts?: number
+          channel?: string
+          code_hash?: string
+          created_at?: string
+          destination?: string
+          expires_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guardian_contact_otps_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       incidents: {
         Row: {
@@ -192,7 +259,6 @@ export type Database = {
           status: Database["public"]["Enums"]["observation_status"]
           submitted_at: string | null
           updated_at: string
-          user_id: string
           walk_completion: Database["public"]["Enums"]["walk_completion"]
         }
         Insert: {
@@ -209,7 +275,6 @@ export type Database = {
           status?: Database["public"]["Enums"]["observation_status"]
           submitted_at?: string | null
           updated_at?: string
-          user_id: string
           walk_completion?: Database["public"]["Enums"]["walk_completion"]
         }
         Update: {
@@ -226,22 +291,14 @@ export type Database = {
           status?: Database["public"]["Enums"]["observation_status"]
           submitted_at?: string | null
           updated_at?: string
-          user_id?: string
           walk_completion?: Database["public"]["Enums"]["walk_completion"]
         }
         Relationships: [
           {
             foreignKeyName: "observations_slot_id_fkey"
             columns: ["slot_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "walk_slots"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "observations_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -250,9 +307,17 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          date_of_birth: string | null
           email: string
           full_name: string | null
+          guardian_email: string | null
+          guardian_email_verified_at: string | null
+          guardian_name: string | null
+          guardian_phone_number: string | null
+          guardian_phone_verified_at: string | null
           id: string
+          phone_number: string | null
+          phone_verified_at: string | null
           role: Database["public"]["Enums"]["user_role"]
           status: Database["public"]["Enums"]["user_status"]
           updated_at: string
@@ -260,9 +325,17 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          date_of_birth?: string | null
           email: string
           full_name?: string | null
+          guardian_email?: string | null
+          guardian_email_verified_at?: string | null
+          guardian_name?: string | null
+          guardian_phone_number?: string | null
+          guardian_phone_verified_at?: string | null
           id: string
+          phone_number?: string | null
+          phone_verified_at?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
@@ -270,9 +343,17 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          date_of_birth?: string | null
           email?: string
           full_name?: string | null
+          guardian_email?: string | null
+          guardian_email_verified_at?: string | null
+          guardian_name?: string | null
+          guardian_phone_number?: string | null
+          guardian_phone_verified_at?: string | null
           id?: string
+          phone_number?: string | null
+          phone_verified_at?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
@@ -480,6 +561,74 @@ export type Database = {
           },
         ]
       }
+      user_audit_logs: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          event_type: Database["public"]["Enums"]["user_audit_event_type"]
+          id: string
+          metadata: Json
+          occurred_at: string
+          reason: string | null
+          round_id: string | null
+          slot_id: string | null
+          user_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          event_type: Database["public"]["Enums"]["user_audit_event_type"]
+          id?: string
+          metadata?: Json
+          occurred_at?: string
+          reason?: string | null
+          round_id?: string | null
+          slot_id?: string | null
+          user_id?: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          event_type?: Database["public"]["Enums"]["user_audit_event_type"]
+          id?: string
+          metadata?: Json
+          occurred_at?: string
+          reason?: string | null
+          round_id?: string | null
+          slot_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_audit_logs_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_audit_logs_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "survey_rounds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_audit_logs_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: false
+            referencedRelation: "walk_slots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       walk_slots: {
         Row: {
           created_at: string
@@ -532,6 +681,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cancel_slot_with_draft_cleanup: {
+        Args: { p_cancellation_reason?: string; p_slot_id: string }
+        Returns: Json
+      }
+      is_active_slot_member: { Args: { p_slot_id: string }; Returns: boolean }
+      is_admin: { Args: never; Returns: boolean }
       join_slot_with_observation: {
         Args: { p_slot_id: string; p_user_id: string }
         Returns: Json
@@ -554,6 +709,7 @@ export type Database = {
       observation_status: "DRAFT" | "SUBMITTED"
       round_status: "DRAFT" | "OPEN" | "CLOSED"
       species_type: "RBL" | "LTM" | "DUSKY" | "OTHER"
+      user_audit_event_type: "LATE_WALK_CANCELLATION"
       user_role: "ADMIN" | "VOLUNTEER"
       user_audit_event_type: "LATE_WALK_CANCELLATION"
       user_status: "PENDING" | "ACTIVE" | "REJECTED" | "DISABLED"
@@ -683,6 +839,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       incident_type: [

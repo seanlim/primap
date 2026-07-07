@@ -75,6 +75,34 @@ npm test
 npm run test:coverage
 ```
 
+## Local Development
+
+### Prerequisites
+
+- Docker Desktop (must be running)
+
+### 1. Start a local Supabase instance
+
+From the project root:
+
+```bash
+npx supabase start
+```
+
+This starts the local Supabase stack in Docker, applies all migrations in `supabase/migrations`, and loads seeded data from `supabase/seed.sql`.
+
+### 2. Modify `.env.local` 
+
+`NEXT_PUBLIC_SUPABASE_URL`,  `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Go to [Studio](http://localhost:54323/project/default?showConnect=true) -> App Frameworks -> Next.js
+
+`SUPABASE_SERVICE_ROLE_KEY`: In the output that appears after `npx supabase start`, copy the key under `Authentication Keys` -> `Secret`
+
+### To stop the local Supabase instance
+
+```bash
+npx supabase stop
+```
+
 ## Demo Accounts
 
 Use the provided demo credentials for the following accounts:

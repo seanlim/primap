@@ -108,10 +108,14 @@ This starts the local Supabase stack in Docker, applies all migrations in `supab
 
 `SUPABASE_SERVICE_ROLE_KEY`: In the output that appears after `npx supabase start`, copy the key under `Authentication Keys` -> `Secret`
 
-### To stop the local Supabase instance
+### 4. Making DB changes
+
+> For more details: [Local development with schema migrations | Supabase Docs](https://supabase.com/docs/guides/local-development/overview)
+
+You can make changes to your local Supabase instance directly using the table editor, then run this to capture the changes in a new migration file
 
 ```bash
-npx supabase stop
+npx supabase db diff -f <migration_name>
 ```
 
 ## Demo Accounts

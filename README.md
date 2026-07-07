@@ -81,9 +81,20 @@ npm run test:coverage
 
 - Docker Desktop (must be running)
 
-### 1. Start a local Supabase instance
+### 1. Link to remote Supabase
 
-From the project root:
+Link local Supabase CLI to Supabase account
+```bash
+npx supabase login
+```
+
+Link local Supabase project to remote Supabase project
+```bash
+npx supabase link
+```
+
+### 2. Start a local Supabase instance
+
 
 ```bash
 npx supabase start
@@ -91,7 +102,7 @@ npx supabase start
 
 This starts the local Supabase stack in Docker, applies all migrations in `supabase/migrations`, and loads seeded data from `supabase/seed.sql`.
 
-### 2. Modify `.env.local` 
+### 3. Modify `.env.local` to connect to local Supabase instance
 
 `NEXT_PUBLIC_SUPABASE_URL`,  `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Go to [Studio](http://localhost:54323/project/default?showConnect=true) -> App Frameworks -> Next.js
 

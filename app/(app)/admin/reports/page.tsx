@@ -317,6 +317,7 @@ export default async function AdminReportsPage({
                             {report.startTime ? ` · ${report.startTime.slice(0, 5)}` : ''}
                           </p>
                           <div className="mt-3 space-y-1 text-xs text-gray-500">
+                            {/* TODO: To add back in issue #105 */}
                             {/* <p className="flex items-center gap-1">
                               <Users className="h-3 w-3" />
                               {report.reporterName}

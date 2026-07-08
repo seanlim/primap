@@ -26,7 +26,7 @@ type SupabaseCountQueryLike = PromiseLike<CountResult> & {
 
 export type SupabaseClientLike = {
   from: (table: string) => {
-    select: (...args: any[]) => SupabaseQueryLike<unknown> | SupabaseCountQueryLike
+    select: (...args: unknown[]) => SupabaseQueryLike<unknown> | SupabaseCountQueryLike
   }
 }
 

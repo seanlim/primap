@@ -1,10 +1,16 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import type { AnchorHTMLAttributes, ReactNode } from 'react'
 import { SidebarNav } from '@/components/layout/sidebar-nav'
 import { useAuth } from '@/lib/hooks/use-auth'
+import type { Profile } from '@/lib/types/database'
 
 vi.mock('next/link', () => ({
-  default: ({ children, href, ...props }: any) => (
+  default: ({
+    children,
+    href,
+    ...props
+  }: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string; children: ReactNode }) => (
     <a href={href} {...props}>
       {children}
     </a>
@@ -49,7 +55,7 @@ describe('SidebarNav', () => {
   it('shows user avatar initial from full_name', () => {
     mockedUseAuth.mockReturnValue({
       user: null,
-      profile: { full_name: 'Jane Doe', email: 'jane@example.com' } as any,
+      profile: { full_name: 'Jane Doe', email: 'jane@example.com' } as Profile,
       loading: false,
       signOut: vi.fn(),
       refreshProfile: vi.fn(),

@@ -71,6 +71,10 @@ export function LocationPicker({
       onLocationChange(e.lngLat.lat, e.lngLat.lng)
     })
 
+    map.on('load', () => {
+      setLoaded(true)
+    })
+
     // Auto-center on user geolocation if no lat/lng props set
     if (!lat && !lng && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -86,8 +90,6 @@ export function LocationPicker({
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
       )
     }
-
-    setLoaded(true)
   }
 
   // Init on mount

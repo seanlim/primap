@@ -75,6 +75,49 @@ npm test
 npm run test:coverage
 ```
 
+## Local Development
+
+### Prerequisites
+
+- Docker Desktop (must be running)
+
+### 1. Link to remote Supabase
+
+Link local Supabase CLI to Supabase account
+```bash
+npx supabase login
+```
+
+Link local Supabase project to remote Supabase project
+```bash
+npx supabase link
+```
+
+### 2. Start a local Supabase instance
+
+
+```bash
+npx supabase start
+```
+
+This starts the local Supabase stack in Docker, applies all migrations in `supabase/migrations`, and loads seeded data from `supabase/seed.sql`.
+
+### 3. Modify `.env.local` to connect to local Supabase instance
+
+`NEXT_PUBLIC_SUPABASE_URL`,  `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Go to [Studio](http://localhost:54323/project/default?showConnect=true) -> App Frameworks -> Next.js
+
+`SUPABASE_SERVICE_ROLE_KEY`: In the output that appears after `npx supabase start`, copy the key under `Authentication Keys` -> `Secret`
+
+### 4. Making DB changes
+
+> For more details: [Local development with schema migrations | Supabase Docs](https://supabase.com/docs/guides/local-development/overview)
+
+You can make changes to your local Supabase instance directly using the table editor, then run this to capture the changes in a new migration file
+
+```bash
+npx supabase db diff -f <migration_name>
+```
+
 ## Demo Accounts
 
 Use the provided demo credentials for the following accounts:

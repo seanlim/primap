@@ -4,7 +4,7 @@ SET session_replication_role = replica;
 -- PostgreSQL database dump
 --
 
--- \restrict tPwyCeLkCMbdbDHUstq5PiuMaG4lbax80QKUpgM5TUSmFl6WpEbFmEqlzUfDfzE
+-- \restrict A9Y04rNH7ApPh7Na5ipGmnccoy0LswtBHZ77NUGbAUGNGOPjQaSnJPTspImABxg
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -311,9 +311,8 @@ INSERT INTO "auth"."refresh_tokens" ("instance_id", "id", "token", "user_id", "r
 -- Data for Name: app_settings; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO "public"."app_settings" ("id", "required_walks_per_round", "created_at", "updated_at", "max_media_per_report", "high_participation_threshold", "reminder_send_time", "reminder_send_weekday", "reminder_window_length_days", "reminder_window_start_offset_days") VALUES
-	('3e82a5bb-9c79-4684-978d-ecfc705baab1', 4, '2026-07-07 13:45:09.562124+00', '2026-07-07 13:45:09.562124+00', 10, 8, '13:00:00', 3, 7, 2),
-	('9b1fe76f-9b3b-42f0-acf9-a9e8e524f461', 3, '2026-02-21 10:33:06.672319+00', '2026-05-28 10:10:35.683883+00', 10, 3, '13:00:00', 3, 7, 2);
+INSERT INTO "public"."app_settings" ("id", "required_walks_per_round", "created_at", "updated_at", "max_media_per_report", "high_participation_threshold", "reminder_send_weekday", "reminder_send_time", "reminder_window_start_offset_days", "reminder_window_length_days") VALUES
+	('9b1fe76f-9b3b-42f0-acf9-a9e8e524f461', 3, '2026-02-21 10:33:06.672319+00', '2026-05-28 10:10:35.683883+00', 10, 3, 3, '13:00:00', 2, 7);
 
 
 --
@@ -420,25 +419,42 @@ INSERT INTO "public"."incidents" ("id", "slot_id", "reported_by", "incident_type
 -- Data for Name: observations; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO "public"."observations" ("id", "slot_id", "walk_completion", "outcome", "notes", "lat", "lng", "status", "client_draft_id", "submitted_at", "created_at", "updated_at", "last_user_agent", "completion_comment") VALUES
-	('7fe4444a-bd0e-41e8-a1a1-d56135f42072', 'd1c7caad-af1d-40b6-8fa6-2b528ca8ad8c', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-24 10:23:42.770205+00', '2026-06-24 10:23:42.770205+00', NULL, NULL),
-	('57b6a9ee-58bf-465a-8d28-c46077c89d1f', '33104d62-71a1-4a28-ae5a-a98352fcf80d', 'COMPLETED', 'NOT_SIGHTED', 'No sightings.', 1.344970751742693, 103.78312211402363, 'SUBMITTED', NULL, '2026-04-11 16:52:34.528+00', '2026-04-11 16:35:06.283073+00', '2026-04-11 16:52:34.552422+00', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', NULL),
-	('b62bd06c-5683-4ad1-b555-2d103c68a051', '709d6317-26f6-4a95-b410-9eda24ef1820', 'COMPLETED', 'SIGHTED', NULL, NULL, NULL, 'SUBMITTED', NULL, '2026-04-11 16:48:58.944+00', '2026-04-11 16:34:26.098825+00', '2026-04-11 16:48:58.968425+00', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', NULL),
-	('55b6ed84-4165-41c1-a8f7-08529f70ce24', 'cd36b3b3-d954-44c5-8811-4e86f5a5eb36', 'PARTIAL', 'SIGHTED', NULL, NULL, NULL, 'SUBMITTED', NULL, '2026-04-13 07:07:44.972+00', '2026-04-13 07:04:18.837149+00', '2026-04-13 07:07:45.025423+00', 'Mozilla/5.0 (Linux; Android 8.0.0; SM-G955U Build/R16NW) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Mobile Safari/537.36', NULL),
-	('6e1fdb03-d4bc-4d45-8fa9-87c583c0210e', '3a78fc15-9661-42f7-82ad-44f61b3c64f9', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-04-13 07:15:05.456419+00', '2026-04-13 07:15:05.456419+00', NULL, NULL),
-	('39da2398-b938-4051-973f-87f7b3bee6f2', '67900344-3562-4e0e-8abe-559355e9e3cb', 'COMPLETED', 'SIGHTED', NULL, NULL, NULL, 'SUBMITTED', NULL, '2026-04-11 16:43:52.851+00', '2026-04-11 16:23:57.048437+00', '2026-04-11 16:43:52.880165+00', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', NULL),
-	('20fb30f3-de88-4af6-8d8e-b321d2ee1501', '5e7b7335-36aa-40ff-9f18-15a62e16b617', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-10 08:35:50.825821+00', '2026-06-10 08:35:50.825821+00', NULL, NULL),
-	('3032d059-c7ed-4ec4-b36a-f155635cecde', '52ee3a01-2577-47bb-8136-8c8f4ccfde07', 'COMPLETED', 'SIGHTED', NULL, NULL, NULL, 'SUBMITTED', NULL, '2026-04-11 16:51:07.296+00', '2026-04-11 16:34:36.132308+00', '2026-04-11 16:51:07.32192+00', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', NULL),
-	('52d1c887-058a-4014-8c86-372d6fbdcc71', '756de038-6ea5-4455-893c-64e139a5478e', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-26 05:33:23.291194+00', '2026-06-26 05:33:23.291194+00', NULL, NULL),
-	('18acc209-aba1-4914-8770-f5f564e01b4f', '2863ff2d-3fca-45a6-915f-a2716fdc31ae', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-28 05:17:06.374419+00', '2026-06-28 05:17:06.374419+00', NULL, NULL),
-	('44667de4-f64b-44b7-b0f3-34288bc2091e', '846c0897-3abd-4ef8-8f2d-8dcba3622731', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-05-11 06:51:08.187553+00', '2026-05-11 06:51:08.187553+00', NULL, NULL),
-	('d18a1d9b-2461-4f51-8381-67a5dced1ba0', 'cefc8f26-fed3-42f9-80bd-1ef79c039bc4', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-28 05:17:16.771729+00', '2026-06-28 05:17:16.771729+00', NULL, NULL),
-	('56917e7b-16aa-4b01-9352-a70ddb71df67', 'c20018e4-0221-4beb-b396-c26ea28ca7e8', 'PARTIAL', 'SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-05-11 07:18:42.8064+00', '2026-06-22 14:19:12.094365+00', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36', NULL),
-	('c40d267b-5cb7-4cbc-a02a-cb9b94ed0c9f', '0b6f4eda-a939-4e38-b1b8-7a98081c8a7f', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-24 06:15:05.42867+00', '2026-06-24 06:15:05.42867+00', NULL, NULL),
-	('5af21920-70e0-4a76-957e-956dc320a19f', 'bbdbe4b5-62e5-4b91-9225-adb359a98037', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-24 09:54:34.297777+00', '2026-06-24 09:54:34.297777+00', NULL, NULL),
-	('5401b2cc-77c0-4966-85fa-c4fdf9dbc6cb', '6f6bf323-9a62-4a4a-81db-dab64b5eb13a', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-24 10:06:51.75245+00', '2026-06-24 10:06:51.75245+00', NULL, NULL),
-	('67a6247e-39e7-40df-b3be-31c2382e5a13', '00d58acd-f74d-4e62-b658-b51b772b1195', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-28 06:50:48.049076+00', '2026-06-28 06:50:48.049076+00', NULL, NULL),
-	('c24e1604-d746-4d7f-be12-7b18913a95c8', '825278bd-5d21-4027-bc47-68db6e4341a6', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-28 06:50:56.312497+00', '2026-06-28 06:50:56.312497+00', NULL, NULL);
+INSERT INTO "public"."observations" ("id", "slot_id", "user_id", "walk_completion", "outcome", "notes", "lat", "lng", "status", "client_draft_id", "submitted_at", "created_at", "updated_at", "last_user_agent", "completion_comment") VALUES
+	('82abc1d4-f3d7-49b0-9a17-c0ce134d9f8f', '756de038-6ea5-4455-893c-64e139a5478e', 'ed8835fa-ab3a-4078-89e7-f660e08f02bf', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-24 10:09:02.097505+00', '2026-06-24 10:09:02.097505+00', NULL, NULL),
+	('7fe4444a-bd0e-41e8-a1a1-d56135f42072', 'd1c7caad-af1d-40b6-8fa6-2b528ca8ad8c', 'ed8835fa-ab3a-4078-89e7-f660e08f02bf', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-24 10:23:42.770205+00', '2026-06-24 10:23:42.770205+00', NULL, NULL),
+	('57b6a9ee-58bf-465a-8d28-c46077c89d1f', '33104d62-71a1-4a28-ae5a-a98352fcf80d', 'ef71f1fa-d448-4c9f-9b10-76a559bb8069', 'COMPLETED', 'NOT_SIGHTED', 'No sightings.', 1.344970751742693, 103.78312211402363, 'SUBMITTED', NULL, '2026-04-11 16:52:34.528+00', '2026-04-11 16:35:06.283073+00', '2026-04-11 16:52:34.552422+00', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', NULL),
+	('9c9009be-f0e2-47d1-b782-3c686387653c', 'c20018e4-0221-4beb-b396-c26ea28ca7e8', '0f2cbdab-dfca-42c9-9a90-1b4b677a84ce', 'COMPLETED', 'SIGHTED', NULL, NULL, NULL, 'SUBMITTED', NULL, '2026-05-11 19:15:06.51+00', '2026-05-11 19:07:00.754798+00', '2026-05-11 19:15:06.543907+00', 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1', NULL),
+	('b62bd06c-5683-4ad1-b555-2d103c68a051', '709d6317-26f6-4a95-b410-9eda24ef1820', '56823340-0cb5-4679-aab3-8fa552178a90', 'COMPLETED', 'SIGHTED', NULL, NULL, NULL, 'SUBMITTED', NULL, '2026-04-11 16:48:58.944+00', '2026-04-11 16:34:26.098825+00', '2026-04-11 16:48:58.968425+00', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', NULL),
+	('55b6ed84-4165-41c1-a8f7-08529f70ce24', 'cd36b3b3-d954-44c5-8811-4e86f5a5eb36', 'cc60e20c-0986-4157-a153-1c62e0c76042', 'PARTIAL', 'SIGHTED', NULL, NULL, NULL, 'SUBMITTED', NULL, '2026-04-13 07:07:44.972+00', '2026-04-13 07:04:18.837149+00', '2026-04-13 07:07:45.025423+00', 'Mozilla/5.0 (Linux; Android 8.0.0; SM-G955U Build/R16NW) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Mobile Safari/537.36', NULL),
+	('6e1fdb03-d4bc-4d45-8fa9-87c583c0210e', '3a78fc15-9661-42f7-82ad-44f61b3c64f9', 'cc60e20c-0986-4157-a153-1c62e0c76042', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-04-13 07:15:05.456419+00', '2026-04-13 07:15:05.456419+00', NULL, NULL),
+	('39da2398-b938-4051-973f-87f7b3bee6f2', '67900344-3562-4e0e-8abe-559355e9e3cb', '888758d2-5bf0-4ecb-a85e-cc998ebe775b', 'COMPLETED', 'SIGHTED', NULL, NULL, NULL, 'SUBMITTED', NULL, '2026-04-11 16:43:52.851+00', '2026-04-11 16:23:57.048437+00', '2026-04-11 16:43:52.880165+00', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', NULL),
+	('20fb30f3-de88-4af6-8d8e-b321d2ee1501', '5e7b7335-36aa-40ff-9f18-15a62e16b617', '888758d2-5bf0-4ecb-a85e-cc998ebe775b', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-10 08:35:50.825821+00', '2026-06-10 08:35:50.825821+00', NULL, NULL),
+	('98b01e5a-4288-45d6-bfb0-01607179a5b2', '6f6bf323-9a62-4a4a-81db-dab64b5eb13a', '4406c55b-09b6-4f82-8975-6bffe8886513', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-26 05:33:04.376116+00', '2026-06-26 05:33:04.376116+00', NULL, NULL),
+	('8882963f-9009-404a-9173-2edd4b123d94', '67900344-3562-4e0e-8abe-559355e9e3cb', '71c422c5-ff93-495c-9f90-b8cf3e40d696', 'COMPLETED', 'SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-04-11 16:57:09.358781+00', '2026-04-12 13:43:59.884415+00', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', NULL),
+	('de18acdd-8b97-4c77-b979-b870b2e62246', '709d6317-26f6-4a95-b410-9eda24ef1820', '888758d2-5bf0-4ecb-a85e-cc998ebe775b', 'COMPLETED', 'NOT_SIGHTED', 'No sightings.', 1.372310540281859, 103.82581007052113, 'SUBMITTED', NULL, '2026-04-11 16:45:30.407+00', '2026-04-11 16:24:02.484824+00', '2026-04-11 16:45:30.428973+00', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', NULL),
+	('3032d059-c7ed-4ec4-b36a-f155635cecde', '52ee3a01-2577-47bb-8136-8c8f4ccfde07', '56823340-0cb5-4679-aab3-8fa552178a90', 'COMPLETED', 'SIGHTED', NULL, NULL, NULL, 'SUBMITTED', NULL, '2026-04-11 16:51:07.296+00', '2026-04-11 16:34:36.132308+00', '2026-04-11 16:51:07.32192+00', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', NULL),
+	('52d1c887-058a-4014-8c86-372d6fbdcc71', '756de038-6ea5-4455-893c-64e139a5478e', '4406c55b-09b6-4f82-8975-6bffe8886513', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-26 05:33:23.291194+00', '2026-06-26 05:33:23.291194+00', NULL, NULL),
+	('18acc209-aba1-4914-8770-f5f564e01b4f', '2863ff2d-3fca-45a6-915f-a2716fdc31ae', '4406c55b-09b6-4f82-8975-6bffe8886513', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-28 05:17:06.374419+00', '2026-06-28 05:17:06.374419+00', NULL, NULL),
+	('7cdb514f-33c4-4495-8eab-fea6105e07a3', 'cd36b3b3-d954-44c5-8811-4e86f5a5eb36', '888758d2-5bf0-4ecb-a85e-cc998ebe775b', 'ABORTED', 'SIGHTED', 'ssdsdsdsdsdsdsd', NULL, NULL, 'DRAFT', NULL, NULL, '2026-04-11 16:24:09.540185+00', '2026-04-14 09:01:28.378093+00', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36', NULL),
+	('cc90a91d-17b3-4b56-899e-94148ec99900', '709d6317-26f6-4a95-b410-9eda24ef1820', 'cc60e20c-0986-4157-a153-1c62e0c76042', 'PARTIAL', 'SIGHTED', 'dsafklasdf', NULL, NULL, 'DRAFT', NULL, NULL, '2026-04-11 16:31:50.057228+00', '2026-04-13 08:27:27.02445+00', 'Mozilla/5.0 (Linux; Android 8.0.0; SM-G955U Build/R16NW) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Mobile Safari/537.36', NULL),
+	('57673137-4a75-4306-b2d2-619f4dc9396e', 'cd36b3b3-d954-44c5-8811-4e86f5a5eb36', '71c422c5-ff93-495c-9f90-b8cf3e40d696', 'COMPLETED', 'SIGHTED', 'Admin correction: updated count for RBL sighting.', NULL, NULL, 'SUBMITTED', NULL, '2026-04-11 16:59:24.787+00', '2026-04-11 16:57:53.828681+00', '2026-04-13 09:53:49.061899+00', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36', NULL),
+	('742cf8d3-f1d1-47fe-916d-b953a553e9ac', '3a78fc15-9661-42f7-82ad-44f61b3c64f9', '0f2cbdab-dfca-42c9-9a90-1b4b677a84ce', 'PARTIAL', 'SIGHTED', NULL, NULL, NULL, 'SUBMITTED', NULL, '2026-04-13 09:46:26.995+00', '2026-04-13 09:44:14.990859+00', '2026-05-10 09:10:15.373393+00', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', 'Rain started midway'),
+	('44667de4-f64b-44b7-b0f3-34288bc2091e', '846c0897-3abd-4ef8-8f2d-8dcba3622731', '888758d2-5bf0-4ecb-a85e-cc998ebe775b', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-05-11 06:51:08.187553+00', '2026-05-11 06:51:08.187553+00', NULL, NULL),
+	('cac4b285-b6e0-46c2-a0b6-de60bf45c5ff', 'c20018e4-0221-4beb-b396-c26ea28ca7e8', '888758d2-5bf0-4ecb-a85e-cc998ebe775b', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-05-11 06:54:17.44794+00', '2026-05-11 06:54:17.44794+00', NULL, NULL),
+	('d18a1d9b-2461-4f51-8381-67a5dced1ba0', 'cefc8f26-fed3-42f9-80bd-1ef79c039bc4', '4406c55b-09b6-4f82-8975-6bffe8886513', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-28 05:17:16.771729+00', '2026-06-28 05:17:16.771729+00', NULL, NULL),
+	('bb288e52-f494-41a9-8be1-3d8801666268', '3a78fc15-9661-42f7-82ad-44f61b3c64f9', '888758d2-5bf0-4ecb-a85e-cc998ebe775b', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-04-14 05:59:40.143423+00', '2026-04-14 05:59:40.143423+00', NULL, NULL),
+	('edd481f6-ac8c-4954-ba24-1779cc8b57cf', '00d58acd-f74d-4e62-b658-b51b772b1195', '4406c55b-09b6-4f82-8975-6bffe8886513', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-28 05:19:14.839549+00', '2026-06-28 05:19:14.839549+00', NULL, NULL),
+	('9e79d656-fd75-49a8-b8dd-848eaaf4aeb0', '2863ff2d-3fca-45a6-915f-a2716fdc31ae', '888758d2-5bf0-4ecb-a85e-cc998ebe775b', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-28 06:46:43.367668+00', '2026-06-28 06:46:43.367668+00', NULL, NULL),
+	('56917e7b-16aa-4b01-9352-a70ddb71df67', 'c20018e4-0221-4beb-b396-c26ea28ca7e8', '51b1cf99-e8c3-4c9a-8143-6be06b6dba70', 'PARTIAL', 'SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-05-11 07:18:42.8064+00', '2026-06-22 14:19:12.094365+00', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36', NULL),
+	('a5be2d4e-3542-4da7-a8c7-42c12b8208e2', 'c20018e4-0221-4beb-b396-c26ea28ca7e8', 'ec26112d-5f65-4666-9d40-5fb222f55dbf', 'PARTIAL', 'SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-05-11 08:36:13.248131+00', '2026-05-11 08:36:43.998707+00', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36', NULL),
+	('848c782b-ffea-4333-8a72-1e6b210d106b', '00d58acd-f74d-4e62-b658-b51b772b1195', '888758d2-5bf0-4ecb-a85e-cc998ebe775b', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-28 06:46:56.930804+00', '2026-06-28 06:46:56.930804+00', NULL, NULL),
+	('c40d267b-5cb7-4cbc-a02a-cb9b94ed0c9f', '0b6f4eda-a939-4e38-b1b8-7a98081c8a7f', '4406c55b-09b6-4f82-8975-6bffe8886513', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-24 06:15:05.42867+00', '2026-06-24 06:15:05.42867+00', NULL, NULL),
+	('5af21920-70e0-4a76-957e-956dc320a19f', 'bbdbe4b5-62e5-4b91-9225-adb359a98037', 'ed8835fa-ab3a-4078-89e7-f660e08f02bf', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-24 09:54:34.297777+00', '2026-06-24 09:54:34.297777+00', NULL, NULL),
+	('5401b2cc-77c0-4966-85fa-c4fdf9dbc6cb', '6f6bf323-9a62-4a4a-81db-dab64b5eb13a', 'ed8835fa-ab3a-4078-89e7-f660e08f02bf', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-24 10:06:51.75245+00', '2026-06-24 10:06:51.75245+00', NULL, NULL),
+	('89d71fce-3b1f-41ec-bd02-1bef59e24480', '2863ff2d-3fca-45a6-915f-a2716fdc31ae', 'cc60e20c-0986-4157-a153-1c62e0c76042', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-28 06:47:21.810591+00', '2026-06-28 06:47:21.810591+00', NULL, NULL),
+	('a4ac6176-5f63-4de2-bf70-37b0bf064d60', 'bbdbe4b5-62e5-4b91-9225-adb359a98037', 'cc60e20c-0986-4157-a153-1c62e0c76042', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-28 06:47:40.773678+00', '2026-06-28 06:47:40.773678+00', NULL, NULL),
+	('67a6247e-39e7-40df-b3be-31c2382e5a13', '00d58acd-f74d-4e62-b658-b51b772b1195', '71c422c5-ff93-495c-9f90-b8cf3e40d696', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-28 06:50:48.049076+00', '2026-06-28 06:50:48.049076+00', NULL, NULL),
+	('c24e1604-d746-4d7f-be12-7b18913a95c8', '825278bd-5d21-4027-bc47-68db6e4341a6', '71c422c5-ff93-495c-9f90-b8cf3e40d696', 'PARTIAL', 'NOT_SIGHTED', NULL, NULL, NULL, 'DRAFT', NULL, NULL, '2026-06-28 06:50:56.312497+00', '2026-06-28 06:50:56.312497+00', NULL, NULL);
 
 
 --
@@ -449,13 +465,21 @@ INSERT INTO "public"."sightings" ("id", "observation_id", "species", "count", "o
 	('d3aa93d8-a3e9-478b-afe5-fab9ff918692', '55b6ed84-4165-41c1-a8f7-08529f70ce24', 'RBL', '1', '2026-04-13 15:05:00+00', 1.349335511133944, 103.8312298146289, 'asdfasdfnasdfjasdfadsf', '2026-04-13 07:05:36.222745+00', NULL),
 	('5b9bb001-6d44-4b01-9a38-ac8d480d0033', '3032d059-c7ed-4ec4-b36a-f155635cecde', 'DUSKY', '4', '2026-04-12 00:49:00+00', 1.3562498155269935, 103.82031098590113, 'Climbing up tree trunk slowly.', '2026-04-11 16:49:43.01021+00', NULL),
 	('be7e2cfd-a519-439f-966e-e6b914dc6e7a', '3032d059-c7ed-4ec4-b36a-f155635cecde', 'RBL', '2', '2026-04-12 00:49:00+00', 1.3576403238378418, 103.82220748540306, 'Playing and chasing within the group.', '2026-04-11 16:50:35.915322+00', NULL),
+	('9fd7dbf6-57e9-40d4-9a98-3a9b96b60a16', 'cc90a91d-17b3-4b56-899e-94148ec99900', 'RBL', '1', '2026-04-13 15:17:00+00', 1.3486489871796152, 103.83133352818777, NULL, '2026-04-13 07:17:27.610446+00', NULL),
 	('4da6ec90-de85-4359-8e0e-fe1e48c8b891', '56917e7b-16aa-4b01-9352-a70ddb71df67', 'RBL', '1', '2026-06-21 22:41:00+00', 0, 0, NULL, '2026-06-21 14:41:27.614178+00', NULL),
 	('f9e4b880-8350-4afe-a574-a0deed411207', '39da2398-b938-4051-973f-87f7b3bee6f2', 'RBL', '1', '2026-04-12 00:36:00+00', 1.383728690688713, 103.82194849747827, 'Feeding on leaves in the canopy.', '2026-04-11 16:36:44.461036+00', NULL),
 	('c1fe4d83-7349-441e-bedc-bdfeecd906bf', '39da2398-b938-4051-973f-87f7b3bee6f2', 'LTM', '1', '2026-04-12 00:36:00+00', 1.3831072138206366, 103.82300069696265, 'Resting on tree branch with minimal movement.', '2026-04-11 16:40:28.673695+00', NULL),
 	('6ec52b58-c855-41ab-b44c-ec69bc2f2dee', '39da2398-b938-4051-973f-87f7b3bee6f2', 'DUSKY', '1', '2026-04-12 00:36:00+00', 1.3819682528031336, 103.82163136162842, 'Moving quickly across trees from left to right.', '2026-04-11 16:41:03.60088+00', NULL),
 	('ee26ff4c-5523-4606-ad28-23385d31e916', '39da2398-b938-4051-973f-87f7b3bee6f2', 'OTHER', '1', '2026-04-12 00:41:00+00', 1.382641610664649, 103.82418364068695, 'Small squirrel on tree.', '2026-04-11 16:41:47.564533+00', 'Plantain squirrel'),
+	('4b4c2ffc-e74b-4ce7-bc45-4a601ab8bc41', '57673137-4a75-4306-b2d2-619f4dc9396e', 'RBL', '2', '2026-04-12 00:58:00+00', 1.37305450538925, 103.812085724354, 'Foraging on the ground briefly.', '2026-04-11 16:58:19.166723+00', NULL),
+	('2ca59963-860e-4290-a21e-e994bbc21070', '57673137-4a75-4306-b2d2-619f4dc9396e', 'LTM', '5', '2026-04-12 00:58:00+00', 1.37171694569172, 103.812936249853, 'Playing and chasing within the group.', '2026-04-11 16:58:50.375232+00', NULL),
 	('a9b22848-06ce-459a-a73b-520504271428', 'b62bd06c-5683-4ad1-b555-2d103c68a051', 'RBL', '2', '2026-04-12 00:47:00+00', 1.3721379025752611, 103.8246651312457, 'Grooming another individual.', '2026-04-11 16:47:43.484876+00', NULL),
-	('8b4f1cad-407a-446d-9084-aed903486ce7', 'b62bd06c-5683-4ad1-b555-2d103c68a051', 'LTM', '3', '2026-04-12 00:47:00+00', 1.3731050366596946, 103.82474207615502, 'Sitting still and observing surroundings.', '2026-04-11 16:48:20.17636+00', NULL);
+	('8b4f1cad-407a-446d-9084-aed903486ce7', 'b62bd06c-5683-4ad1-b555-2d103c68a051', 'LTM', '3', '2026-04-12 00:47:00+00', 1.3731050366596946, 103.82474207615502, 'Sitting still and observing surroundings.', '2026-04-11 16:48:20.17636+00', NULL),
+	('3cd460bc-d855-4417-a8a8-eac300f30460', '8882963f-9009-404a-9173-2edd4b123d94', 'RBL', '1', '2026-04-12 00:57:00+00', 0, 0, NULL, '2026-04-11 16:57:32.505356+00', NULL),
+	('33d8ffb4-7f69-405b-9c23-7e59a6af326c', '7cdb514f-33c4-4495-8eab-fea6105e07a3', 'RBL', '1', '2026-04-14 15:17:00+00', 0, 0, NULL, '2026-04-14 07:18:03.912935+00', NULL),
+	('acb9189f-3362-47a8-960f-d8ccae990b6b', '742cf8d3-f1d1-47fe-916d-b953a553e9ac', 'OTHER', '1', '2026-04-13 17:45:00+00', 1.3289049999520017, 103.82539404723985, 'hehe', '2026-04-13 09:46:00.264487+00', 'idk?'),
+	('a778c3db-3eb4-4a5d-bf6c-91445d24116f', 'a5be2d4e-3542-4da7-a8c7-42c12b8208e2', 'RBL', '1', '2026-05-11 16:36:00+00', 0, 0, NULL, '2026-05-11 08:36:39.384645+00', NULL),
+	('1362a901-ab45-489d-8eb8-c76b9d2fc216', '9c9009be-f0e2-47d1-b782-3c686387653c', 'RBL', '1', '2026-05-12 03:12:00+00', 1.3140646925828605, 103.79465697615962, 'mmmmmmm', '2026-05-11 19:12:47.989986+00', NULL);
 
 
 --
@@ -471,7 +495,12 @@ INSERT INTO "public"."media" ("id", "observation_id", "sighting_id", "file_path"
 	('714689c6-9574-46c9-98df-396379188c95', NULL, '8b4f1cad-407a-446d-9084-aed903486ce7', '56823340-0cb5-4679-aab3-8fa552178a90/8b4f1cad-407a-446d-9084-aed903486ce7/73ad2a98-f5a6-42e6-8110-55649318f2b5.jpg', 'LTM2.jpg', 'PHOTO', 47352, NULL, NULL, NULL, '2026-04-11 16:48:48.563308+00', NULL),
 	('a8a3646e-5542-4dea-b1ea-9845bb27fdc2', NULL, '5b9bb001-6d44-4b01-9a38-ac8d480d0033', '56823340-0cb5-4679-aab3-8fa552178a90/5b9bb001-6d44-4b01-9a38-ac8d480d0033/4a398b5c-ccb0-4175-97e4-a23338437f06.jpg', 'DUSKY2.jpg', 'PHOTO', 53323, NULL, NULL, NULL, '2026-04-11 16:50:29.671055+00', NULL),
 	('737b428b-1219-4d68-8d90-008302ad0f28', NULL, NULL, '888758d2-5bf0-4ecb-a85e-cc998ebe775b/97d45f21-9f57-4b9c-969d-19f52e879d78/d7769b11-bc93-4016-ac5f-52ce83620d24.jpeg', 'HABITAT_DAMAGE.jpeg', 'PHOTO', 16018, NULL, NULL, NULL, '2026-04-11 16:55:56.506356+00', '97d45f21-9f57-4b9c-969d-19f52e879d78'),
-	('ac9c2cbc-682b-434c-b7d3-8ca3e42e4b6c', NULL, 'd3aa93d8-a3e9-478b-afe5-fab9ff918692', 'cc60e20c-0986-4157-a153-1c62e0c76042/d3aa93d8-a3e9-478b-afe5-fab9ff918692/a5b2a619-ec7b-4d75-8b86-225c4b464dc7.jpg', 'RBL1.jpg', 'PHOTO', 197500, NULL, NULL, '2020-01-19 08:10:00+00', '2026-04-13 07:05:49.925516+00', NULL);
+	('601e3982-fe4b-40f8-962a-24f6a7a0b5fb', NULL, '4b4c2ffc-e74b-4ce7-bc45-4a601ab8bc41', '71c422c5-ff93-495c-9f90-b8cf3e40d696/4b4c2ffc-e74b-4ce7-bc45-4a601ab8bc41/fda6d056-6868-4fd4-80e6-cbf4e1537b18.jpg', 'RBL1.jpg', 'PHOTO', 197500, NULL, NULL, '2020-01-19 08:10:00+00', '2026-04-11 16:58:44.553454+00', NULL),
+	('2e933288-0c44-49af-b19a-fbdcbbbbbf47', NULL, '2ca59963-860e-4290-a21e-e994bbc21070', '71c422c5-ff93-495c-9f90-b8cf3e40d696/2ca59963-860e-4290-a21e-e994bbc21070/e142f274-76ef-4a6b-a44a-b8c1161c91ff.jpg', 'LTM1.jpg', 'PHOTO', 175510, NULL, NULL, NULL, '2026-04-11 16:59:20.998273+00', NULL),
+	('ac9c2cbc-682b-434c-b7d3-8ca3e42e4b6c', NULL, 'd3aa93d8-a3e9-478b-afe5-fab9ff918692', 'cc60e20c-0986-4157-a153-1c62e0c76042/d3aa93d8-a3e9-478b-afe5-fab9ff918692/a5b2a619-ec7b-4d75-8b86-225c4b464dc7.jpg', 'RBL1.jpg', 'PHOTO', 197500, NULL, NULL, '2020-01-19 08:10:00+00', '2026-04-13 07:05:49.925516+00', NULL),
+	('54bf0fde-2a93-43fc-bb89-f98a97034052', NULL, '9fd7dbf6-57e9-40d4-9a98-3a9b96b60a16', 'cc60e20c-0986-4157-a153-1c62e0c76042/9fd7dbf6-57e9-40d4-9a98-3a9b96b60a16/b560d498-f737-421f-a820-8653523276c2.jpg', 'RBL1.jpg', 'PHOTO', 197500, NULL, NULL, '2020-01-19 08:10:00+00', '2026-04-13 07:17:36.69894+00', NULL),
+	('4b58dc3b-a7f6-4986-89de-720171953d6b', NULL, 'acb9189f-3362-47a8-960f-d8ccae990b6b', '0f2cbdab-dfca-42c9-9a90-1b4b677a84ce/acb9189f-3362-47a8-960f-d8ccae990b6b/d5c9a906-d3d3-45ba-a9d5-efafe5bab2c8.jpeg', 'IMG_1417 (1).jpeg', 'PHOTO', 2932345, 35.68848333333333, 128.46624722222222, '2025-10-10 13:11:00+00', '2026-04-13 09:46:13.308992+00', NULL),
+	('1749d252-2e0e-40af-9337-40cee81d29e0', NULL, '1362a901-ab45-489d-8eb8-c76b9d2fc216', '0f2cbdab-dfca-42c9-9a90-1b4b677a84ce/1362a901-ab45-489d-8eb8-c76b9d2fc216/22903832-80af-40dd-a132-d0267924e2ef.png', 'Screenshot_1778027179.png', 'PHOTO', 260754, NULL, NULL, NULL, '2026-05-11 19:13:06.685924+00', NULL);
 
 
 --
@@ -533,11 +562,6 @@ INSERT INTO "public"."user_audit_logs" ("id", "user_id", "actor_id", "event_type
 
 
 --
--- Data for Name: buckets; Type: TABLE DATA; Schema: storage; Owner: supabase_storage_admin
---
-
-
---
 -- Data for Name: buckets_analytics; Type: TABLE DATA; Schema: storage; Owner: supabase_storage_admin
 --
 
@@ -545,18 +569,6 @@ INSERT INTO "public"."user_audit_logs" ("id", "user_id", "actor_id", "event_type
 
 --
 -- Data for Name: buckets_vectors; Type: TABLE DATA; Schema: storage; Owner: supabase_storage_admin
---
-
-
-
---
--- Data for Name: iceberg_namespaces; Type: TABLE DATA; Schema: storage; Owner: supabase_storage_admin
---
-
-
-
---
--- Data for Name: iceberg_tables; Type: TABLE DATA; Schema: storage; Owner: supabase_storage_admin
 --
 
 
@@ -637,12 +649,6 @@ INSERT INTO "storage"."objects" ("id", "bucket_id", "name", "owner", "created_at
 
 
 --
--- Data for Name: hooks; Type: TABLE DATA; Schema: supabase_functions; Owner: supabase_functions_admin
---
-
-
-
---
 -- Name: refresh_tokens_id_seq; Type: SEQUENCE SET; Schema: auth; Owner: supabase_auth_admin
 --
 
@@ -650,16 +656,9 @@ SELECT pg_catalog.setval('"auth"."refresh_tokens_id_seq"', 614, true);
 
 
 --
--- Name: hooks_id_seq; Type: SEQUENCE SET; Schema: supabase_functions; Owner: supabase_functions_admin
---
-
-SELECT pg_catalog.setval('"supabase_functions"."hooks_id_seq"', 1, false);
-
-
---
 -- PostgreSQL database dump complete
 --
 
--- \unrestrict tPwyCeLkCMbdbDHUstq5PiuMaG4lbax80QKUpgM5TUSmFl6WpEbFmEqlzUfDfzE
+-- \unrestrict A9Y04rNH7ApPh7Na5ipGmnccoy0LswtBHZ77NUGbAUGNGOPjQaSnJPTspImABxg
 
 RESET ALL;

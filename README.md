@@ -118,6 +118,24 @@ You can make changes to your local Supabase instance directly using the table ed
 npx supabase db diff -f <migration_name>
 ```
 
+### 5. Configuring Google sign-in provider for local Supabase instance
+
+Go to [Google Auth Platform console](https://console.cloud.google.com/auth/overview). 
+
+If you have not already created a project, click `Create project`. After creating project, click `Get started` and complete the configuration.
+
+In the Auth Platform, go to `Clients` -> `Create client`.
+- Under `Application type`, select `Web application`
+- Change the name of the application
+- Under `Authorized JavaScript origins`, include the following URIs:
+  - `http://localhost:3000`
+  - `http://127.0.0.1:3000`
+- Under `Authorized redirect URIs`, include the following URIs:
+  - `http://localhost:54321/auth/v1/callback`
+  - `http://127.0.0.1:54321/auth/v1/callback`
+
+Upon client creation, you will receive a client ID and client secret. Use them to configure `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` and `SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET` in `.env.local` respectively.
+
 ## Demo Accounts
 
 Use the provided demo credentials for the following accounts:

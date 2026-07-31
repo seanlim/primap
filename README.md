@@ -75,6 +75,67 @@ npm test
 npm run test:coverage
 ```
 
+## Local Development
+
+### Prerequisites
+
+- Docker Desktop (must be running)
+
+### 1. Link to remote Supabase
+
+Link local Supabase CLI to Supabase account
+```bash
+npx supabase login
+```
+
+Link local Supabase project to remote Supabase project
+```bash
+npx supabase link
+```
+
+### 2. Start a local Supabase instance
+
+
+```bash
+npx supabase start
+```
+
+This starts the local Supabase stack in Docker, applies all migrations in `supabase/migrations`, and loads seeded data from `supabase/seed.sql`.
+
+### 3. Modify `.env.local` to connect to local Supabase instance
+
+`NEXT_PUBLIC_SUPABASE_URL`,  `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Go to [Studio](http://localhost:54323/project/default?showConnect=true) -> App Frameworks -> Next.js
+
+`SUPABASE_SERVICE_ROLE_KEY`: In the output that appears after `npx supabase start`, copy the key under `Authentication Keys` -> `Secret`
+
+### 4. Making DB changes
+
+> For more details: [Local development with schema migrations | Supabase Docs](https://supabase.com/docs/guides/local-development/overview)
+
+You can make changes to your local Supabase instance directly using the table editor, then run this to capture the changes in a new migration file
+
+```bash
+npx supabase db diff -f <migration_name>
+```
+
+### 5. Configuring Google sign-in provider for local Supabase instance
+
+Go to [Google Auth Platform console](https://console.cloud.google.com/auth/overview). 
+
+If you have not already created a project, click `Create project`. After creating project, click `Get started` and complete the configuration.
+
+In the Auth Platform, go to `Clients` -> `Create client`.
+- Under `Application type`, select `Web application`
+- Change the name of the application
+- Under `Authorized JavaScript origins`, include the following URIs:
+  - `http://localhost:3000`
+  - `http://127.0.0.1:3000`
+- Under `Authorized redirect URIs`, include the following URIs:
+  - `http://localhost:54321/auth/v1/callback`
+  - `http://127.0.0.1:54321/auth/v1/callback`
+
+Upon client creation, you will receive a client ID and client secret. Use them to configure `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` and `SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET` in `.env.local` respectively.
+
 ## Demo Accounts
 
 Use the provided demo credentials for the following accounts:
@@ -110,7 +171,7 @@ These steps assume the shared backend and demo credentials provided with the sub
 3. Open the admin users page (`/admin/users`) and verify that `emily@primap.demo` appears as `PENDING`.
 4. Open the admin reports page (`/admin/reports`) to review the seeded submitted reports.
 5. Open the admin incidents page (`/admin/incidents`) to review the seeded incident.
-6. Open the survey rounds page (`/admin/rounds`) and walk management page (`/admin/walks`) to inspect the seeded schedule data.
+6. Open the survey rounds page (`/admin/rounds`) and walk management page and select round to inspect the seeded schedule data for the round.
 7. Open the data management page (`/admin/data`) to access export and import features.
 
 ### Pending-user flow
@@ -127,8 +188,7 @@ These steps assume the shared backend and demo credentials provided with the sub
 - `/report` for volunteer reporting
 - `/admin` for admin features
 - `/admin/users` for user approval and role management
-- `/admin/rounds` for survey-round management
-- `/admin/walks` for walk-slot management
+- `/admin/rounds` for survey-round management and walk management
 - `/admin/reports` for report review
 - `/admin/incidents` for incident review
 - `/admin/data` for data export and import

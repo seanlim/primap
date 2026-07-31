@@ -447,7 +447,7 @@ export async function createWalk(data: {
     })
 
   if (error) return { error: error.message }
-  revalidatePath('/admin/walks')
+  revalidatePath(`/admin/rounds/${data.roundId}/walks`)
   revalidatePath('/walk')
   return { success: true }
 }
@@ -506,7 +506,7 @@ export async function updateWalk(walkId: string, data: {
     .eq('id', walkId)
 
   if (error) return { error: error.message }
-  revalidatePath('/admin/walks')
+  revalidatePath(`/admin/rounds/${data.roundId}/walks`)
   revalidatePath('/walk')
   return { success: true }
 }
@@ -540,13 +540,16 @@ export async function deleteWalk(
 
   if (membershipError) return { error: membershipError.message }
 
-  const { error } = await supabase
+  const { error, data } = await supabase
     .from('walk_slots')
     .delete()
     .eq('id', walkId)
-
+    .select('round_id')
+  
   if (error) return { error: error.message }
-  revalidatePath('/admin/walks')
+  if (data?.[0]?.round_id) {
+    revalidatePath(`/admin/rounds/${data[0].round_id}/walks`)
+  }
   revalidatePath('/walk')
   return { success: true }
 }
@@ -586,7 +589,7 @@ export async function bulkCreateWalks(data: {
   })
 
   if (error) return { error: error.message }
-  revalidatePath('/admin/walks')
+  revalidatePath(`/admin/rounds/${data.roundId}/walks`)
   revalidatePath('/walk')
   return result as { success: true; created: number }
 }

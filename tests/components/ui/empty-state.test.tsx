@@ -1,14 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { Circle } from 'lucide-react'
 import { EmptyState } from '@/components/ui/empty-state'
-
-import type { LucideIcon } from 'lucide-react'
-import React from 'react'
-
-const MockIcon = React.forwardRef<SVGSVGElement, React.SVGProps<SVGSVGElement>>((props, ref) => (
-  <svg {...props} ref={ref} data-testid="icon" />
-)) as unknown as LucideIcon
-MockIcon.displayName = 'MockIcon'
 
 describe('EmptyState', () => {
   it('renders title', () => {
@@ -28,8 +21,8 @@ describe('EmptyState', () => {
   })
 
   it('renders icon when provided', () => {
-    render(<EmptyState title="No items" icon={MockIcon} />)
-    expect(screen.getByTestId('icon')).toBeInTheDocument()
+    render(<EmptyState title="No items" icon={Circle} />)
+    expect(document.querySelector('svg')).toBeInTheDocument()
   })
 
   it('does not render icon when not provided', () => {

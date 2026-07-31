@@ -40,3 +40,12 @@ export function formatDate(
   const d = typeof date === 'string' ? new Date(date) : date
   return d.toLocaleDateString(LOCALE, options ?? PRESETS[preset])
 }
+
+export function formatTime_HH_MM(timestamp: string | Date): string {
+  const d = typeof timestamp === 'string' ? new Date(timestamp) : timestamp
+  return d.toLocaleTimeString(LOCALE, {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}

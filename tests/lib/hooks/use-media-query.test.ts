@@ -59,8 +59,9 @@ describe('useMediaQuery', () => {
     window.matchMedia = mockMatchMedia
 
     const { unmount } = renderHook(() => useMediaQuery('(min-width: 768px)'))
-    const mediaInstance = mockMatchMedia.mock.results[0].value
+    const mediaInstance = mockMatchMedia.mock.results.at(-1)?.value
 
+    expect(mediaInstance).toBeDefined()
     expect(mediaInstance.removeEventListener).not.toHaveBeenCalled()
 
     unmount()

@@ -95,6 +95,7 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
         setPendingAction(null)
       } else {
         setLateCancellationActive(result.isLateCancellation ?? false)
+        setPendingAction(null)
         setShowCancelDialog(true)
       }
     })

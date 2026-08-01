@@ -2,7 +2,7 @@
 
 import { useRef, useState, useOptimistic, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { joinWalk, cancelWalk } from '@/lib/actions/walk-actions'
+import { joinWalk, cancelWalk, getWalkLateCancellationStatus } from '@/lib/actions/walk-actions'
 import { MapPin, Calendar, Clock, Users } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { Breadcrumb } from '@/components/ui/breadcrumb'
@@ -31,13 +31,13 @@ interface WalkDetailProps {
   isJoined: boolean
   isFull: boolean
   currentUserId: string
-  lateCancellationActive: boolean
   hasSubmittedReport: boolean
 }
 
-export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserId, lateCancellationActive, hasSubmittedReport }: WalkDetailProps) {
+export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserId, hasSubmittedReport }: WalkDetailProps) {
   const [error, setError] = useState('')
   const [showCancelDialog, setShowCancelDialog] = useState(false)
+  const [lateCancellationActive, setLateCancellationActive] = useState(false)
   const [cancellationReason, setCancellationReason] = useState('')
   const [isPending, startTransition] = useTransition()
   const [pendingAction, setPendingAction] = useState<'join' | 'cancel' | null>(null)
@@ -68,24 +68,36 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
 
   const handleJoin = () => {
     setError('')
-      setPendingAction('join')
-      startTransition(async () => {
-        setOptimistic('join')
-        const result = await joinWalk(walk.id)
-        if (result.error) {
-          setError(result.error)
-          setPendingAction(null)
-        } else {
-          if (result.warning) {
-            showToast(result.warning, 'info')
-          }
-          router.refresh()
+    setPendingAction('join')
+    startTransition(async () => {
+      setOptimistic('join')
+      const result = await joinWalk(walk.id)
+      if (result.error) {
+        setError(result.error)
+        setPendingAction(null)
+      } else {
+        if (result.warning) {
+          showToast(result.warning, 'info')
         }
-      })
+        router.refresh()
+      }
+    })
   }
 
   const handleCancel = () => {
-    setShowCancelDialog(true)
+    setError('')
+    setPendingAction('cancel')
+    startTransition(async () => {
+      setOptimistic('cancel')
+      const result = await getWalkLateCancellationStatus(walk.id)
+      if (result.error) {
+        setError(result.error)
+        setPendingAction(null)
+      } else {
+        setLateCancellationActive(result.isLateCancellation ?? false)
+        setShowCancelDialog(true)
+      }
+    })
   }
 
   const confirmCancel = () => {

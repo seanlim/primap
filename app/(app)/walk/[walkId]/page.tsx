@@ -62,7 +62,6 @@ export default async function WalkDetailPage({
   const slotStart = getWalkStartDateTime(walk.walk_date, walk.start_time)
   const isPastOrStarted = slotStart <= new Date()
   const isFull = memberships.length >= walk.max_volunteers
-  const lateCancellationActive = Boolean(userMembership) && isLateCancellationActive(walk.reminder_sent_at)
 
   const joinBlockedInfo = !userMembership
     ? getJoinBlockInfo({
@@ -94,7 +93,6 @@ export default async function WalkDetailPage({
       isJoined={!!userMembership}
       isFull={isFull}
       currentUserId={user.id}
-      lateCancellationActive={lateCancellationActive}
       hasSubmittedReport={hasSubmittedReport}
     />
   )

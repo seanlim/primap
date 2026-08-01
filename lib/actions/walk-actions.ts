@@ -141,6 +141,18 @@ export async function joinWalk(walkId: string) {
 
 const MAX_CANCELLATION_REASON_LENGTH = 1000
 
+export async function getWalkLateCancellationStatus(walkId: string) {
+  const supabase = await createClient()
+  const { data: slot, error: slotError } = await supabase
+    .from('walk_slots')
+    .select('reminder_sent_at')
+    .eq('id', walkId)
+    .single()
+  if (slotError) return { error: slotError.message }
+  if (!slot) return { error: 'Walk slot not found.' }
+  return { isLateCancellation: isLateCancellationActive(slot.reminder_sent_at) }
+}
+
 export async function cancelWalk(walkId: string, cancellationReason?: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

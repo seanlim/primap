@@ -174,7 +174,7 @@ describe('GET /api/cron/reminders', () => {
     expect(response.status).toBe(200)
     expect(body.success).toBe(true)
     expect(body.emailsSent).toBe(2)
-    expect(body.slotsMarkedLate).toBe(1)
+    expect(body.slotsCount).toBe(1)
     expect(sendWalkReminderEmail).toHaveBeenCalledTimes(2)
     expect(sendWalkReminderEmail).toHaveBeenCalledWith('alice@test.com', 'Alice', {
       date: '2026-03-11',
@@ -214,7 +214,7 @@ describe('GET /api/cron/reminders', () => {
     expect(response.status).toBe(200)
     expect(body.success).toBe(true)
     expect(body.emailsSent).toBe(0)
-    expect(body.slotsMarkedLate).toBe(1)
+    expect(body.slotsCount).toBe(1)
     expect(sendWalkReminderEmail).not.toHaveBeenCalled()
     expect(mockWalkUpdateEq).toHaveBeenCalledWith('id', 'slot-1')
   })
@@ -256,7 +256,7 @@ describe('GET /api/cron/reminders', () => {
     expect(response.status).toBe(200)
     expect(body.success).toBe(true)
     expect(body.emailsSent).toBe(0)
-    expect(body.slotsMarkedLate).toBe(1)
+    expect(body.slotsCount).toBe(1)
     expect(mockWalkUpdateEq).toHaveBeenCalledWith('id', 'slot-1')
   })
 

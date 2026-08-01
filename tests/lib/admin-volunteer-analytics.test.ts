@@ -211,16 +211,19 @@ describe('getAdminUsersAnalytics indicators', () => {
                   user_id: 'user-1',
                   status: 'CANCELLED',
                   walk_slots: { reminder_sent_at: '2026-04-09T05:00:00' },
+                  cancelled_at: '2026-04-09T07:00:00',
                 },
                 {
                   user_id: 'user-1',
                   status: 'CANCELLED',
                   walk_slots: { reminder_sent_at: null },
+                  cancelled_at: '2026-04-09T07:00:00',
                 },
                 {
                   user_id: 'user-1',
                   status: 'CANCELLED',
                   walk_slots: { reminder_sent_at: '2026-04-09T05:00:00' },
+                  cancelled_at: '2026-04-09T05:00:00',
                 },
               ],
             })
@@ -237,7 +240,7 @@ describe('getAdminUsersAnalytics indicators', () => {
 
     expect(snapshot.userStats['user-1']).toMatchObject({
       cancellations: 3,
-      lateCancellations: 2,
+      lateCancellations: 1,
       hasLateCancellationIndicator: true,
     })
   })

@@ -18,7 +18,8 @@ import {
   User, Mail, 
   TriangleAlert, 
   CalendarPlus, 
-  CalendarX 
+  CalendarX, 
+  AlertTriangle
 } from 'lucide-react'
 import { 
   createWalk, 
@@ -58,6 +59,12 @@ interface WalkData {
   }>
   memberCount: number
   reminderSentAt: string | null
+}
+
+interface LateCancellation {
+  user_id: string
+  reason: string | null
+  slot_id: string | null
 }
 
 interface BulkRule {
@@ -110,9 +117,10 @@ function formatWalkTimeDisplay(walk: WalkData): string {
   return `${formatTime_HH_MM(`${walk.walkDate}T${walk.startTime}`)} - ${formatTime_HH_MM(`${walk.walkDate}T${walk.endTime}`)}`
 }
 
-export function WalksClient({ walks, round }: {
+export function WalksClient({ walks, round, lateCancellations }: {
   walks: WalkData[]
   round: { id: string; name: string; startDate: string; endDate: string }
+  lateCancellations: LateCancellation[]
 }) {
 
   const [showForm, setShowForm] = useState(false)
@@ -184,6 +192,15 @@ export function WalksClient({ walks, round }: {
   const editingWalk = editingWalkId ? walks.find(w => w.id === editingWalkId) : null
   const editingWalkVolunteers = editingWalk?.volunteers.filter(v => v.status === 'ACTIVE') || []
   const editingWalkCancellations = editingWalk?.volunteers.filter(v => v.status === 'CANCELLED') || []
+
+  const lateCancellationsBySlotId = new Map<string, LateCancellation[]>()
+  for (const cancellation of lateCancellations) {
+    if (!cancellation.slot_id) continue
+    if (!lateCancellationsBySlotId.has(cancellation.slot_id)) {
+      lateCancellationsBySlotId.set(cancellation.slot_id, [])
+    }
+    lateCancellationsBySlotId.get(cancellation.slot_id)?.push(cancellation)
+  }
 
   const handleCreate = async (e: React.SubmitEvent) => {
     e.preventDefault()
@@ -697,24 +714,36 @@ export function WalksClient({ walks, round }: {
                     <div className="bg-gray-50 rounded-lg p-3">
                       <p className="text-sm font-medium text-gray-900">None</p>
                     </div>
-                  ) : editingWalkCancellations.map((v) => (
-                    <div key={v.user_id} className="bg-gray-50 rounded-lg p-3">
-                      <div className="flex flex-row items-center gap-2 text-gray-900">
-                        <User className="w-4 h-4" />
-                        <p className="text-sm font-medium">{v.name || 'Unnamed user'}</p>
-                      </div>
-                      <div className="flex flex-row items-center gap-2 text-gray-500">
-                        <Mail className="w-4 h-4" />
-                        <p className="text-sm font-medium">{v.email}</p>
-                      </div>
-                      {v.cancelled_at && (
-                        <div className="flex flex-row items-center gap-2 text-gray-500">
-                          <CalendarX className="w-4 h-4" />
-                          <p className="text-sm font-medium">{formatDate(v.cancelled_at)}</p>
+                  ) : editingWalkCancellations.map((v) => {
+                    const isLateCancellation = v.cancelled_at && editingWalk?.reminderSentAt && editingWalk.reminderSentAt < v.cancelled_at
+                    const lateCancellationReason = isLateCancellation ? lateCancellationsBySlotId.get(editingWalk.id)?.find(c => c.user_id === v.user_id)?.reason : "None"
+
+                    return (
+                      <div key={v.user_id} className="bg-gray-50 rounded-lg p-3">
+                        <div className="flex flex-row items-center gap-2 text-gray-900">
+                          <User className="w-4 h-4" />
+                          <p className="text-sm font-medium">{v.name || 'Unnamed user'}</p>
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        <div className="flex flex-row items-center gap-2 text-gray-500">
+                          <Mail className="w-4 h-4" />
+                          <p className="text-sm font-medium">{v.email}</p>
+                        </div>
+                        {v.cancelled_at && (
+                          <div className="flex flex-row items-center gap-2 text-gray-500">
+                            <CalendarX className="w-4 h-4" />
+                            <p className="text-sm font-medium">{formatDate(v.cancelled_at)}</p>
+                            <span className="inline-flex rounded-lg bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">Late</span>
+                          </div>
+                        )}
+                        {lateCancellationReason && (
+                          <div className="flex flex-row items-center gap-2 text-gray-500">
+                            <AlertTriangle className="w-4 h-4" />
+                            <p className="text-sm font-medium">Reason: {lateCancellationReason}</p>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}

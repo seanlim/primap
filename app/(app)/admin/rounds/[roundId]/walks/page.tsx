@@ -16,7 +16,11 @@ export default async function AdminWalksPage({ params }: {
     .select('*, survey_rounds(name, status, start_date, end_date), slot_memberships(profiles(id, full_name, email), status, joined_at, cancelled_at)')
     .filter('round_id', 'eq', roundId)
     .order('walk_date', { ascending: false })
-
+  const { data: lateCancellations } = await supabase
+    .from('user_audit_logs')
+    .select('user_id, reason, slot_id')
+    .eq('event_type', 'LATE_WALK_CANCELLATION')
+    .eq('round_id', roundId)
   const { data: selectedRound } = await supabase
     .from('survey_rounds')
     .select('id, name, start_date, end_date')
@@ -57,6 +61,7 @@ export default async function AdminWalksPage({ params }: {
             startDate: selectedRound.start_date,
             endDate: selectedRound.end_date,
           }}
+          lateCancellations={lateCancellations || []}
         />
       ) : (
         <div className="flex items-center justify-center h-100">

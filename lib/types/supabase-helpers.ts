@@ -1,4 +1,4 @@
-import type { Profile, WalkSlot, SlotMembership, Observation, Incident, SurveyRound, Sighting, Media } from './database'
+import type { Profile, WalkSlot, SlotMembership, SlotInvitation, Observation, Incident, SurveyRound, Sighting, Media } from './database'
 
 // --- Compact relation refs used in Supabase join selects ---
 
@@ -10,6 +10,16 @@ export type ProfileNameRef = Pick<Profile, 'full_name' | 'email'>
 
 export type MembershipWithProfile = Pick<SlotMembership, 'id' | 'user_id' | 'status' | 'joined_at'> & {
   profiles: ProfileRef
+}
+
+// --- Slot invitation with nested invitee/inviter profiles ---
+
+export type SlotInvitationWithProfiles = Pick<
+  SlotInvitation,
+  'id' | 'slot_id' | 'invited_user_id' | 'invited_by' | 'status' | 'created_at' | 'responded_at'
+> & {
+  invitee: ProfileNameRef
+  inviter: ProfileNameRef
 }
 
 // --- Walk with nested memberships and round ---

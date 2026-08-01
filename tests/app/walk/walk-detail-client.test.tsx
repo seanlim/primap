@@ -5,11 +5,18 @@ import { WalkDetailClient } from '@/app/(app)/walk/[walkId]/walk-detail-client'
 
 const mockJoinWalk = vi.fn()
 const mockCancelWalk = vi.fn()
+const mockSearchInviteCandidates = vi.fn()
+const mockInviteVolunteerToWalk = vi.fn()
+const mockCancelSlotInvitation = vi.fn()
 const mockShowToast = vi.fn()
 
 vi.mock('@/lib/actions/walk-actions', () => ({
   joinWalk: (...args: unknown[]) => mockJoinWalk(...args),
   cancelWalk: (...args: unknown[]) => mockCancelWalk(...args),
+  searchInviteCandidates: (...args: unknown[]) => mockSearchInviteCandidates(...args),
+  inviteVolunteerToWalk: (...args: unknown[]) => mockInviteVolunteerToWalk(...args),
+  cancelSlotInvitation: (...args: unknown[]) => mockCancelSlotInvitation(...args),
+  respondToSlotInvitation: vi.fn(),
 }))
 
 vi.mock('@/components/ui/toast', () => ({
@@ -39,8 +46,12 @@ function renderWalkDetail(overrides: Partial<ComponentProps<typeof WalkDetailCli
         joinBlockedInfo: null,
       }}
       members={[]}
+      pendingInvitations={[]}
+      currentUserPendingInvitation={null}
       isJoined={false}
       isFull={false}
+      reservedCount={0}
+      canInvite={false}
       currentUserId="user-1"
       lateCancelWarning={null}
       hasSubmittedReport={false}
@@ -180,5 +191,108 @@ describe('WalkDetailClient', () => {
 
     expect(screen.getByRole('button', { name: 'Round Closed' })).toBeDisabled()
     expect(screen.getByText('This survey round is no longer open for volunteer signup.')).toBeInTheDocument()
+  })
+
+  it('shows invitation response banner for current user pending invite', () => {
+    renderWalkDetail({
+      pendingInvitations: [{
+        id: 'invite-1',
+        invitedUserId: 'user-1',
+        invitedBy: 'user-2',
+        inviteeName: 'June',
+        inviteeEmail: 'june@example.com',
+        inviterName: 'Alex',
+        inviterEmail: 'alex@example.com',
+        createdAt: '2099-04-01T08:00:00.000Z',
+      }],
+      currentUserPendingInvitation: {
+        id: 'invite-1',
+        invitedByName: 'Alex',
+        invitedByEmail: 'alex@example.com',
+      },
+      reservedCount: 1,
+    })
+
+    expect(screen.getByText('Invitation pending')).toBeInTheDocument()
+    expect(screen.getByText('Alex reserved a spot for you.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Accept' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Decline' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Join Walk' })).not.toBeInTheDocument()
+  })
+
+  it('searches candidates and sends an invitation', async () => {
+    mockSearchInviteCandidates.mockResolvedValueOnce({
+      candidates: [{ id: 'user-2', fullName: 'Alex', email: 'alex@example.com' }],
+    })
+    mockInviteVolunteerToWalk.mockResolvedValueOnce({ success: true })
+
+    renderWalkDetail({
+      isJoined: true,
+      canInvite: true,
+      reservedCount: 1,
+      members: [{
+        userId: 'user-1',
+        fullName: 'June',
+        email: 'june@example.com',
+        joinedAt: '2099-04-01T08:00:00.000Z',
+      }],
+    })
+
+    fireEvent.change(screen.getByLabelText('Search volunteers'), {
+      target: { value: 'alex' },
+    })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+      await Promise.resolve()
+    })
+
+    expect(mockSearchInviteCandidates).toHaveBeenCalledWith('slot-1', 'alex')
+    expect(screen.getByText('Alex')).toBeInTheDocument()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Invite' }))
+      await Promise.resolve()
+    })
+
+    expect(mockInviteVolunteerToWalk).toHaveBeenCalledWith('slot-1', 'user-2')
+    expect(mockShowToast).toHaveBeenCalledWith('Invitation sent to Alex.', 'success')
+  })
+
+  it('shows pending invitations and lets inviter cancel one', async () => {
+    mockCancelSlotInvitation.mockResolvedValueOnce({ success: true })
+
+    renderWalkDetail({
+      isJoined: true,
+      canInvite: true,
+      reservedCount: 2,
+      members: [{
+        userId: 'user-1',
+        fullName: 'June',
+        email: 'june@example.com',
+        joinedAt: '2099-04-01T08:00:00.000Z',
+      }],
+      pendingInvitations: [{
+        id: 'invite-1',
+        invitedUserId: 'user-2',
+        invitedBy: 'user-1',
+        inviteeName: 'Alex',
+        inviteeEmail: 'alex@example.com',
+        inviterName: 'June',
+        inviterEmail: 'june@example.com',
+        createdAt: '2099-04-01T08:00:00.000Z',
+      }],
+    })
+
+    expect(screen.getByText('Alex')).toBeInTheDocument()
+    expect(screen.getByText('Invited by June')).toBeInTheDocument()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+      await Promise.resolve()
+    })
+
+    expect(mockCancelSlotInvitation).toHaveBeenCalledWith('invite-1')
+    expect(mockShowToast).toHaveBeenCalledWith('Invitation cancelled.', 'info')
   })
 })

@@ -145,6 +145,28 @@ export async function sendWalkCancellationEmail(
   ));
 }
 
+export async function sendWalkInvitationEmail(
+  email: string,
+  inviteeName: string | null,
+  inviterName: string,
+  slotInfo: { id: string; date: string; time: string; location: string }
+) {
+  const displayName = escapeHtml(inviteeName || 'Volunteer')
+  const walkUrl = `${APP_URL()}/walk/${encodeURIComponent(slotInfo.id)}`
+
+  await sendEmail(email, 'Primap Walk Invitation', wrapHtml(`
+    <p>Hi ${displayName},</p>
+    <p>${escapeHtml(inviterName)} invited you to join an upcoming survey walk.</p>
+    <div style="background-color: #f0fdf4; padding: 15px; border-radius: 5px; margin: 15px 0; border: 1px solid #bbf7d0;">
+      <p><strong>Date:</strong> ${escapeHtml(slotInfo.date)}</p>
+      <p><strong>Time:</strong> ${escapeHtml(slotInfo.time)}</p>
+      <p><strong>Location:</strong> ${escapeHtml(slotInfo.location)}</p>
+    </div>
+    <p>Please sign in to accept or reject the invitation. This invite reserves a spot until you respond.</p>
+    <a href="${escapeHtml(walkUrl)}" class="button">View Invitation</a>
+  `));
+}
+
 export async function sendIncidentReportedEmail(
   adminEmails: string[],
   details: {

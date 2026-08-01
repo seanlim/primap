@@ -359,6 +359,61 @@ export type Database = {
           },
         ]
       }
+      slot_invitations: {
+        Row: {
+          created_at: string
+          id: string
+          invited_by: string
+          invited_user_id: string
+          responded_at: string | null
+          slot_id: string
+          status: Database["public"]["Enums"]["slot_invitation_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invited_by: string
+          invited_user_id: string
+          responded_at?: string | null
+          slot_id: string
+          status?: Database["public"]["Enums"]["slot_invitation_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invited_by?: string
+          invited_user_id?: string
+          responded_at?: string | null
+          slot_id?: string
+          status?: Database["public"]["Enums"]["slot_invitation_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "slot_invitations_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "slot_invitations_invited_user_id_fkey"
+            columns: ["invited_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "slot_invitations_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: false
+            referencedRelation: "walk_slots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       survey_rounds: {
         Row: {
           created_at: string
@@ -460,6 +515,18 @@ export type Database = {
         Args: { p_slot_id: string }
         Returns: Json
       }
+      cancel_slot_invitation: {
+        Args: { p_invitation_id: string }
+        Returns: Json
+      }
+      create_slot_invitation: {
+        Args: { p_invited_user_id: string; p_slot_id: string }
+        Returns: Json
+      }
+      respond_to_slot_invitation: {
+        Args: { p_invitation_id: string; p_response: string }
+        Returns: Json
+      }
     }
     Enums: {
       incident_type:
@@ -474,6 +541,7 @@ export type Database = {
       observation_status: "DRAFT" | "SUBMITTED"
       round_status: "DRAFT" | "OPEN" | "CLOSED"
       species_type: "RBL" | "LTM" | "DUSKY" | "OTHER"
+      slot_invitation_status: "PENDING" | "ACCEPTED" | "REJECTED" | "CANCELLED"
       user_role: "ADMIN" | "VOLUNTEER"
       user_status: "PENDING" | "ACTIVE" | "REJECTED" | "DISABLED"
       walk_completion: "COMPLETED" | "PARTIAL" | "ABORTED"
@@ -617,6 +685,7 @@ export const Constants = {
       observation_status: ["DRAFT", "SUBMITTED"],
       round_status: ["DRAFT", "OPEN", "CLOSED"],
       species_type: ["RBL", "LTM", "DUSKY", "OTHER"],
+      slot_invitation_status: ["PENDING", "ACCEPTED", "REJECTED", "CANCELLED"],
       user_role: ["ADMIN", "VOLUNTEER"],
       user_status: ["PENDING", "ACTIVE", "REJECTED", "DISABLED"],
       walk_completion: ["COMPLETED", "PARTIAL", "ABORTED"],
@@ -633,6 +702,7 @@ export type AppSettings = Tables<"app_settings">
 export type SurveyRound = Tables<"survey_rounds">
 export type WalkSlot = Tables<"walk_slots">
 export type SlotMembership = Tables<"slot_memberships">
+export type SlotInvitation = Tables<"slot_invitations">
 export type Observation = Tables<"observations">
 export type Sighting = Tables<"sightings">
 export type Media = Tables<"media">
@@ -645,6 +715,6 @@ export type ObservationOutcome = Enums<"observation_outcome">
 export type ObservationStatus = Enums<"observation_status">
 export type RoundStatus = Enums<"round_status">
 export type MembershipStatus = Enums<"membership_status">
+export type SlotInvitationStatus = Enums<"slot_invitation_status">
 export type WalkCompletion = Enums<"walk_completion">
 export type SpeciesType = Enums<"species_type">
-

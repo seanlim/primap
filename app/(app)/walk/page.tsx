@@ -7,7 +7,9 @@ import { MapPin, Calendar, Clock, Users, ChevronRight, Footprints, Search } from
 import { EmptyState } from '@/components/ui/empty-state'
 import { hasWalkStarted } from '@/lib/utils/walk-participation'
 import { findCurrentRound } from '@/lib/utils/rounds'
-import type { SlotMembership, WalkSlot as DbWalkSlot } from '@/lib/types/database'
+import type { SlotInvitation, SlotMembership, WalkSlot as DbWalkSlot } from '@/lib/types/database'
+import type { ProfileNameRef } from '@/lib/types/supabase-helpers'
+import { InvitationResponseActions } from './invitation-response-actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,6 +17,7 @@ const PAGE_SIZE = 10
 
 type WalkSlot = DbWalkSlot & {
   slot_memberships: Pick<SlotMembership, 'id' | 'user_id' | 'status'>[]
+  slot_invitations?: Pick<SlotInvitation, 'id' | 'invited_user_id' | 'status'>[]
 }
 
 type RoundMeta = {
@@ -30,8 +33,23 @@ type WalkSlotWithRound = WalkSlot & {
   roundEndDate: string
 }
 
+type PendingInvitationRow = Pick<SlotInvitation, 'id' | 'created_at' | 'invited_by'> & {
+  inviter: ProfileNameRef | null
+  walk_slots: (Pick<DbWalkSlot, 'id' | 'location_name' | 'walk_date' | 'start_time' | 'end_time'> & {
+    survey_rounds: (RoundMeta & { status: string }) | null
+  }) | null
+}
+
 function getActiveMembershipCount(slot: Pick<WalkSlot, 'slot_memberships'>) {
   return slot.slot_memberships.filter((membership) => membership.status === 'ACTIVE').length
+}
+
+function getPendingInvitationCount(slot: Pick<WalkSlot, 'slot_invitations'>) {
+  return (slot.slot_invitations || []).filter((invitation) => invitation.status === 'PENDING').length
+}
+
+function getReservedCapacityCount(slot: Pick<WalkSlot, 'slot_memberships' | 'slot_invitations'>) {
+  return getActiveMembershipCount(slot) + getPendingInvitationCount(slot)
 }
 
 function groupSlotsByRound(slots: WalkSlotWithRound[]) {
@@ -185,7 +203,7 @@ export default async function WalkPage({
   let slotsQuery = roundIds.length > 0
     ? supabase
         .from('walk_slots')
-        .select('*, slot_memberships(id, user_id, status)', { count: 'exact' })
+        .select('*, slot_memberships(id, user_id, status), slot_invitations(id, invited_user_id, status)', { count: 'exact' })
         .in('round_id', roundIds)
         .order('walk_date', { ascending: true })
     : null
@@ -241,18 +259,60 @@ export default async function WalkPage({
 
   const mySlotIds = new Set((myMemberships || []).map(m => m.slot_id))
 
+  const { data: pendingInvitationRows } = await supabase
+    .from('slot_invitations')
+    .select(`
+      id,
+      created_at,
+      invited_by,
+      inviter:invited_by (full_name, email),
+      walk_slots (
+        id,
+        location_name,
+        walk_date,
+        start_time,
+        end_time,
+        survey_rounds (id, name, status, start_date, end_date)
+      )
+    `)
+    .eq('invited_user_id', user.id)
+    .eq('status', 'PENDING')
+
+  const pendingInvitations = ((pendingInvitationRows || []) as unknown as PendingInvitationRow[])
+    .filter((invitation) => {
+      const slot = invitation.walk_slots
+      return Boolean(
+        slot &&
+        slot.survey_rounds?.status === 'OPEN' &&
+        !hasWalkStarted(slot.walk_date, slot.start_time)
+      )
+    })
+    .sort((left, right) => {
+      const leftSlot = left.walk_slots
+      const rightSlot = right.walk_slots
+      const leftTime = leftSlot ? new Date(`${leftSlot.walk_date}T${leftSlot.start_time}`).getTime() : 0
+      const rightTime = rightSlot ? new Date(`${rightSlot.walk_date}T${rightSlot.start_time}`).getTime() : 0
+      return leftTime - rightTime
+    })
+
+  const invitedSlotIds = new Set(
+    pendingInvitations
+      .map((invitation) => invitation.walk_slots?.id)
+      .filter((id): id is string => Boolean(id))
+  )
+
   const mySlots = allUpcomingSlots.filter(s => mySlotIds.has(s.id))
   const groupedMySlots = groupSlotsByRound(mySlots)
 
   // Apply availability filter to available slots
-  let availableSlots = allUpcomingSlots.filter(s => !mySlotIds.has(s.id))
+  let availableSlots = allUpcomingSlots.filter(s => !mySlotIds.has(s.id) && !invitedSlotIds.has(s.id))
   if (availabilityFilter === 'open') {
     availableSlots = availableSlots.filter(s => {
-      return getActiveMembershipCount(s) < s.max_volunteers
+      return getReservedCapacityCount(s) < s.max_volunteers
     })
   } else if (availabilityFilter === 'full') {
     availableSlots = availableSlots.filter(s => {
-      return getActiveMembershipCount(s) >= s.max_volunteers
+      return getReservedCapacityCount(s) >= s.max_volunteers
     })
   }
 
@@ -284,6 +344,66 @@ export default async function WalkPage({
 
       {/* Filters */}
       <WalkFilters />
+
+      {pendingInvitations.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-end justify-between gap-3">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+              Invitations
+            </h2>
+            <div className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-100">
+              {pendingInvitations.length} pending
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {pendingInvitations.map((invitation) => {
+              const slot = invitation.walk_slots
+              if (!slot) return null
+
+              const relDay = getRelativeDay(slot.walk_date)
+              return (
+                <div
+                  key={invitation.id}
+                  className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm"
+                >
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <Link href={`/walk/${slot.id}`} className="min-w-0 flex-1 group">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-3.5 w-3.5 shrink-0 text-amber-700" />
+                        <p className="truncate font-semibold text-gray-900 group-hover:text-amber-800">
+                          {slot.location_name}
+                        </p>
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-700">
+                        <span className="inline-flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                          {formatDate(slot.walk_date, 'default')}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <Clock className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                          {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
+                        </span>
+                        {relDay && (
+                          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-100">
+                            {relDay}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-2 text-xs text-amber-800">
+                        Invited by {invitation.inviter?.full_name || invitation.inviter?.email || 'a volunteer'}
+                      </p>
+                    </Link>
+                    <div className="sm:min-w-[180px]">
+                      <InvitationResponseActions invitationId={invitation.id} compact />
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Walks by Round */}
       <section className="space-y-3">
@@ -340,6 +460,7 @@ export default async function WalkPage({
                       </div>
                       {joinedGroup.slots.map((slot) => {
                         const activeCount = getActiveMembershipCount(slot)
+                        const reservedCount = getReservedCapacityCount(slot)
                         const relDay = getRelativeDay(slot.walk_date)
                         return (
                           <Link
@@ -377,6 +498,9 @@ export default async function WalkPage({
                               <div className="mt-3 flex items-center gap-1.5 text-xs text-gray-500">
                                 <Users className="w-3.5 h-3.5 text-gray-400" />
                                 {activeCount}/{slot.max_volunteers} volunteers
+                                {reservedCount > activeCount && (
+                                  <span className="text-amber-700">({reservedCount} reserved)</span>
+                                )}
                               </div>
                             </div>
                             <ChevronRight className="w-4 h-4 text-green-300 group-hover:text-green-600 transition-colors shrink-0" />
@@ -390,7 +514,9 @@ export default async function WalkPage({
                     <div className="space-y-2">
                       {availableGroup.slots.map((slot) => {
                         const activeCount = getActiveMembershipCount(slot)
-                        const isFull = activeCount >= slot.max_volunteers
+                        const pendingCount = getPendingInvitationCount(slot)
+                        const reservedCount = activeCount + pendingCount
+                        const isFull = reservedCount >= slot.max_volunteers
                         const relDay = getRelativeDay(slot.walk_date)
                         return (
                           <Link
@@ -435,14 +561,19 @@ export default async function WalkPage({
                                 <div className="flex-1 bg-gray-100 rounded-full h-2.5">
                                   <div
                                     className="bg-gradient-to-r from-emerald-400 to-sky-500 h-2.5 rounded-full transition-all"
-                                    style={{ width: `${(activeCount / slot.max_volunteers) * 100}%` }}
+                                    style={{ width: `${(reservedCount / slot.max_volunteers) * 100}%` }}
                                   />
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0 text-xs text-gray-500">
                                   <Users className="w-3.5 h-3.5 text-gray-400" />
-                                  {activeCount}/{slot.max_volunteers}
+                                  {reservedCount}/{slot.max_volunteers}
                                 </div>
                               </div>
+                              {pendingCount > 0 && (
+                                <p className="mt-2 text-xs text-amber-700">
+                                  {pendingCount} spot{pendingCount === 1 ? '' : 's'} reserved by invitation
+                                </p>
+                              )}
                             </div>
                             <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-sky-500 transition-colors shrink-0" />
                           </Link>

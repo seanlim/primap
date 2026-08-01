@@ -484,7 +484,7 @@ export async function getAdminUsersAnalytics(
   const profileQuery = supabase.from('profiles').select('id')
   const membershipsQuery = supabase
     .from('slot_memberships')
-    .select('user_id, status, walk_slots(reminder_sent_at)')
+    .select('user_id, status, walk_slots(reminder_sent_at), cancelled_at')
   const observationsQuery = supabase.from('observations').select('user_id, status')
 
   const scopedProfileQuery = userIds?.length ? profileQuery.in('id', userIds) : profileQuery
@@ -497,6 +497,7 @@ export async function getAdminUsersAnalytics(
       user_id: string
       status: 'ACTIVE' | 'CANCELLED'
       walk_slots?: { reminder_sent_at?: string | null } | null
+      cancelled_at: string | null
     }>>,
     scopedObservationsQuery as SupabaseQueryLike<Array<{ user_id: string; status: 'DRAFT' | 'SUBMITTED' }>>,
   ])
@@ -524,7 +525,9 @@ export async function getAdminUsersAnalytics(
     if (membership.status === 'CANCELLED') {
       const stats = userStats[membership.user_id]
       stats.cancellations += 1
-      if (membership.walk_slots?.reminder_sent_at) {
+      if (membership.walk_slots?.reminder_sent_at && membership.cancelled_at
+        && new Date(membership.cancelled_at) > new Date(membership.walk_slots.reminder_sent_at)
+      ) {
         stats.lateCancellations += 1
         stats.hasLateCancellationIndicator = true
       }

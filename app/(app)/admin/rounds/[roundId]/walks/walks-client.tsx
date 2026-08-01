@@ -114,7 +114,6 @@ export function WalksClient({ walks, round }: {
   walks: WalkData[]
   round: { id: string; name: string; startDate: string; endDate: string }
 }) {
-  console.log('walks', walks)
 
   const [showForm, setShowForm] = useState(false)
   const [showBulkForm, setShowBulkForm] = useState(false)

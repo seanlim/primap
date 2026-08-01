@@ -87,20 +87,19 @@ export async function GET(req: NextRequest) {
   }
 
   let emailCount = 0;
-  let slotsMarkedLate = 0;
 
   for (const slot of slots) {
     const members = membersBySlot.get(slot.id) || [];
     const participants = members
       .map((member) => {
-        const profile = member.profiles as unknown as { full_name: string | null; email: string };
+        const profile = member.profiles;
         if (!profile?.email) return null;
         return { fullName: profile.full_name, email: profile.email };
       })
-      .filter((participant): participant is { fullName: string | null; email: string } => participant !== null);
+      .filter((participant) => participant !== null);
 
     for (const member of members) {
-      const profile = member.profiles as unknown as { full_name: string | null; email: string };
+      const profile = member.profiles;
       if (profile?.email) {
         await sendWalkReminderEmail(
           profile.email,
@@ -120,13 +119,12 @@ export async function GET(req: NextRequest) {
       .from('walk_slots')
       .update({ reminder_sent_at: new Date().toISOString() })
       .eq('id', slot.id);
-    slotsMarkedLate++;
   }
 
   return NextResponse.json({
     success: true,
     emailsSent: emailCount,
-    slotsMarkedLate,
+    slotsCount: slots.length,
     startDate: window.startDate,
     endDate: window.endDate,
   });

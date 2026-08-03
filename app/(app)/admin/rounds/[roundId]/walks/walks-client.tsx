@@ -732,10 +732,12 @@ export function WalksClient({ walks, round, lateCancellations }: {
                           <div className="flex flex-row items-center gap-2 text-gray-500">
                             <CalendarX className="w-4 h-4" />
                             <p className="text-sm font-medium">{formatDate(v.cancelled_at)}</p>
-                            <span className="inline-flex rounded-lg bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">Late</span>
+                            {isLateCancellation && (
+                              <span className="text-xs text-amber-600 font-medium">(Late cancellation)</span>
+                            )}
                           </div>
                         )}
-                        {lateCancellationReason && (
+                        {isLateCancellation && lateCancellationReason && (
                           <div className="flex flex-row items-center gap-2 text-gray-500">
                             <AlertTriangle className="w-4 h-4" />
                             <p className="text-sm font-medium">Reason: {lateCancellationReason}</p>

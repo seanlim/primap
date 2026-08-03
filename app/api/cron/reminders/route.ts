@@ -115,10 +115,14 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    await supabase
+    const { error: slotUpdateError } = await supabase
       .from('walk_slots')
       .update({ reminder_sent_at: new Date().toISOString() })
       .eq('id', slot.id);
+    if (slotUpdateError) {
+      console.error(`[Cron] Error updating reminder_sent_at for slot ${slot.id}:`, slotUpdateError);
+      return NextResponse.json({ error: slotUpdateError.message }, { status: 500 });
+    }
   }
 
   return NextResponse.json({

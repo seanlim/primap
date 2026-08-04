@@ -514,7 +514,7 @@ describe('POST /api/admin/import', () => {
     const mockMaybeSingle = vi.fn().mockResolvedValue({ data: { id: 'existing-settings-id' }, error: null })
 
     mockParseWorkbook.mockResolvedValue({
-      app_settings: [{ id: 'imported-id', required_walks_per_round: 5, late_cancel_hours: 24 }],
+      app_settings: [{ id: 'imported-id', required_walks_per_round: 5, reminder_send_weekday: 3 }],
     })
 
     mockAdminFrom.mockImplementation((table: string) => {
@@ -539,7 +539,7 @@ describe('POST /api/admin/import', () => {
     expect(mockUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         required_walks_per_round: 5,
-        late_cancel_hours: 24,
+        reminder_send_weekday: 3,
       })
     )
     expect(body.summary.app_settings.inserted).toBe(1)
@@ -553,7 +553,7 @@ describe('POST /api/admin/import', () => {
     const mockMaybeSingle = vi.fn().mockResolvedValue({ data: null, error: null })
 
     mockParseWorkbook.mockResolvedValue({
-      app_settings: [{ id: 'imported-id', required_walks_per_round: 3, late_cancel_hours: 48 }],
+      app_settings: [{ id: 'imported-id', required_walks_per_round: 3, reminder_send_weekday: 2 }],
     })
 
     mockAdminFrom.mockImplementation((table: string) => {
@@ -670,7 +670,7 @@ describe('POST /api/admin/import', () => {
     const mockMaybeSingle = vi.fn().mockResolvedValue({ data: { id: 'existing-id' }, error: null })
 
     mockParseWorkbook.mockResolvedValue({
-      app_settings: [{ id: 'imported-id', required_walks_per_round: 4, late_cancel_hours: '' }],
+      app_settings: [{ id: 'imported-id', required_walks_per_round: 4, reminder_send_time: '' }],
     })
 
     mockAdminFrom.mockImplementation((table: string) => {
@@ -690,7 +690,7 @@ describe('POST /api/admin/import', () => {
     await POST(makeRequest())
 
     expect(mockUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ late_cancel_hours: null })
+      expect.objectContaining({ reminder_send_time: null })
     )
   })
 

@@ -2,10 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { UsersClient } from './users-client'
 import type { UserStatus } from '@/lib/auth/access-policy'
 import { getAdminUsersAnalytics, type SupabaseClientLike } from '@/lib/admin-volunteer-analytics'
-import {
-  DEFAULT_HIGH_PARTICIPATION_THRESHOLD,
-  DEFAULT_LATE_CANCEL_HOURS,
-} from '@/lib/constants/settings'
+import { DEFAULT_HIGH_PARTICIPATION_THRESHOLD } from '@/lib/constants/settings'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,7 +45,7 @@ export default async function AdminUsersPage({
     })(),
     supabase
       .from('app_settings')
-      .select('late_cancel_hours, high_participation_threshold')
+      .select('high_participation_threshold')
       .limit(1)
       .single(),
     ...ALL_STATUSES.map(s =>
@@ -73,7 +70,6 @@ export default async function AdminUsersPage({
     analyticsClient,
     userRows.map((user) => user.id),
     {
-      lateCancelHours: settings?.late_cancel_hours ?? DEFAULT_LATE_CANCEL_HOURS,
       highParticipationThreshold: settings?.high_participation_threshold ?? DEFAULT_HIGH_PARTICIPATION_THRESHOLD,
     }
   )

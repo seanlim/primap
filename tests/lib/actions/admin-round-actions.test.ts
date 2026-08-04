@@ -1,5 +1,11 @@
 import { revalidatePath } from 'next/cache'
 import type { Mock } from 'vitest'
+import {
+  DEFAULT_REMINDER_SEND_WEEKDAY,
+  DEFAULT_REMINDER_SEND_TIME,
+  DEFAULT_REMINDER_WINDOW_LENGTH_DAYS,
+  DEFAULT_REMINDER_WINDOW_START_OFFSET_DAYS,
+} from '@/lib/constants/settings'
 
 interface MockSupabase {
   auth: { getUser: Mock }
@@ -103,6 +109,18 @@ const walkData = {
 function mockRoundDateRange(startDate = '2026-04-01', endDate = '2026-04-30') {
   methods.single.mockResolvedValueOnce({
     data: { start_date: startDate, end_date: endDate },
+    error: null,
+  })
+}
+
+function mockExistingWalk(overrides?: Partial<{ walk_date: string; start_time: string; reminder_sent_at: string | null }>) {
+  methods.single.mockResolvedValueOnce({
+    data: {
+      walk_date: '2026-04-15',
+      start_time: '08:00:00',
+      reminder_sent_at: null,
+      ...overrides,
+    },
     error: null,
   })
 }
@@ -606,6 +624,25 @@ describe('admin-round-actions', () => {
   })
 
   describe('updateSettings', () => {
+    const buildSettingsInput = (overrides?: Partial<{
+      requiredWalksPerRound: number
+      highParticipationThreshold: number
+      maxMediaPerReport: number
+      reminderSendWeekday: number
+      reminderSendTime: string
+      reminderWindowStartOffsetDays: number
+      reminderWindowLengthDays: number
+    }>) => ({
+      requiredWalksPerRound: 4,
+      highParticipationThreshold: 8,
+      maxMediaPerReport: 10,
+      reminderSendWeekday: DEFAULT_REMINDER_SEND_WEEKDAY,
+      reminderSendTime: DEFAULT_REMINDER_SEND_TIME.slice(0, 5),
+      reminderWindowStartOffsetDays: DEFAULT_REMINDER_WINDOW_START_OFFSET_DAYS,
+      reminderWindowLengthDays: DEFAULT_REMINDER_WINDOW_LENGTH_DAYS,
+      ...overrides,
+    })
+
     it('updates settings when they exist', async () => {
       setupAdmin()
       // second single(): fetch existing settings
@@ -614,19 +651,17 @@ describe('admin-round-actions', () => {
         error: null,
       })
 
-      const result = await updateSettings({
-        requiredWalksPerRound: 4,
-        lateCancelHours: 24,
-        highParticipationThreshold: 8,
-        maxMediaPerReport: 10,
-      })
+      const result = await updateSettings(buildSettingsInput())
 
       expect(result).toEqual({ success: true })
       expect(methods.update).toHaveBeenCalledWith({
         required_walks_per_round: 4,
-        late_cancel_hours: 24,
         high_participation_threshold: 8,
         max_media_per_report: 10,
+        reminder_send_weekday: DEFAULT_REMINDER_SEND_WEEKDAY,
+        reminder_send_time: DEFAULT_REMINDER_SEND_TIME,
+        reminder_window_start_offset_days: DEFAULT_REMINDER_WINDOW_START_OFFSET_DAYS,
+        reminder_window_length_days: DEFAULT_REMINDER_WINDOW_LENGTH_DAYS,
       })
       expect(revalidatePath).toHaveBeenCalledWith('/admin/settings')
     })
@@ -635,12 +670,7 @@ describe('admin-round-actions', () => {
       setupAdmin()
       methods.single.mockResolvedValueOnce({ data: null, error: null })
 
-      const result = await updateSettings({
-        requiredWalksPerRound: 4,
-        lateCancelHours: 24,
-        highParticipationThreshold: 8,
-        maxMediaPerReport: 10,
-      })
+      const result = await updateSettings(buildSettingsInput())
 
       expect(result).toEqual({ error: 'Settings not found' })
     })
@@ -656,12 +686,7 @@ describe('admin-round-actions', () => {
         .mockReturnValueOnce(methods) // requireAdmin's eq
         .mockReturnValueOnce({ error: { message: 'Update failed' } }) // action's eq
 
-      const result = await updateSettings({
-        requiredWalksPerRound: 4,
-        lateCancelHours: 24,
-        highParticipationThreshold: 8,
-        maxMediaPerReport: 10,
-      })
+      const result = await updateSettings(buildSettingsInput())
 
       expect(result).toEqual({ error: 'Update failed' })
     })
@@ -673,12 +698,7 @@ describe('admin-round-actions', () => {
         error: null,
       })
 
-      await updateSettings({
-        requiredWalksPerRound: 4,
-        lateCancelHours: 48,
-        highParticipationThreshold: 8,
-        maxMediaPerReport: 15,
-      })
+      await updateSettings(buildSettingsInput({ maxMediaPerReport: 15 }))
 
       expect(methods.update).toHaveBeenCalledWith(
         expect.objectContaining({ max_media_per_report: 15 })
@@ -687,12 +707,7 @@ describe('admin-round-actions', () => {
 
     describe('input validation', () => {
       it('rejects maxMediaPerReport below the allowed range', async () => {
-        const result = await updateSettings({
-          requiredWalksPerRound: 4,
-          lateCancelHours: 48,
-          highParticipationThreshold: 8,
-          maxMediaPerReport: 0,
-        })
+        const result = await updateSettings(buildSettingsInput({ maxMediaPerReport: 0 }))
         expect(result).toEqual({
           error: expect.stringContaining('Max media per report must be an integer between 1 and 50'),
         })
@@ -700,12 +715,7 @@ describe('admin-round-actions', () => {
       })
 
       it('rejects maxMediaPerReport above the allowed range', async () => {
-        const result = await updateSettings({
-          requiredWalksPerRound: 4,
-          lateCancelHours: 48,
-          highParticipationThreshold: 8,
-          maxMediaPerReport: 51,
-        })
+        const result = await updateSettings(buildSettingsInput({ maxMediaPerReport: 51 }))
         expect(result).toEqual({
           error: expect.stringContaining('Max media per report must be an integer between 1 and 50'),
         })
@@ -713,12 +723,7 @@ describe('admin-round-actions', () => {
       })
 
       it('rejects non-integer maxMediaPerReport', async () => {
-        const result = await updateSettings({
-          requiredWalksPerRound: 4,
-          lateCancelHours: 48,
-          highParticipationThreshold: 8,
-          maxMediaPerReport: 5.5,
-        })
+        const result = await updateSettings(buildSettingsInput({ maxMediaPerReport: 5.5 }))
         expect(result).toEqual({
           error: expect.stringContaining('Max media per report must be an integer between 1 and 50'),
         })
@@ -726,24 +731,14 @@ describe('admin-round-actions', () => {
       })
 
       it('rejects NaN maxMediaPerReport (e.g. parseInt of empty input)', async () => {
-        const result = await updateSettings({
-          requiredWalksPerRound: 4,
-          lateCancelHours: 48,
-          highParticipationThreshold: 8,
-          maxMediaPerReport: Number.NaN,
-        })
+        const result = await updateSettings(buildSettingsInput({ maxMediaPerReport: Number.NaN }))
         expect(result).toEqual({
           error: expect.stringContaining('Max media per report must be an integer between 1 and 50'),
         })
       })
 
       it('rejects highParticipationThreshold out of range', async () => {
-        const result = await updateSettings({
-          requiredWalksPerRound: 4,
-          lateCancelHours: 48,
-          highParticipationThreshold: 101,
-          maxMediaPerReport: 10,
-        })
+        const result = await updateSettings(buildSettingsInput({ highParticipationThreshold: 101 }))
 
         expect(result).toEqual({
           error: expect.stringContaining('High participation threshold must be an integer between 1 and 100 participations'),
@@ -752,12 +747,7 @@ describe('admin-round-actions', () => {
       })
 
       it('rejects NaN highParticipationThreshold', async () => {
-        const result = await updateSettings({
-          requiredWalksPerRound: 4,
-          lateCancelHours: 48,
-          highParticipationThreshold: Number.NaN,
-          maxMediaPerReport: 10,
-        })
+        const result = await updateSettings(buildSettingsInput({ highParticipationThreshold: Number.NaN }))
 
         expect(result).toEqual({
           error: expect.stringContaining('High participation threshold must be an integer between 1 and 100 participations'),
@@ -765,49 +755,34 @@ describe('admin-round-actions', () => {
       })
 
       it('rejects requiredWalksPerRound out of range', async () => {
-        const result = await updateSettings({
-          requiredWalksPerRound: 0,
-          lateCancelHours: 48,
-          highParticipationThreshold: 8,
-          maxMediaPerReport: 10,
-        })
+        const result = await updateSettings(buildSettingsInput({ requiredWalksPerRound: 0 }))
         expect(result).toEqual({
           error: expect.stringContaining('Required walks per round must be an integer between 1 and 20'),
         })
       })
 
-      it('rejects lateCancelHours out of range', async () => {
-        const result = await updateSettings({
-          requiredWalksPerRound: 4,
-          lateCancelHours: 200,
-          highParticipationThreshold: 8,
-          maxMediaPerReport: 10,
-        })
+      it('rejects reminderWindowLengthDays out of range', async () => {
+        const result = await updateSettings(buildSettingsInput({ reminderWindowLengthDays: 31 }))
         expect(result).toEqual({
-          error: expect.stringContaining('Late cancellation window must be an integer between 1 and 168 hours'),
+          error: expect.stringContaining('Reminder window length must be an integer between 1 and 30 days'),
         })
       })
 
       it('reports multiple validation errors joined together', async () => {
-        const result = await updateSettings({
+        const result = await updateSettings(buildSettingsInput({
           requiredWalksPerRound: 0,
-          lateCancelHours: 0,
           highParticipationThreshold: 0,
           maxMediaPerReport: 0,
-        })
+          reminderWindowLengthDays: 0,
+        }))
         expect(result.error).toContain('Required walks per round must be an integer between 1 and 20')
-        expect(result.error).toContain('Late cancellation window must be an integer between 1 and 168 hours')
         expect(result.error).toContain('Max media per report must be an integer between 1 and 50')
         expect(result.error).toContain('High participation threshold must be an integer between 1 and 100 participations')
+        expect(result.error).toContain('Reminder window length must be an integer between 1 and 30 days')
       })
 
       it('does not call requireAdmin/db when validation fails', async () => {
-        await updateSettings({
-          requiredWalksPerRound: 0,
-          lateCancelHours: 48,
-          highParticipationThreshold: 8,
-          maxMediaPerReport: 10,
-        })
+        await updateSettings(buildSettingsInput({ requiredWalksPerRound: 0 }))
         // requireAdmin is not invoked, so neither auth nor db access should happen
         expect(mockSupabase.from).not.toHaveBeenCalled()
         const authMock = (mockSupabase as { auth: { getUser: ReturnType<typeof vi.fn> } }).auth
@@ -821,12 +796,14 @@ describe('admin-round-actions', () => {
           error: null,
         })
 
-        const result = await updateSettings({
+        const result = await updateSettings(buildSettingsInput({
           requiredWalksPerRound: 1,
-          lateCancelHours: 1,
           highParticipationThreshold: 1,
           maxMediaPerReport: 1,
-        })
+          reminderSendWeekday: 0,
+          reminderWindowStartOffsetDays: 0,
+          reminderWindowLengthDays: 1,
+        }))
 
         expect(result).toEqual({ success: true })
       })
@@ -838,12 +815,14 @@ describe('admin-round-actions', () => {
           error: null,
         })
 
-        const result = await updateSettings({
+        const result = await updateSettings(buildSettingsInput({
           requiredWalksPerRound: 20,
-          lateCancelHours: 168,
           highParticipationThreshold: 100,
           maxMediaPerReport: 50,
-        })
+          reminderSendWeekday: 6,
+          reminderWindowStartOffsetDays: 30,
+          reminderWindowLengthDays: 30,
+        }))
 
         expect(result).toEqual({ success: true })
       })
@@ -925,6 +904,7 @@ describe('admin-round-actions', () => {
   describe('updateWalk', () => {
     it('updates a slot and revalidates', async () => {
       setupAdmin()
+      mockExistingWalk()
       mockRoundDateRange()
 
       const result = await updateWalk('slot-1', walkData)
@@ -966,6 +946,7 @@ describe('admin-round-actions', () => {
 
     it('returns error on DB failure', async () => {
       setupAdmin()
+      mockExistingWalk()
       mockRoundDateRange()
       mockSupabase.from.mockImplementation((table: string) => {
         if (table === 'walk_slots') {
@@ -986,6 +967,7 @@ describe('admin-round-actions', () => {
 
     it('returns error when updated walk date is outside the selected round', async () => {
       setupAdmin()
+      mockExistingWalk()
       mockRoundDateRange()
 
       const result = await updateWalk('slot-1', {
@@ -997,6 +979,20 @@ describe('admin-round-actions', () => {
         error: 'Walk date 2026-03-31 must be between the round start date (2026-04-01) and end date (2026-04-30).',
       })
       expect(methods.update).not.toHaveBeenCalled()
+    })
+
+    it('blocks date/time changes after reminder emails have been sent', async () => {
+      setupAdmin()
+      mockExistingWalk({ reminder_sent_at: '2026-04-09T05:00:00.000Z' })
+
+      const result = await updateWalk('slot-1', {
+        ...walkData,
+        startTime: '09:00',
+      })
+
+      expect(result).toEqual({
+        error: 'Walk date and start time cannot be changed after reminder emails have been sent.',
+      })
     })
   })
 

@@ -210,20 +210,20 @@ describe('getAdminUsersAnalytics indicators', () => {
                 {
                   user_id: 'user-1',
                   status: 'CANCELLED',
-                  cancelled_at: '2026-04-09T06:00:00',
-                  walk_slots: { walk_date: '2026-04-10', start_time: '06:00:00' },
+                  walk_slots: { reminder_sent_at: '2026-04-09T05:00:00' },
+                  cancelled_at: '2026-04-09T07:00:00',
                 },
                 {
                   user_id: 'user-1',
                   status: 'CANCELLED',
-                  cancelled_at: '2026-04-08T05:59:59',
-                  walk_slots: { walk_date: '2026-04-10', start_time: '06:00:00' },
+                  walk_slots: { reminder_sent_at: null },
+                  cancelled_at: '2026-04-09T07:00:00',
                 },
                 {
                   user_id: 'user-1',
                   status: 'CANCELLED',
-                  cancelled_at: '2026-04-10T05:00:00',
-                  walk_slots: { walk_date: '2026-04-10', start_time: '06:00:00' },
+                  walk_slots: { reminder_sent_at: '2026-04-09T05:00:00' },
+                  cancelled_at: '2026-04-09T05:00:00',
                 },
               ],
             })
@@ -235,13 +235,12 @@ describe('getAdminUsersAnalytics indicators', () => {
     }
 
     const snapshot = await getAdminUsersAnalytics(supabase as never, undefined, {
-      lateCancelHours: 24,
       highParticipationThreshold: 10,
     })
 
     expect(snapshot.userStats['user-1']).toMatchObject({
       cancellations: 3,
-      lateCancellations: 2,
+      lateCancellations: 1,
       hasLateCancellationIndicator: true,
     })
   })

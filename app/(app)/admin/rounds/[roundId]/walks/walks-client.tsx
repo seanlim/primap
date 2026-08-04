@@ -18,7 +18,8 @@ import {
   User, Mail, 
   TriangleAlert, 
   CalendarPlus, 
-  CalendarX 
+  CalendarX, 
+  AlertTriangle
 } from 'lucide-react'
 import { 
   createWalk, 
@@ -57,6 +58,13 @@ interface WalkData {
     cancelled_at: string | null,
   }>
   memberCount: number
+  reminderSentAt: string | null
+}
+
+interface LateCancellation {
+  user_id: string
+  reason: string | null
+  slot_id: string | null
 }
 
 interface BulkRule {
@@ -109,10 +117,12 @@ function formatWalkTimeDisplay(walk: WalkData): string {
   return `${formatTime_HH_MM(`${walk.walkDate}T${walk.startTime}`)} - ${formatTime_HH_MM(`${walk.walkDate}T${walk.endTime}`)}`
 }
 
-export function WalksClient({ walks, round }: {
+export function WalksClient({ walks, round, lateCancellations }: {
   walks: WalkData[]
   round: { id: string; name: string; startDate: string; endDate: string }
+  lateCancellations: LateCancellation[]
 }) {
+
   const [showForm, setShowForm] = useState(false)
   const [showBulkForm, setShowBulkForm] = useState(false)
   const [filterLocation, setFilterLocation] = useState('')
@@ -182,6 +192,15 @@ export function WalksClient({ walks, round }: {
   const editingWalk = editingWalkId ? walks.find(w => w.id === editingWalkId) : null
   const editingWalkVolunteers = editingWalk?.volunteers.filter(v => v.status === 'ACTIVE') || []
   const editingWalkCancellations = editingWalk?.volunteers.filter(v => v.status === 'CANCELLED') || []
+
+  const lateCancellationsBySlotId = new Map<string, LateCancellation[]>()
+  for (const cancellation of lateCancellations) {
+    if (!cancellation.slot_id) continue
+    if (!lateCancellationsBySlotId.has(cancellation.slot_id)) {
+      lateCancellationsBySlotId.set(cancellation.slot_id, [])
+    }
+    lateCancellationsBySlotId.get(cancellation.slot_id)?.push(cancellation)
+  }
 
   const handleCreate = async (e: React.SubmitEvent) => {
     e.preventDefault()
@@ -332,6 +351,7 @@ export function WalksClient({ walks, round }: {
         <div>
           <label className="text-xs font-medium text-gray-500 mb-1">Date</label>
           <input type="date" value={walkDate} onChange={e => setWalkDate(e.target.value)}
+            disabled={Boolean(editingWalk?.reminderSentAt)}
             min={round.startDate}
             max={round.endDate}
             className="w-full px-3 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required />
@@ -339,6 +359,7 @@ export function WalksClient({ walks, round }: {
         <div>
           <label className="text-xs font-medium text-gray-500 mb-1">Start</label>
           <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)}
+            disabled={Boolean(editingWalk?.reminderSentAt)}
             className="w-full px-3 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required />
         </div>
         <div>
@@ -347,6 +368,11 @@ export function WalksClient({ walks, round }: {
             className="w-full px-3 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required />
         </div>
       </div>
+      {editingWalk?.reminderSentAt && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+          Reminder emails have already been sent for this walk, so its date and start time can no longer be changed.
+        </p>
+      )}
       <div>
         <label className="text-xs font-medium text-gray-500 mb-1">Max Volunteers</label>
         <input type="number" min="1" max={MAX_VOLUNTEERS_PER_SLOT} step="1" value={maxVol} onChange={e => setMaxVol(readSlotCapacity(e.target.valueAsNumber))}
@@ -654,6 +680,11 @@ export function WalksClient({ walks, round }: {
                 {walkForm(handleUpdate, 'Save Changes', cancelEdit, () => setDeletingWalkId(editingWalkId))}
 
                 <div className="space-y-2">
+                  {editingWalk?.reminderSentAt && (
+                    <p className="mt-1 text-xs font-medium text-amber-600">
+                      Reminder sent. Late cancellation is currently active.
+                    </p>
+                  )}
                   <p className="text-xs text-gray-400 font-medium">Current participants ({editingWalkVolunteers.length})</p>
                   {editingWalkVolunteers.length === 0 ? (
                     <div className="bg-gray-50 rounded-lg p-3">
@@ -683,24 +714,38 @@ export function WalksClient({ walks, round }: {
                     <div className="bg-gray-50 rounded-lg p-3">
                       <p className="text-sm font-medium text-gray-900">None</p>
                     </div>
-                  ) : editingWalkCancellations.map((v) => (
-                    <div key={v.user_id} className="bg-gray-50 rounded-lg p-3">
-                      <div className="flex flex-row items-center gap-2 text-gray-900">
-                        <User className="w-4 h-4" />
-                        <p className="text-sm font-medium">{v.name || 'Unnamed user'}</p>
-                      </div>
-                      <div className="flex flex-row items-center gap-2 text-gray-500">
-                        <Mail className="w-4 h-4" />
-                        <p className="text-sm font-medium">{v.email}</p>
-                      </div>
-                      {v.cancelled_at && (
-                        <div className="flex flex-row items-center gap-2 text-gray-500">
-                          <CalendarX className="w-4 h-4" />
-                          <p className="text-sm font-medium">{formatDate(v.cancelled_at)}</p>
+                  ) : editingWalkCancellations.map((v) => {
+                    const isLateCancellation = v.cancelled_at && editingWalk?.reminderSentAt && editingWalk.reminderSentAt < v.cancelled_at
+                    const lateCancellationReason = isLateCancellation ? lateCancellationsBySlotId.get(editingWalk.id)?.find(c => c.user_id === v.user_id)?.reason : "None"
+
+                    return (
+                      <div key={v.user_id} className="bg-gray-50 rounded-lg p-3">
+                        <div className="flex flex-row items-center gap-2 text-gray-900">
+                          <User className="w-4 h-4" />
+                          <p className="text-sm font-medium">{v.name || 'Unnamed user'}</p>
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        <div className="flex flex-row items-center gap-2 text-gray-500">
+                          <Mail className="w-4 h-4" />
+                          <p className="text-sm font-medium">{v.email}</p>
+                        </div>
+                        {v.cancelled_at && (
+                          <div className="flex flex-row items-center gap-2 text-gray-500">
+                            <CalendarX className="w-4 h-4" />
+                            <p className="text-sm font-medium">{formatDate(v.cancelled_at)}</p>
+                            {isLateCancellation && (
+                              <span className="text-xs text-amber-600 font-medium">(Late cancellation)</span>
+                            )}
+                          </div>
+                        )}
+                        {isLateCancellation && lateCancellationReason && (
+                          <div className="flex flex-row items-center gap-2 text-gray-500">
+                            <AlertTriangle className="w-4 h-4" />
+                            <p className="text-sm font-medium">Reason: {lateCancellationReason}</p>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}

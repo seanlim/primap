@@ -2,22 +2,39 @@ import { NextRequest } from 'next/server'
 
 const mockSlotsResult = vi.fn()
 const mockMembersInResult = vi.fn()
+const mockSettingsSingle = vi.fn()
+const mockWalkUpdateEq = vi.fn()
 
 const slotsChain = {
   select: vi.fn().mockReturnThis(),
-  eq: mockSlotsResult,
+  gte: vi.fn().mockReturnThis(),
+  lte: vi.fn().mockReturnThis(),
+  is: mockSlotsResult,
+  update: vi.fn().mockReturnValue({
+    eq: mockWalkUpdateEq,
+  }),
 }
 const membersChain = {
   select: vi.fn().mockReturnThis(),
   in: vi.fn().mockReturnValue({ eq: mockMembersInResult }),
   eq: vi.fn().mockReturnThis(),
 }
+const settingsChain = {
+  select: vi.fn().mockReturnValue({
+    limit: vi.fn().mockReturnValue({
+      single: mockSettingsSingle,
+    }),
+  }),
+}
 
 vi.mock('@/lib/supabase/admin', () => ({
   createAdminClient: vi.fn(() => ({
-    from: vi.fn((table: string) =>
-      table === 'walk_slots' ? slotsChain : membersChain
-    ),
+    from: vi.fn((table: string) => {
+      if (table === 'app_settings') return settingsChain
+      if (table === 'walk_slots') return slotsChain
+      if (table === 'slot_memberships') return membersChain
+      throw new Error(`Unexpected table ${table}`)
+    }),
   })),
 }))
 
@@ -39,8 +56,20 @@ describe('GET /api/cron/reminders', () => {
     vi.clearAllMocks()
     delete process.env.CRON_SECRET
     slotsChain.select.mockReturnThis()
+    slotsChain.gte.mockReturnThis()
+    slotsChain.lte.mockReturnThis()
     membersChain.select.mockReturnThis()
     membersChain.in.mockReturnValue({ eq: mockMembersInResult })
+    mockSettingsSingle.mockResolvedValue({
+      data: {
+        reminder_send_weekday: 3,
+        reminder_send_time: '13:00:00',
+        reminder_window_start_offset_days: 2,
+        reminder_window_length_days: 7,
+      },
+      error: null,
+    })
+    mockWalkUpdateEq.mockResolvedValue({ error: null })
   })
 
   // --- Auth ---
@@ -53,6 +82,8 @@ describe('GET /api/cron/reminders', () => {
 
     expect(response.status).toBe(200)
     expect(body.message).toBe('No walks scheduled.')
+    expect(body.startDate).toBeDefined()
+    expect(body.endDate).toBeDefined()
   })
 
   it('returns 401 when CRON_SECRET is set and token is invalid', async () => {
@@ -101,7 +132,8 @@ describe('GET /api/cron/reminders', () => {
 
     expect(response.status).toBe(200)
     expect(body.message).toBe('No walks scheduled.')
-    expect(body.date).toBeDefined()
+    expect(body.startDate).toBeDefined()
+    expect(body.endDate).toBeDefined()
   })
 
   // --- Batch members query ---
@@ -142,17 +174,25 @@ describe('GET /api/cron/reminders', () => {
     expect(response.status).toBe(200)
     expect(body.success).toBe(true)
     expect(body.emailsSent).toBe(2)
+    expect(body.slotsCount).toBe(1)
     expect(sendWalkReminderEmail).toHaveBeenCalledTimes(2)
     expect(sendWalkReminderEmail).toHaveBeenCalledWith('alice@test.com', 'Alice', {
       date: '2026-03-11',
       time: '08:00',
       location: 'Bukit Timah',
-    })
+    }, [
+      { fullName: 'Alice', email: 'alice@test.com' },
+      { fullName: 'Bob', email: 'bob@test.com' },
+    ])
     expect(sendWalkReminderEmail).toHaveBeenCalledWith('bob@test.com', 'Bob', {
       date: '2026-03-11',
       time: '08:00',
       location: 'Bukit Timah',
-    })
+    }, [
+      { fullName: 'Alice', email: 'alice@test.com' },
+      { fullName: 'Bob', email: 'bob@test.com' },
+    ])
+    expect(mockWalkUpdateEq).toHaveBeenCalledWith('id', 'slot-1')
   })
 
   it('skips members without an email address', async () => {
@@ -174,7 +214,9 @@ describe('GET /api/cron/reminders', () => {
     expect(response.status).toBe(200)
     expect(body.success).toBe(true)
     expect(body.emailsSent).toBe(0)
+    expect(body.slotsCount).toBe(1)
     expect(sendWalkReminderEmail).not.toHaveBeenCalled()
+    expect(mockWalkUpdateEq).toHaveBeenCalledWith('id', 'slot-1')
   })
 
   it('returns correct total emailCount across multiple slots', async () => {
@@ -214,6 +256,8 @@ describe('GET /api/cron/reminders', () => {
     expect(response.status).toBe(200)
     expect(body.success).toBe(true)
     expect(body.emailsSent).toBe(0)
+    expect(body.slotsCount).toBe(1)
+    expect(mockWalkUpdateEq).toHaveBeenCalledWith('id', 'slot-1')
   })
 
   it('uses Singapore timezone for date calculation', async () => {
@@ -222,7 +266,7 @@ describe('GET /api/cron/reminders', () => {
     const response = await GET(makeRequest('/api/cron/reminders'))
     const body = await response.json()
 
-    // Date should be in YYYY-MM-DD format
-    expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(body.startDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(body.endDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 })

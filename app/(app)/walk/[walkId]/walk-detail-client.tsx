@@ -2,7 +2,7 @@
 
 import { useRef, useState, useOptimistic, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { joinWalk, cancelWalk } from '@/lib/actions/walk-actions'
+import { joinWalk, cancelWalk, getWalkLateCancellationStatus } from '@/lib/actions/walk-actions'
 import { MapPin, Calendar, Clock, Users } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { Breadcrumb } from '@/components/ui/breadcrumb'
@@ -31,13 +31,14 @@ interface WalkDetailProps {
   isJoined: boolean
   isFull: boolean
   currentUserId: string
-  lateCancelWarning: string | null
   hasSubmittedReport: boolean
 }
 
-export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserId, lateCancelWarning, hasSubmittedReport }: WalkDetailProps) {
+export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserId, hasSubmittedReport }: WalkDetailProps) {
   const [error, setError] = useState('')
   const [showCancelDialog, setShowCancelDialog] = useState(false)
+  const [lateCancellationActive, setLateCancellationActive] = useState(false)
+  const [cancellationReason, setCancellationReason] = useState('')
   const [isPending, startTransition] = useTransition()
   const [pendingAction, setPendingAction] = useState<'join' | 'cancel' | null>(null)
   // Synchronous in-flight gate for the cancel handler. The dialog's busy
@@ -75,13 +76,29 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
         setError(result.error)
         setPendingAction(null)
       } else {
+        if (result.warning) {
+          showToast(result.warning, 'info')
+        }
         router.refresh()
       }
     })
   }
 
   const handleCancel = () => {
-    setShowCancelDialog(true)
+    setError('')
+    setPendingAction('cancel')
+    startTransition(async () => {
+      setOptimistic('cancel')
+      const result = await getWalkLateCancellationStatus(walk.id)
+      if (result.error) {
+        setError(result.error)
+        setPendingAction(null)
+      } else {
+        setLateCancellationActive(result.isLateCancellation ?? false)
+        setPendingAction(null)
+        setShowCancelDialog(true)
+      }
+    })
   }
 
   const confirmCancel = () => {
@@ -91,7 +108,7 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
     setPendingAction('cancel')
     startTransition(async () => {
       setOptimistic('cancel')
-      const result = await cancelWalk(walk.id)
+      const result = await cancelWalk(walk.id, lateCancellationActive ? cancellationReason : undefined)
       if (result.error) {
         setError(result.error)
         setPendingAction(null)
@@ -100,6 +117,7 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
         if (result.warning) {
           showToast(result.warning, 'info')
         }
+        setCancellationReason('')
         setShowCancelDialog(false)
         router.refresh()
       }
@@ -222,16 +240,23 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
       <ConfirmationDialog
         open={showCancelDialog}
         title="Cancel Participation"
-        message={lateCancelWarning
-          ? `Are you sure you want to cancel your participation? Other group members will be notified. ${lateCancelWarning}`
+        message={lateCancellationActive
+          ? 'Are you sure you want to cancel your participation? Other group members will be notified. This walk is already in the late cancellation period because participant reminders were sent.'
           : 'Are you sure you want to cancel your participation? Other group members will be notified.'}
         confirmLabel="Yes, Cancel"
         cancelLabel="Keep"
+        textareaLabel={lateCancellationActive ? 'Reason for late cancellation' : undefined}
+        textareaPlaceholder={lateCancellationActive ? 'Share the reason for this late cancellation' : undefined}
+        textareaValue={cancellationReason}
+        textareaRequired={lateCancellationActive}
+        textareaMaxLength={1000}
+        onTextareaChange={setCancellationReason}
         destructive
         busy={isCancelling}
         onConfirm={confirmCancel}
         onCancel={() => {
           if (isCancelling) return
+          setCancellationReason('')
           setShowCancelDialog(false)
         }}
       />

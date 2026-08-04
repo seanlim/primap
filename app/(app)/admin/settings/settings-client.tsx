@@ -10,15 +10,21 @@ import { useToast } from '@/components/ui/toast'
 export function SettingsClient({ settings }: {
   settings: {
     requiredWalksPerRound: number
-    lateCancelHours: number
     highParticipationThreshold: number
     maxMediaPerReport: number
+    reminderSendWeekday: number
+    reminderSendTime: string
+    reminderWindowStartOffsetDays: number
+    reminderWindowLengthDays: number
   }
 }) {
   const [requiredWalks, setRequiredWalks] = useState(settings.requiredWalksPerRound.toString())
-  const [lateCancelHours, setLateCancelHours] = useState(settings.lateCancelHours.toString())
   const [highParticipationThreshold, setHighParticipationThreshold] = useState(settings.highParticipationThreshold.toString())
   const [maxMedia, setMaxMedia] = useState(settings.maxMediaPerReport.toString())
+  const [reminderSendWeekday, setReminderSendWeekday] = useState(settings.reminderSendWeekday.toString())
+  const [reminderSendTime, setReminderSendTime] = useState(settings.reminderSendTime)
+  const [reminderWindowStartOffsetDays, setReminderWindowStartOffsetDays] = useState(settings.reminderWindowStartOffsetDays.toString())
+  const [reminderWindowLengthDays, setReminderWindowLengthDays] = useState(settings.reminderWindowLengthDays.toString())
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const router = useRouter()
@@ -29,9 +35,12 @@ export function SettingsClient({ settings }: {
     setSaving(true)
     const result = await updateSettings({
       requiredWalksPerRound: parseInt(requiredWalks),
-      lateCancelHours: parseInt(lateCancelHours),
       highParticipationThreshold: parseInt(highParticipationThreshold),
       maxMediaPerReport: parseInt(maxMedia),
+      reminderSendWeekday: parseInt(reminderSendWeekday),
+      reminderSendTime,
+      reminderWindowStartOffsetDays: parseInt(reminderWindowStartOffsetDays),
+      reminderWindowLengthDays: parseInt(reminderWindowLengthDays),
     })
     if (result.error) showToast(result.error, 'error')
     else {
@@ -86,18 +95,69 @@ export function SettingsClient({ settings }: {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Late Cancellation Window (hours)
+            Reminder Send Day
+          </label>
+          <select
+            value={reminderSendWeekday}
+            onChange={e => setReminderSendWeekday(e.target.value)}
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          >
+            <option value="0">Sunday</option>
+            <option value="1">Monday</option>
+            <option value="2">Tuesday</option>
+            <option value="3">Wednesday</option>
+            <option value="4">Thursday</option>
+            <option value="5">Friday</option>
+            <option value="6">Saturday</option>
+          </select>
+          <p className="text-xs text-gray-400 mt-1">
+            Weekly day when reminder batches are sent in Singapore time.
+          </p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Reminder Send Time
+          </label>
+          <input
+            type="time"
+            value={reminderSendTime}
+            onChange={e => setReminderSendTime(e.target.value)}
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Time in Singapore when the reminder batch becomes active.
+          </p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Reminder Window Start Offset (days)
+          </label>
+          <input
+            type="number"
+            min="0"
+            max="30"
+            value={reminderWindowStartOffsetDays}
+            onChange={e => setReminderWindowStartOffsetDays(e.target.value)}
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Number of days after the reminder send date before the covered walk window begins.
+          </p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Reminder Window Length (days)
           </label>
           <input
             type="number"
             min="1"
-            max="168"
-            value={lateCancelHours}
-            onChange={e => setLateCancelHours(e.target.value)}
+            max="30"
+            value={reminderWindowLengthDays}
+            onChange={e => setReminderWindowLengthDays(e.target.value)}
             className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
           <p className="text-xs text-gray-400 mt-1">
-            Cancellations within this many hours before a walk are considered late.
+            Number of walk dates covered by each reminder batch. Covered slots become late once reminded.
           </p>
         </div>
         <div>

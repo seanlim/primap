@@ -17,28 +17,37 @@ export type Database = {
       app_settings: {
         Row: {
           created_at: string
-          id: string
           high_participation_threshold: number
-          late_cancel_hours: number
+          id: string
           max_media_per_report: number
+          reminder_send_time: string
+          reminder_send_weekday: number
+          reminder_window_length_days: number
+          reminder_window_start_offset_days: number
           required_walks_per_round: number
           updated_at: string
         }
         Insert: {
           created_at?: string
-          id?: string
           high_participation_threshold?: number
-          late_cancel_hours?: number
+          id?: string
           max_media_per_report?: number
+          reminder_send_time?: string
+          reminder_send_weekday?: number
+          reminder_window_length_days?: number
+          reminder_window_start_offset_days?: number
           required_walks_per_round?: number
           updated_at?: string
         }
         Update: {
           created_at?: string
-          id?: string
           high_participation_threshold?: number
-          late_cancel_hours?: number
+          id?: string
           max_media_per_report?: number
+          reminder_send_time?: string
+          reminder_send_weekday?: number
+          reminder_window_length_days?: number
+          reminder_window_start_offset_days?: number
           required_walks_per_round?: number
           updated_at?: string
         }
@@ -270,6 +279,74 @@ export type Database = {
         }
         Relationships: []
       }
+      user_audit_logs: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          event_type: Database["public"]["Enums"]["user_audit_event_type"]
+          id: string
+          metadata: Json
+          occurred_at: string
+          reason: string | null
+          round_id: string | null
+          slot_id: string | null
+          user_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          event_type: Database["public"]["Enums"]["user_audit_event_type"]
+          id?: string
+          metadata?: Json
+          occurred_at?: string
+          reason?: string | null
+          round_id?: string | null
+          slot_id?: string | null
+          user_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          event_type?: Database["public"]["Enums"]["user_audit_event_type"]
+          id?: string
+          metadata?: Json
+          occurred_at?: string
+          reason?: string | null
+          round_id?: string | null
+          slot_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_audit_logs_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_audit_logs_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "survey_rounds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_audit_logs_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: false
+            referencedRelation: "walk_slots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sightings: {
         Row: {
           count: string
@@ -410,6 +487,7 @@ export type Database = {
           id: string
           location_name: string
           max_volunteers: number
+          reminder_sent_at: string | null
           round_id: string
           start_time: string
           updated_at: string
@@ -421,6 +499,7 @@ export type Database = {
           id?: string
           location_name: string
           max_volunteers?: number
+          reminder_sent_at?: string | null
           round_id: string
           start_time: string
           updated_at?: string
@@ -432,6 +511,7 @@ export type Database = {
           id?: string
           location_name?: string
           max_volunteers?: number
+          reminder_sent_at?: string | null
           round_id?: string
           start_time?: string
           updated_at?: string
@@ -457,7 +537,7 @@ export type Database = {
         Returns: Json
       }
       cancel_slot_with_draft_cleanup: {
-        Args: { p_slot_id: string }
+        Args: { p_slot_id: string; p_cancellation_reason?: string | null }
         Returns: Json
       }
     }
@@ -475,6 +555,7 @@ export type Database = {
       round_status: "DRAFT" | "OPEN" | "CLOSED"
       species_type: "RBL" | "LTM" | "DUSKY" | "OTHER"
       user_role: "ADMIN" | "VOLUNTEER"
+      user_audit_event_type: "LATE_WALK_CANCELLATION"
       user_status: "PENDING" | "ACTIVE" | "REJECTED" | "DISABLED"
       walk_completion: "COMPLETED" | "PARTIAL" | "ABORTED"
     }
@@ -617,6 +698,7 @@ export const Constants = {
       observation_status: ["DRAFT", "SUBMITTED"],
       round_status: ["DRAFT", "OPEN", "CLOSED"],
       species_type: ["RBL", "LTM", "DUSKY", "OTHER"],
+      user_audit_event_type: ["LATE_WALK_CANCELLATION"],
       user_role: ["ADMIN", "VOLUNTEER"],
       user_status: ["PENDING", "ACTIVE", "REJECTED", "DISABLED"],
       walk_completion: ["COMPLETED", "PARTIAL", "ABORTED"],
@@ -633,11 +715,13 @@ export type AppSettings = Tables<"app_settings">
 export type SurveyRound = Tables<"survey_rounds">
 export type WalkSlot = Tables<"walk_slots">
 export type SlotMembership = Tables<"slot_memberships">
+export type UserAuditLog = Tables<"user_audit_logs">
 export type Observation = Tables<"observations">
 export type Sighting = Tables<"sightings">
 export type Media = Tables<"media">
 export type Incident = Tables<"incidents">
 export type UserRole = Enums<"user_role">
+export type UserAuditEventType = Enums<"user_audit_event_type">
 export type UserStatus = Enums<"user_status">
 export type MediaType = Enums<"media_type">
 export type IncidentType = Enums<"incident_type">
@@ -647,4 +731,3 @@ export type RoundStatus = Enums<"round_status">
 export type MembershipStatus = Enums<"membership_status">
 export type WalkCompletion = Enums<"walk_completion">
 export type SpeciesType = Enums<"species_type">
-

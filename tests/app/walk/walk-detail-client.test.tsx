@@ -4,11 +4,13 @@ import { describe, expect, it, vi } from 'vitest'
 import { WalkDetailClient } from '@/app/(app)/walk/[walkId]/walk-detail-client'
 
 const mockJoinWalk = vi.fn()
+const mockGetWalkLateCancellationStatus = vi.fn()
 const mockCancelWalk = vi.fn()
 const mockShowToast = vi.fn()
 
 vi.mock('@/lib/actions/walk-actions', () => ({
   joinWalk: (...args: unknown[]) => mockJoinWalk(...args),
+  getWalkLateCancellationStatus: (...args: unknown[]) => mockGetWalkLateCancellationStatus(...args),
   cancelWalk: (...args: unknown[]) => mockCancelWalk(...args),
 }))
 
@@ -42,7 +44,6 @@ function renderWalkDetail(overrides: Partial<ComponentProps<typeof WalkDetailCli
       isJoined={false}
       isFull={false}
       currentUserId="user-1"
-      lateCancelWarning={null}
       hasSubmittedReport={false}
       {...overrides}
     />
@@ -72,6 +73,7 @@ describe('WalkDetailClient', () => {
 
   it('shows "Cancelling..." while cancel request is pending', async () => {
     const deferred = createDeferred<{ success: true }>()
+    mockGetWalkLateCancellationStatus.mockResolvedValueOnce({ isLateCancellation: false })
     mockCancelWalk.mockReturnValueOnce(deferred.promise)
 
     renderWalkDetail({
@@ -83,8 +85,13 @@ describe('WalkDetailClient', () => {
         joinedAt: '2099-04-01T08:00:00.000Z',
       }],
     })
-
+    
     fireEvent.click(screen.getByRole('button', { name: 'Cancel Participation' }))
+    expect(screen.getByRole('button', { name: 'Cancelling...' })).toBeInTheDocument()
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(screen.getByRole('button', { name: 'Cancel Participation' })).toBeInTheDocument()
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Yes, Cancel' }))
@@ -125,6 +132,7 @@ describe('WalkDetailClient', () => {
   it('disables the cancel-confirm button while a cancellation is in flight', async () => {
     // Reset mock state — other tests in this file share mockCancelWalk and
     // there's no beforeEach(clearAllMocks) at the top level.
+    mockGetWalkLateCancellationStatus.mockResolvedValueOnce({ isLateCancellation: false })
     mockCancelWalk.mockClear()
 
     const deferred = createDeferred<{ success: true }>()
@@ -140,7 +148,10 @@ describe('WalkDetailClient', () => {
       }],
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel Participation' }))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel Participation' }))
+      await Promise.resolve()
+    })
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Yes, Cancel' }))
@@ -158,6 +169,88 @@ describe('WalkDetailClient', () => {
       deferred.resolve({ success: true })
       await Promise.resolve()
     })
+  })
+
+  it('requires a reason in the late cancellation dialog', async () => {
+    mockGetWalkLateCancellationStatus.mockResolvedValueOnce({ isLateCancellation: true })
+
+    renderWalkDetail({
+      isJoined: true,
+      members: [{
+        userId: 'user-1',
+        fullName: 'June',
+        email: 'june@example.com',
+        joinedAt: '2099-04-01T08:00:00.000Z',
+      }],
+    })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel Participation' }))
+      await Promise.resolve()
+    })
+
+    expect(screen.getByText('Reason for late cancellation')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Yes, Cancel' })).toBeDisabled()
+
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: 'Work emergency' },
+    })
+
+    expect(screen.getByRole('button', { name: 'Yes, Cancel' })).not.toBeDisabled()
+  })
+
+  it('passes the late cancellation reason to cancelWalk', async () => {
+    mockGetWalkLateCancellationStatus.mockResolvedValueOnce({ isLateCancellation: true })
+    mockCancelWalk.mockClear()
+    mockCancelWalk.mockResolvedValueOnce({ success: true })
+
+    renderWalkDetail({
+      isJoined: true,
+      members: [{
+        userId: 'user-1',
+        fullName: 'June',
+        email: 'june@example.com',
+        joinedAt: '2099-04-01T08:00:00.000Z',
+      }],
+    })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel Participation' }))
+      await Promise.resolve()
+    })
+
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: 'Work emergency' },
+    })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Yes, Cancel' }))
+      await Promise.resolve()
+    })
+
+    expect(mockCancelWalk).toHaveBeenCalledWith('slot-1', 'Work emergency')
+  })
+
+  it('keeps non-late cancellation confirmation reason-free', async () => {
+    mockGetWalkLateCancellationStatus.mockResolvedValueOnce({ isLateCancellation: false })
+    
+    renderWalkDetail({
+      isJoined: true,
+      members: [{
+        userId: 'user-1',
+        fullName: 'June',
+        email: 'june@example.com',
+        joinedAt: '2099-04-01T08:00:00.000Z',
+      }],
+    })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel Participation' }))
+      await Promise.resolve()
+    })
+
+    expect(screen.queryByText('Reason for late cancellation')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Yes, Cancel' })).not.toBeDisabled()
   })
 
   it('shows clearer blocked join status and explanation', () => {

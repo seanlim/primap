@@ -101,7 +101,13 @@ describe('buildExportWorkbook', () => {
   it('preserves numeric values as numbers', async () => {
     const data = makeTableData({
       app_settings: [
-        { id: 's1', required_walks_per_round: 4, late_cancel_hours: 48, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
+        {
+          id: 's1',
+          required_walks_per_round: 4,
+          reminder_send_weekday: 3,
+          created_at: '2026-01-01T00:00:00Z',
+          updated_at: '2026-01-01T00:00:00Z',
+        },
       ],
     })
 
@@ -110,7 +116,7 @@ describe('buildExportWorkbook', () => {
     const ws = workbook.getWorksheet('app_settings')!
 
     expect(ws.getRow(2).getCell(2).value).toBe(4)
-    expect(ws.getRow(2).getCell(3).value).toBe(48)
+    expect(ws.getRow(2).getCell(5).value).toBe(3)
   })
 
   it('preserves boolean values', async () => {

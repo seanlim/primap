@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendWalkReminderEmail } from '@/lib/email';
+import {
+  DEFAULT_REMINDER_SEND_TIME,
+  DEFAULT_REMINDER_SEND_WEEKDAY,
+  DEFAULT_REMINDER_WINDOW_LENGTH_DAYS,
+  DEFAULT_REMINDER_WINDOW_START_OFFSET_DAYS,
+} from '@/lib/constants/settings';
+import {
+  formatReminderTimeForInput,
+  getReminderCoverageWindow,
+} from '@/lib/utils/reminder-schedule';
+import { APP_TIME_ZONE } from '@/lib/utils/walk-participation';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,25 +23,33 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = createAdminClient();
+  const { data: settings } = await supabase
+    .from('app_settings')
+    .select('reminder_send_weekday, reminder_send_time, reminder_window_start_offset_days, reminder_window_length_days')
+    .limit(1)
+    .single()
 
-  // Use Asia/Singapore timezone to compute "tomorrow"
-  const sgFormatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Singapore',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  const nowInSG = new Date();
-  nowInSG.setDate(nowInSG.getDate() + 1);
-  const dateStr = sgFormatter.format(nowInSG); // YYYY-MM-DD
+  const schedule = {
+    reminderSendWeekday: settings?.reminder_send_weekday ?? DEFAULT_REMINDER_SEND_WEEKDAY,
+    reminderSendTime: settings?.reminder_send_time ?? DEFAULT_REMINDER_SEND_TIME,
+    reminderWindowStartOffsetDays:
+      settings?.reminder_window_start_offset_days ?? DEFAULT_REMINDER_WINDOW_START_OFFSET_DAYS,
+    reminderWindowLengthDays:
+      settings?.reminder_window_length_days ?? DEFAULT_REMINDER_WINDOW_LENGTH_DAYS,
+  }
 
-  console.log(`[Cron] Checking for walks on: ${dateStr}`);
+  const window = getReminderCoverageWindow(new Date(), schedule)
 
-  // Fetch slots for tomorrow
+  console.log(
+    `[Cron] Checking reminder window ${window.startDate} to ${window.endDate} (send weekday ${schedule.reminderSendWeekday} at ${formatReminderTimeForInput(schedule.reminderSendTime)} ${APP_TIME_ZONE})`
+  );
+
   const { data: slots, error: slotsError } = await supabase
     .from('walk_slots')
-    .select('id, walk_date, start_time, location_name')
-    .eq('walk_date', dateStr);
+    .select('id, walk_date, start_time, location_name, reminder_sent_at')
+    .gte('walk_date', window.startDate)
+    .lte('walk_date', window.endDate)
+    .is('reminder_sent_at', null);
 
   if (slotsError) {
     console.error('[Cron] Error fetching slots:', slotsError);
@@ -38,8 +57,12 @@ export async function GET(req: NextRequest) {
   }
 
   if (!slots || slots.length === 0) {
-    console.log('[Cron] No walks scheduled for tomorrow.');
-    return NextResponse.json({ message: 'No walks scheduled.', date: dateStr });
+    console.log('[Cron] No walks scheduled in the active reminder window.');
+    return NextResponse.json({
+      message: 'No walks scheduled.',
+      startDate: window.startDate,
+      endDate: window.endDate,
+    });
   }
 
   // Batch fetch all active members for all slots at once (fixes N+1)
@@ -67,9 +90,16 @@ export async function GET(req: NextRequest) {
 
   for (const slot of slots) {
     const members = membersBySlot.get(slot.id) || [];
+    const participants = members
+      .map((member) => {
+        const profile = member.profiles;
+        if (!profile?.email) return null;
+        return { fullName: profile.full_name, email: profile.email };
+      })
+      .filter((participant) => participant !== null);
 
     for (const member of members) {
-      const profile = member.profiles as unknown as { full_name: string | null; email: string };
+      const profile = member.profiles;
       if (profile?.email) {
         await sendWalkReminderEmail(
           profile.email,
@@ -78,12 +108,28 @@ export async function GET(req: NextRequest) {
             date: slot.walk_date,
             time: slot.start_time,
             location: slot.location_name
-          }
+          },
+          participants
         );
         emailCount++;
       }
     }
+
+    const { error: slotUpdateError } = await supabase
+      .from('walk_slots')
+      .update({ reminder_sent_at: new Date().toISOString() })
+      .eq('id', slot.id);
+    if (slotUpdateError) {
+      console.error(`[Cron] Error updating reminder_sent_at for slot ${slot.id}:`, slotUpdateError);
+      return NextResponse.json({ error: slotUpdateError.message }, { status: 500 });
+    }
   }
 
-  return NextResponse.json({ success: true, emailsSent: emailCount, date: dateStr });
+  return NextResponse.json({
+    success: true,
+    emailsSent: emailCount,
+    slotsCount: slots.length,
+    startDate: window.startDate,
+    endDate: window.endDate,
+  });
 }

@@ -17,6 +17,7 @@ const { mockSend, mockSingle, mockChain, mockSupabase } = vi.hoisted(() => {
     insert: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     neq: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
     single: mockSingle,
   }
   const mockSupabase = {
@@ -59,6 +60,7 @@ function resetChain() {
   mockChain.insert.mockReturnThis()
   mockChain.eq.mockReturnThis()
   mockChain.neq.mockReturnThis()
+  mockChain.limit.mockReturnThis()
   mockSingle.mockReset()
   mockSupabase.from.mockReturnValue(mockChain)
   mockSupabase.rpc.mockResolvedValue({
@@ -91,13 +93,11 @@ describe('cancel-walk-email-flow (integration)', () => {
         return {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                neq: vi.fn().mockResolvedValue({
-                  data: [
-                    { user_id: 'user-2', profiles: { email: 'bob@test.com' } },
-                  ],
-                  error: null,
-                }),
+              eq: vi.fn().mockResolvedValue({
+                data: [
+                  { user_id: 'user-2', profiles: { full_name: 'Bob', email: 'bob@test.com' } },
+                ],
+                error: null,
               }),
             }),
           }),
@@ -108,7 +108,7 @@ describe('cancel-walk-email-flow (integration)', () => {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
               single: vi.fn().mockResolvedValue({
-                data: { walk_date: '2026-04-01', start_time: '08:00', location_name: 'Bukit Timah' },
+                data: { walk_date: '2099-04-01', start_time: '08:00', location_name: 'Bukit Timah', reminder_sent_at: null },
                 error: null,
               }),
             }),
@@ -151,9 +151,7 @@ describe('cancel-walk-email-flow (integration)', () => {
         return {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                neq: vi.fn().mockResolvedValue({ data: [], error: null }),
-              }),
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
             }),
           }),
         }
@@ -163,7 +161,7 @@ describe('cancel-walk-email-flow (integration)', () => {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
               single: vi.fn().mockResolvedValue({
-                data: { walk_date: '2026-04-01', start_time: '08:00', location_name: 'Bukit Timah' },
+                data: { walk_date: '2099-04-01', start_time: '08:00', location_name: 'Bukit Timah', reminder_sent_at: null },
                 error: null,
               }),
             }),
@@ -204,13 +202,11 @@ describe('cancel-walk-email-flow (integration)', () => {
         return {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                neq: vi.fn().mockResolvedValue({
-                  data: [
-                    { user_id: 'user-2', profiles: { email: 'bob@test.com' } },
-                  ],
-                  error: null,
-                }),
+              eq: vi.fn().mockResolvedValue({
+                data: [
+                  { user_id: 'user-2', profiles: { full_name: 'Bob', email: 'bob@test.com' } },
+                ],
+                error: null,
               }),
             }),
           }),
@@ -221,7 +217,7 @@ describe('cancel-walk-email-flow (integration)', () => {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
               single: vi.fn().mockResolvedValue({
-                data: { walk_date: '2026-04-01', start_time: '08:00', location_name: 'Bukit Timah' },
+                data: { walk_date: '2099-04-01', start_time: '08:00', location_name: 'Bukit Timah', reminder_sent_at: null },
                 error: null,
               }),
             }),

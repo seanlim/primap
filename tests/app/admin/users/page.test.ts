@@ -67,7 +67,6 @@ function setupMock() {
   ]
   const settingsResult = {
     data: {
-      late_cancel_hours: 24,
       high_participation_threshold: 2,
     },
     error: null,

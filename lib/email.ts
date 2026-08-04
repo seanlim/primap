@@ -64,6 +64,36 @@ async function sendEmail(to: string, subject: string, html: string) {
 
 const APP_URL = () => process.env.NEXT_PUBLIC_APP_URL || 'https://primap.org';
 
+export interface WalkEmailParticipant {
+  fullName: string | null
+  email: string
+}
+
+export interface WalkEmailSlotInfo {
+  date: string
+  time: string
+  location: string
+}
+
+function buildParticipantRosterHtml(participants: WalkEmailParticipant[]) {
+  if (participants.length === 0) return '<p>No active participants are currently listed for this walk.</p>'
+
+  const items = participants.map((participant) => {
+    const label = escapeHtml(participant.fullName || participant.email || 'Volunteer')
+    const email = escapeHtml(participant.email)
+    return `<li><strong>${label}</strong> (${email})</li>`
+  }).join('')
+
+  return `
+    <div style="background-color: #f9fafb; padding: 15px; border-radius: 5px; margin: 15px 0;">
+      <p><strong>Current participant roster</strong></p>
+      <ul style="padding-left: 20px; margin: 8px 0 0;">
+        ${items}
+      </ul>
+    </div>
+  `
+}
+
 export async function sendAccountApprovedEmail(email: string, fullName: string | null) {
   const name = escapeHtml(fullName || 'Volunteer');
   await sendEmail(email, 'Primap Account Approved', wrapHtml(`
@@ -123,7 +153,7 @@ export async function sendRoleDemotedEmail(email: string, fullName: string | nul
 
 export async function sendWalkCancellationEmail(
   recipients: string[],
-  slotInfo: { date: string; time: string; location: string },
+  slotInfo: WalkEmailSlotInfo,
   cancelledBy: string
 ) {
   if (recipients.length === 0) return;
@@ -185,19 +215,55 @@ export async function sendIncidentReportedEmail(
 export async function sendWalkReminderEmail(
   email: string,
   name: string | null,
-  slotInfo: { date: string; time: string; location: string }
+  slotInfo: WalkEmailSlotInfo,
+  participants: WalkEmailParticipant[]
 ) {
   const displayName = escapeHtml(name || 'Volunteer');
   await sendEmail(email, 'Reminder: Upcoming Survey Walk', wrapHtml(`
     <p>Hi ${displayName},</p>
-    <p>This is a reminder for your upcoming survey walk tomorrow.</p>
+    <p>This is a reminder for your upcoming survey walk.</p>
     <div style="background-color: #f0fdf4; padding: 15px; border-radius: 5px; margin: 15px 0; border: 1px solid #bbf7d0;">
       <p><strong>Date:</strong> ${escapeHtml(slotInfo.date)}</p>
       <p><strong>Time:</strong> ${escapeHtml(slotInfo.time)}</p>
       <p><strong>Location:</strong> ${escapeHtml(slotInfo.location)}</p>
     </div>
+    ${buildParticipantRosterHtml(participants)}
     <p>Please remember to bring your equipment and arrive on time.</p>
     <p>If you cannot make it, please cancel your walk as soon as possible to allow others to join.</p>
     <a href="${APP_URL()}/walk" class="button">View My Walks</a>
   `));
+}
+
+export async function sendWalkParticipantUpdateEmail(
+  recipients: string[],
+  slotInfo: WalkEmailSlotInfo,
+  participants: WalkEmailParticipant[],
+  updateType: 'join' | 'late-cancellation',
+  actorName?: string
+) {
+  if (recipients.length === 0) return
+
+  const actionCopy = updateType === 'join'
+    ? `${escapeHtml(actorName || 'A volunteer')} joined this walk after participant reminders had already been sent.`
+    : `${escapeHtml(actorName || 'A volunteer')} cancelled late for this walk.`
+
+  const followupCopy = updateType === 'join'
+    ? 'The latest participant roster is included below so everyone has the current contact list.'
+    : 'The participant list has been updated below so the remaining volunteers have the current contact list.'
+
+  const html = wrapHtml(`
+    <p>${actionCopy}</p>
+    <div style="background-color: #f0fdf4; padding: 15px; border-radius: 5px; margin: 15px 0; border: 1px solid #bbf7d0;">
+      <p><strong>Date:</strong> ${escapeHtml(slotInfo.date)}</p>
+      <p><strong>Time:</strong> ${escapeHtml(slotInfo.time)}</p>
+      <p><strong>Location:</strong> ${escapeHtml(slotInfo.location)}</p>
+    </div>
+    <p>${followupCopy}</p>
+    ${buildParticipantRosterHtml(participants)}
+    <a href="${APP_URL()}/walk" class="button">View My Walks</a>
+  `)
+
+  await Promise.all(recipients.map((email) =>
+    sendEmail(email, 'Notice: Walk Participant Update', html)
+  ))
 }

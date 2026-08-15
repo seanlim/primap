@@ -124,7 +124,12 @@ function renderClusterPopupHtml(markers: MapMarker[]) {
   `.trim();
 }
 
-import { LatLngTuple, LeafletEvent, Map as LeafletMap } from "leaflet";
+import {
+  latLngBounds,
+  LatLngTuple,
+  LeafletEvent,
+  Map as LeafletMap,
+} from "leaflet";
 
 export function MapView({
   center = DEFAULT_CENTER,
@@ -280,7 +285,6 @@ export function MapView({
       ]);
 
       if (marker.popupHtml) {
-        console.info(marker.popupHtml)
         mapMarker.setPopup(
           new mapboxgl.Popup({
             offset: isCluster ? 16 : isNotSighted ? 10 : 14,
@@ -291,13 +295,22 @@ export function MapView({
       return mapMarker.addTo(map);
     });
 
-    setOneMapMarkers(displayedMarkers.map((m) => {
-      return {
-        position: [m.lat, m.lng],
-        content: m.popupHtml,
-        colorHex: m.color,
-      };
-    }))
+    setOneMapMarkers(
+      displayedMarkers.map((m) => {
+        return {
+          position: [m.lat, m.lng],
+          content: m.popupHtml,
+          colorHex: m.color,
+        };
+      }),
+    );
+
+    map2Ref.current?.fitBounds(
+      latLngBounds(displayedMarkers.map((m) => [m.lat, m.lng])),
+      {
+        maxZoom: 14,
+      },
+    );
 
     if (markers.length === 0) {
       map.easeTo({ center, zoom, duration: 500 });
@@ -374,4 +387,3 @@ export function MapView({
     </>
   );
 }
-

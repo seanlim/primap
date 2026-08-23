@@ -7,10 +7,30 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.1"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -249,7 +269,6 @@ export type Database = {
           status: Database["public"]["Enums"]["observation_status"]
           submitted_at: string | null
           updated_at: string
-          user_id: string
           walk_completion: Database["public"]["Enums"]["walk_completion"]
         }
         Insert: {
@@ -266,7 +285,6 @@ export type Database = {
           status?: Database["public"]["Enums"]["observation_status"]
           submitted_at?: string | null
           updated_at?: string
-          user_id: string
           walk_completion?: Database["public"]["Enums"]["walk_completion"]
         }
         Update: {
@@ -283,22 +301,14 @@ export type Database = {
           status?: Database["public"]["Enums"]["observation_status"]
           submitted_at?: string | null
           updated_at?: string
-          user_id?: string
           walk_completion?: Database["public"]["Enums"]["walk_completion"]
         }
         Relationships: [
           {
             foreignKeyName: "observations_slot_id_fkey"
             columns: ["slot_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "walk_slots"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "observations_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -671,6 +681,8 @@ export type Database = {
         Args: { p_cancellation_reason?: string; p_slot_id: string }
         Returns: Json
       }
+      is_active_slot_member: { Args: { p_slot_id: string }; Returns: boolean }
+      is_admin: { Args: never; Returns: boolean }
       join_slot_with_observation: {
         Args: { p_slot_id: string; p_user_id: string }
         Returns: Json
@@ -818,6 +830,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       incident_type: [
@@ -840,3 +855,4 @@ export const Constants = {
     },
   },
 } as const
+

@@ -24,8 +24,7 @@ interface SightingData {
 
 interface ObservationData {
   id: string
-  userId: string
-  userName: string
+  members: { userId: string; userName: string }[]
   slotId: string
   walkCompletion: string | null
   outcome: string | null
@@ -192,9 +191,14 @@ export function AdminEditFormClient({ slot, observation, maxMediaPerReport }: Pr
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Edit Report</h1>
-          <p className="text-sm text-gray-500">
-            {observation.userName} &middot; {slot.locationName} &middot; {formatDate(slot.walkDate, 'compact')}
-          </p>
+          <div className="text-sm text-gray-500">
+            <span>{slot.locationName} &middot; {formatDate(slot.walkDate, 'compact')}</span>
+            <ul className="list-disc list-inside">
+              {observation.members.map((member) => (
+                <li key={member.userId}>{member.userName}</li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
 

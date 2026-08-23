@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { ArrowLeft, Search, Users } from 'lucide-react'
+import { ArrowLeft, Search } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +16,6 @@ interface Report {
   maxVolunteers: number
   memberCount: number
   submittedAt: string
-  // submittedBy: string
 }
 
 /**

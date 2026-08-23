@@ -50,7 +50,7 @@ interface Props {
     endTime: string
     roundName: string
   }
-  observations: ObservationData
+  observation: ObservationData
   members: { userId: string; fullName: string | null; email: string }[]
   incidents: {
     id: string
@@ -77,10 +77,8 @@ const SPECIES_LABELS: Record<string, string> = {
 
 export function GroupViewClient({
   slot,
-  observations,
-  members,
+  observation,
   incidents,
-  currentUserId,
   backHref = '/report',
   backLabel = 'Back to Reports',
   // Default fail-closed: callers must explicitly grant the permission. Both
@@ -95,19 +93,16 @@ export function GroupViewClient({
   const { showToast } = useToast()
   const isAdminView = backHref.startsWith('/admin')
 
-  const myObservation = observations
-  
-
   const handleSubmit = () => {
-    if (!myObservation) return
+    if (!observation) return
     setShowSubmitDialog(true)
   }
 
   const confirmSubmit = async () => {
-    if (!myObservation) return
+    if (!observation) return
     if (submitting) return // guard against double-submit
     setSubmitting(true)
-    const result = await submitObservation(myObservation.id, slot.id)
+    const result = await submitObservation(observation.id, slot.id)
     if (result.error) {
       showToast(result.error, 'error')
     } else {
@@ -143,21 +138,21 @@ export function GroupViewClient({
       </div>
 
       {/* Your Report */}
-      {myObservation && (
+      {observation && (
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
           <div className="p-4 border-b border-gray-100">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <p className="font-medium text-gray-900">Your Report</p>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  myObservation.status === 'SUBMITTED'
+                  observation.status === 'SUBMITTED'
                     ? 'bg-green-100 text-green-700'
                     : 'bg-yellow-100 text-yellow-700'
                 }`}>
-                  {myObservation.status}
+                  {observation.status}
                 </span>
               </div>
-              {myObservation.status === 'DRAFT' && !isAdminView && (
+              {observation.status === 'DRAFT' && !isAdminView && (
                 <div className="flex items-center gap-2">
                   <Link
                     href={`/report/${slot.id}/edit`}
@@ -176,7 +171,7 @@ export function GroupViewClient({
               )}
               {isAdminView && (
                 <Link
-                  href={`/admin/reports/${slot.id}/${myObservation.id}/edit`}
+                  href={`/admin/reports/${slot.id}/${observation.id}/edit`}
                   className="flex items-center gap-1 text-sm bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-200 font-medium transition-colors"
                 >
                   <Pencil className="w-3.5 h-3.5" />
@@ -184,13 +179,13 @@ export function GroupViewClient({
                 </Link>
               )}
             </div>
-            {myObservation.status === 'SUBMITTED' && myObservation.submittedAt && (
+            {observation.status === 'SUBMITTED' && observation.submittedAt && (
               <p className="text-xs text-gray-400 mt-0.5">
-                Submitted {formatDate(myObservation.submittedAt)}
+                Submitted {formatDate(observation.submittedAt)}
               </p>
             )}
           </div>
-          <ObservationDetails observation={myObservation} />
+          <ObservationDetails observation={observation} />
         </div>
       )}
 

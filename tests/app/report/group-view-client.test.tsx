@@ -81,7 +81,7 @@ describe('GroupViewClient – admin edit buttons', () => {
       render(
         <GroupViewClient
           slot={defaultSlot}
-          observations={obs}
+          observation={obs}
           members={defaultMembers}
           incidents={[]}
           currentUserId="admin-99"
@@ -103,7 +103,7 @@ describe('GroupViewClient – admin edit buttons', () => {
       render(
         <GroupViewClient
           slot={defaultSlot}
-          observations={draftObs}
+          observation={draftObs}
           members={defaultMembers}
           incidents={[]}
           currentUserId="admin-1"
@@ -127,7 +127,7 @@ describe('GroupViewClient – admin edit buttons', () => {
       render(
         <GroupViewClient
           slot={defaultSlot}
-          observations={null as never}
+          observation={null as never}
           members={[]}
           incidents={[]}
           currentUserId="admin-1"
@@ -150,7 +150,7 @@ describe('GroupViewClient – admin edit buttons', () => {
       render(
         <GroupViewClient
           slot={defaultSlot}
-          observations={obs}
+          observation={obs}
           members={defaultMembers}
           incidents={[]}
           currentUserId="user-1"
@@ -175,7 +175,7 @@ describe('GroupViewClient – admin edit buttons', () => {
       render(
         <GroupViewClient
           slot={defaultSlot}
-          observations={draftObs}
+          observation={draftObs}
           members={defaultMembers}
           incidents={[]}
           currentUserId="user-1"
@@ -201,7 +201,7 @@ describe('GroupViewClient – admin edit buttons', () => {
       render(
         <GroupViewClient
           slot={defaultSlot}
-          observations={submittedObs}
+          observation={submittedObs}
           members={defaultMembers}
           incidents={[]}
           currentUserId="user-1"
@@ -225,7 +225,7 @@ describe('GroupViewClient – admin edit buttons', () => {
       render(
         <GroupViewClient
           slot={defaultSlot}
-          observations={null as never}
+          observation={null as never}
           members={defaultMembers}
           incidents={[]}
           currentUserId="admin-1"
@@ -250,7 +250,7 @@ describe('GroupViewClient – admin edit buttons', () => {
       render(
         <GroupViewClient
           slot={defaultSlot}
-          observations={notSightedObs}
+          observation={notSightedObs}
           members={defaultMembers}
           incidents={[]}
           currentUserId="admin-99"

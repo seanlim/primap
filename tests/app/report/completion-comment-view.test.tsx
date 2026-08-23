@@ -82,7 +82,7 @@ function renderGroupView(
   return render(
     <GroupViewClient
       slot={defaultSlot}
-      observations={observation}
+      observation={observation}
       members={defaultMembers}
       incidents={[]}
       currentUserId="admin-user"

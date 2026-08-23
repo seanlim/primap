@@ -22,7 +22,7 @@ export default async function AdminWalkReportPage({
   return (
     <GroupViewClient
       slot={viewData.slot}
-      observations={viewData.observations}
+      observation={viewData.observations}
       members={viewData.members}
       incidents={viewData.incidents}
       currentUserId={user.id}

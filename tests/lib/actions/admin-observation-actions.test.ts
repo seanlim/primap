@@ -205,8 +205,8 @@ describe('admin-observation-actions', () => {
   // ─── adminGetObservation ─────────────────────────────────────────────
 
   // adminGetObservation makes TWO queries: observations (select+single), then
-  // slot_memberships (select, filtered client-side to the ACTIVE member) to
-  // resolve userId/userName, since `observations` no longer has a user_id column.
+  // slot_memberships (select, filtered to ACTIVE members) to resolve member
+  // userId/userName values, since `observations` no longer has a user_id column.
   function setupGetObservationMocks(
     observationData: Record<string, unknown> | null,
     memberships: Array<{ user_id: string; status: string; profiles: { full_name: string | null; email: string } | null }> = []
@@ -222,11 +222,15 @@ describe('admin-observation-actions', () => {
         }
       }
       if (table === 'slot_memberships') {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ data: memberships, error: null }),
-          }),
+        const membershipQuery = {
+          eq: vi.fn(),
         }
+        const activeMemberships = memberships.filter((membership) => membership.status === 'ACTIVE')
+        membershipQuery.eq
+          .mockReturnValueOnce(membershipQuery)
+          .mockResolvedValueOnce({ data: activeMemberships, error: null })
+
+        return { select: vi.fn().mockReturnValue(membershipQuery) }
       }
       return adminMethods
     })
@@ -284,8 +288,7 @@ describe('admin-observation-actions', () => {
 
       expect(result).not.toBeNull()
       expect(result!.id).toBe('obs-1')
-      expect(result!.userId).toBe('user-1')
-      expect(result!.userName).toBe('Alice')
+      expect(result!.members).toEqual([{ userId: 'user-1', userName: 'Alice' }])
       expect(result!.slotId).toBe('slot-1')
       expect(result!.walkCompletion).toBe('COMPLETED')
       expect(result!.outcome).toBe('SIGHTED')
@@ -317,7 +320,7 @@ describe('admin-observation-actions', () => {
 
       const result = await adminGetObservation('obs-1')
 
-      expect(result!.userName).toBe('alice@test.com')
+      expect(result!.members).toEqual([{ userId: 'user-1', userName: 'alice@test.com' }])
     })
 
     it('falls back to "Unknown" when no ACTIVE membership is found', async () => {
@@ -340,8 +343,7 @@ describe('admin-observation-actions', () => {
 
       const result = await adminGetObservation('obs-1')
 
-      expect(result!.userId).toBe('')
-      expect(result!.userName).toBe('Unknown')
+      expect(result!.members).toEqual([])
     })
 
     it('slices observed_at to 16 chars for datetime-local input', async () => {

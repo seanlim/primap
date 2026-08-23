@@ -101,8 +101,7 @@ interface TestSighting {
 
 interface TestObservation {
   id: string
-  userId: string
-  userName: string
+  members: { userId: string; userName: string }[]
   slotId: string
   walkCompletion: string
   outcome: string
@@ -116,8 +115,7 @@ interface TestObservation {
 
 const sightedObservation: TestObservation = {
   id: 'obs-1',
-  userId: 'user-1',
-  userName: 'Alice',
+  members: [{ userId: 'user-1', userName: 'Alice' }],
   slotId: 'slot-1',
   walkCompletion: 'COMPLETED',
   outcome: 'SIGHTED',
@@ -143,8 +141,7 @@ const sightedObservation: TestObservation = {
 
 const notSightedObservation: TestObservation = {
   id: 'obs-2',
-  userId: 'user-1',
-  userName: 'Alice',
+  members: [{ userId: 'user-1', userName: 'Alice' }],
   slotId: 'slot-1',
   walkCompletion: 'COMPLETED',
   outcome: 'NOT_SIGHTED',

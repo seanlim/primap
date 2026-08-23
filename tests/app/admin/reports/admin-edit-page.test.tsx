@@ -74,8 +74,7 @@ function makeAwaitableChain(resolvedValue: unknown) {
 
 const fakeObservation = {
   id: 'obs-1',
-  userId: 'user-1',
-  userName: 'Alice',
+  members: [{ userId: 'user-1', userName: 'Alice' }],
   slotId: 'slot-1',
   walkCompletion: 'COMPLETED',
   outcome: 'SIGHTED',

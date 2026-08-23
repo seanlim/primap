@@ -7,14 +7,14 @@ import { MapPin, Calendar, Clock, Users, ChevronRight, Footprints, Search } from
 import { EmptyState } from '@/components/ui/empty-state'
 import { hasWalkStarted } from '@/lib/utils/walk-participation'
 import { findCurrentRound } from '@/lib/utils/rounds'
-import type { SlotMembership, WalkSlot as DbWalkSlot } from '@/lib/types/database'
+import type { Tables } from '@/lib/types/database'
 
 export const dynamic = 'force-dynamic'
 
 const PAGE_SIZE = 10
 
-type WalkSlot = DbWalkSlot & {
-  slot_memberships: Pick<SlotMembership, 'id' | 'user_id' | 'status'>[]
+type WalkSlot = Tables<'walk_slots'> & {
+  slot_memberships: Pick<Tables<'slot_memberships'>, 'id' | 'user_id' | 'status'>[]
 }
 
 type RoundMeta = {

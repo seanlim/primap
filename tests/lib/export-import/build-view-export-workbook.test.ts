@@ -87,6 +87,8 @@ function makeViewExportData(): ViewExportData {
       count: 2,
       fileName: 'sighting.jpg',
       mediaType: 'image/jpeg',
+      incidentId: '',
+      storageBucket: 'incident-media',
       fileSize: 2048,
       originalStoragePath: 'u1/o1/s1/sighting.jpg',
       viewExportPath: 'media/Round 1/.../sighting.jpg',

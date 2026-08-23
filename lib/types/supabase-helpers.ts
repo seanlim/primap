@@ -1,4 +1,13 @@
-import type { Profile, WalkSlot, SlotMembership, Observation, Incident, SurveyRound, Sighting, Media } from './database'
+import type { Tables } from './database'
+
+export type Profile = Tables<'profiles'>
+export type WalkSlot = Tables<'walk_slots'>
+export type SlotMembership = Tables<'slot_memberships'>
+export type Observation = Tables<'observations'>
+export type Incident = Tables<'incidents'>
+export type SurveyRound = Tables<'survey_rounds'>
+export type Sighting = Tables<'sightings'>
+export type Media = Tables<'media'>
 
 // --- Compact relation refs used in Supabase join selects ---
 

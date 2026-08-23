@@ -181,7 +181,7 @@ export async function cancelWalk(walkId: string, cancellationReason?: string) {
 
   const { data, error } = await supabase.rpc('cancel_slot_with_draft_cleanup', {
     p_slot_id: walkId,
-    p_cancellation_reason: isLateCancellation ? sanitizedReason : null,
+    p_cancellation_reason: isLateCancellation ? sanitizedReason : undefined,
   })
 
   if (error) return { error: error.message }

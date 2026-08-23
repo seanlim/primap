@@ -204,7 +204,7 @@ export function MapView({
     if (markers.length > 1) {
       map.fitBounds(
         latLngBounds(oneMapMarkers.map((m) => m.position)),
-        { padding: [72, 72], maxZoom: 14 },
+        { padding: [20, 20], maxZoom: 18 },
       );
     }
   }, [markers, zoom, oneMapMarkers, mapReadyTick]);

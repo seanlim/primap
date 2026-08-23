@@ -12,6 +12,8 @@ interface LocationPickerProps {
   className?: string;
 }
 
+const PICKER_ZOOM = 18
+
 export function LocationPicker({
   lat,
   lng,
@@ -45,7 +47,7 @@ export function LocationPicker({
       (position) => {
         const userLat = position.coords.latitude;
         const userLng = position.coords.longitude;
-        mapRef.current?.flyTo([userLat, userLng], 15);
+        mapRef.current?.flyTo([userLat, userLng], PICKER_ZOOM);
         onLocationChange(userLat, userLng);
       },
       () => {
@@ -58,7 +60,7 @@ export function LocationPicker({
 
   useEffect(() => {
     if (hasCoords) {
-      mapRef.current?.flyTo([lat, lng], 15);
+      mapRef.current?.flyTo([lat, lng], PICKER_ZOOM);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lat, lng]);
@@ -84,7 +86,6 @@ export function LocationPicker({
       ref={mapRef}
       heightPx={192}
       initialCenter={hasCoords ? [lat, lng] : SINGAPORE_LAT_LNG}
-      initialZoom={hasCoords ? 15 : 12}
       points={[
         { position: hasCoords ? [lat, lng] : SINGAPORE_LAT_LNG },
       ]}

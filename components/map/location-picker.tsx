@@ -1,12 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
-import { MAPBOX_TOKEN, DEFAULT_CENTER, MAP_STYLE } from "@/lib/config/mapbox";
 import { MapPin } from "lucide-react";
 import OneMap, { SINGAPORE_LAT_LNG } from "../../lib/config/onemap";
-import { LatLngTuple, LeafletEvent, Map as LeafletMap } from "leaflet";
+import { Map as LeafletMap } from "leaflet";
 
 interface LocationPickerProps {
   lat?: number | null;
@@ -21,14 +18,12 @@ export function LocationPicker({
   onLocationChange,
   className = "w-full h-48 rounded-xl overflow-hidden",
 }: LocationPickerProps) {
-  const mapContainer = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
-  const map2Ref = useRef<LeafletMap | null>(null);
-  const markerRef = useRef<mapboxgl.Marker | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const mapRef = useRef<LeafletMap | null>(null);
   const [online, setOnline] = useState(() =>
     typeof navigator !== "undefined" ? navigator.onLine : true,
   );
+
+  const hasCoords = lat != null && lng != null;
 
   // Track online/offline to re-attempt map init on reconnect
   useEffect(() => {
@@ -42,110 +37,40 @@ export function LocationPicker({
     };
   }, []);
 
-  const initializeMap = () => {
-    if (!MAPBOX_TOKEN || !mapContainer.current || mapRef.current) return;
-
-    mapboxgl.accessToken = MAPBOX_TOKEN;
-
-    // Determine initial center: props > geolocation > default
-    const initialCenter: [number, number] =
-      lat && lng ? [lng, lat] : DEFAULT_CENTER;
-    const initialZoom = lat && lng ? 15 : 12;
-
-    const map = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: MAP_STYLE,
-      center: initialCenter,
-      zoom: initialZoom,
-    });
-
-    mapRef.current = map;
-
-    const marker = new mapboxgl.Marker({ draggable: true, color: "#16a34a" })
-      .setLngLat(initialCenter)
-      .addTo(map);
-
-    markerRef.current = marker;
-
-    marker.on("dragend", () => {
-      const lngLat = marker.getLngLat();
-      onLocationChange(lngLat.lat, lngLat.lng);
-    });
-
-    map.on("click", (e) => {
-      marker.setLngLat(e.lngLat);
-      onLocationChange(e.lngLat.lat, e.lngLat.lng);
-    });
-
-    map.on("load", () => {
-      setLoaded(true);
-    });
-
-    // Auto-center on user geolocation if no lat/lng props set
-    if (!lat && !lng && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const userLng = position.coords.longitude;
-          const userLat = position.coords.latitude;
-          map.flyTo({ center: [userLng, userLat], zoom: 15 });
-          marker.setLngLat([userLng, userLat]);
-          onLocationChange(userLat, userLng);
-        },
-        () => {
-          // Geolocation denied/unavailable — stay at DEFAULT_CENTER
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
-      );
-    }
-  };
-
-  // Init on mount
+  // Auto-center on user geolocation if no lat/lng props set
   useEffect(() => {
-    initializeMap();
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!online || hasCoords || !navigator.geolocation) return;
 
-  // Retry init when coming online if map wasn't loaded (e.g. mounted while offline)
-  useEffect(() => {
-    if (online && !loaded) {
-      initializeMap();
-    }
-  }, [online, loaded]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (loaded && markerRef.current && lat && lng) {
-      markerRef.current.setLngLat([lng, lat]);
-      mapRef.current?.flyTo({ center: [lng, lat], zoom: 15 });
-      map2Ref.current?.flyTo([lat, lng]);
-    }
-  }, [lat, lng, loaded]);
-
-  if (!MAPBOX_TOKEN) {
-    return (
-      <div
-        className={`${className} bg-gray-100 flex flex-col items-center justify-center gap-2`}
-      >
-        <MapPin className="w-6 h-6 text-gray-300" />
-        <p className="text-xs text-gray-400">
-          Map requires NEXT_PUBLIC_MAPBOX_TOKEN
-        </p>
-      </div>
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const userLat = position.coords.latitude;
+        const userLng = position.coords.longitude;
+        mapRef.current?.flyTo([userLat, userLng], 15);
+        onLocationChange(userLat, userLng);
+      },
+      () => {
+        // Geolocation denied/unavailable — stay at SINGAPORE_LAT_LNG
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
     );
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online, hasCoords]);
 
-  if (!loaded && !online) {
+  useEffect(() => {
+    if (hasCoords) {
+      mapRef.current?.flyTo([lat, lng], 15);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lat, lng]);
+
+  if (!online) {
     return (
       <div
         className={`${className} bg-gray-100 flex flex-col items-center justify-center gap-2`}
       >
         <MapPin className="w-6 h-6 text-gray-300" />
         <p className="text-xs text-gray-400">Map unavailable offline</p>
-        {lat && lng && (
+        {lat != null && lng != null && (
           <p className="text-xs text-gray-500">
             {lat.toFixed(5)}, {lng.toFixed(5)}
           </p>
@@ -155,23 +80,17 @@ export function LocationPicker({
   }
 
   return (
-    <>
-      <div>
-        <OneMap
-          ref={map2Ref}
-          initialCenter={lat && lng ? [lat, lng] : SINGAPORE_LAT_LNG}
-          points={
-            lat && lng
-              ? [{ position: [lat, lng] }]
-              : [{ position: SINGAPORE_LAT_LNG }]
-          }
-          onClick={(coordinates) => {
-            onLocationChange(coordinates[0], coordinates[1]);
-            map2Ref.current?.flyTo([coordinates[0], coordinates[1]]);
-          }}
-        />
-      </div>
-      <div ref={mapContainer} className={className} />
-    </>
+    <OneMap
+      ref={mapRef}
+      heightPx={192}
+      initialCenter={hasCoords ? [lat, lng] : SINGAPORE_LAT_LNG}
+      initialZoom={hasCoords ? 15 : 12}
+      points={[
+        { position: hasCoords ? [lat, lng] : SINGAPORE_LAT_LNG },
+      ]}
+      onClick={(coordinates) => {
+        onLocationChange(coordinates[0], coordinates[1]);
+      }}
+    />
   );
 }

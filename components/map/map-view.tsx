@@ -1,17 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
-import {
-  MAPBOX_TOKEN,
-  DEFAULT_CENTER,
-  DEFAULT_ZOOM,
-  MAP_STYLE,
-} from "@/lib/config/mapbox";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MapPin } from "lucide-react";
 import { getSpeciesDisplayName } from "@/lib/constants/species";
-import OneMap, { MapPoint } from "@/lib/config/onemap";
+import OneMap, { MapPoint, SINGAPORE_LAT_LNG } from "@/lib/config/onemap";
+import { latLngBounds, LatLngTuple, Map as LeafletMap } from "leaflet";
 
 export interface MapMarker {
   lat: number;
@@ -26,7 +19,7 @@ export interface MapMarker {
 }
 
 interface MapViewProps {
-  center?: [number, number];
+  center?: LatLngTuple;
   zoom?: number;
   markers?: MapMarker[];
   className?: string;
@@ -124,29 +117,69 @@ function renderClusterPopupHtml(markers: MapMarker[]) {
   `.trim();
 }
 
-import {
-  latLngBounds,
-  LatLngTuple,
-  LeafletEvent,
-  Map as LeafletMap,
-} from "leaflet";
+function buildMapPoints(markers: MapMarker[]): MapPoint[] {
+  const groupedMarkers = new Map<string, MapMarker[]>();
+  for (const marker of markers) {
+    // Bucket nearby points together so real-world GPS jitter still clusters on the analytics map.
+    const key = `${marker.lat.toFixed(4)}:${marker.lng.toFixed(4)}`;
+    const group = groupedMarkers.get(key) ?? [];
+    group.push(marker);
+    groupedMarkers.set(key, group);
+  }
+
+  const displayedMarkers = Array.from(groupedMarkers.values()).map((group) => {
+    if (group.length === 1) {
+      return {
+        ...group[0],
+        count: 1,
+        isCluster: false,
+        popupHtml: renderPopupHtml(group[0]),
+      };
+    }
+
+    const sightedCount = group.filter(
+      (marker) => marker.variant !== "not_sighted",
+    ).length;
+    const notSightedCount = group.length - sightedCount;
+    const label = `${group.length} reports here`;
+    return {
+      ...group[0],
+      label,
+      popupHtml: renderClusterPopupHtml(group),
+      count: group.length,
+      isCluster: true,
+      variant:
+        sightedCount > 0 && notSightedCount > 0 ? "sighted" : group[0].variant,
+    };
+  });
+
+  return displayedMarkers.map((marker) => ({
+    position: [marker.lat, marker.lng] as [number, number],
+    content: marker.popupHtml,
+    colorHex: marker.color,
+    count:
+      marker.isCluster && (marker.count ?? 1) > 1
+        ? (marker.count as number)
+        : undefined,
+    shape: marker.variant === "not_sighted" ? ("square" as const) : undefined,
+  }));
+}
 
 export function MapView({
-  center = DEFAULT_CENTER,
-  zoom = DEFAULT_ZOOM,
+  center = SINGAPORE_LAT_LNG,
+  zoom = 11,
   markers = [],
   className = "w-full h-64 rounded-xl overflow-hidden",
   onMapClick,
 }: MapViewProps) {
-  const mapContainer = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
-  const map2Ref = useRef<LeafletMap | null>(null);
-  const markersRef = useRef<mapboxgl.Marker[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const mapRef = useRef<LeafletMap | null>(null);
   const [online, setOnline] = useState(() =>
     typeof navigator !== "undefined" ? navigator.onLine : true,
   );
-  const [oneMapMarkers, setOneMapMarkers] = useState<MapPoint[]>([]);
+  // Increments each time the Leaflet map mounts so camera effects re-run even
+  // when marker data is unchanged.
+  const [mapReadyTick, setMapReadyTick] = useState(0);
+  const oneMapMarkers = useMemo(() => buildMapPoints(markers), [markers]);
 
   useEffect(() => {
     const goOnline = () => setOnline(true);
@@ -160,193 +193,23 @@ export function MapView({
   }, []);
 
   useEffect(() => {
-    if (!MAPBOX_TOKEN || !mapContainer.current || mapRef.current) return;
-
-    mapboxgl.accessToken = MAPBOX_TOKEN;
-
-    const map = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: MAP_STYLE,
-      center,
-      zoom,
-    });
-
-    mapRef.current = map;
-
-    if (onMapClick) {
-      map.on("click", (e) => {
-        onMapClick(e.lngLat.lat, e.lngLat.lng);
-      });
-    }
-
-    map.on("load", () => {
-      setLoaded(true);
-    });
-
-    return () => {
-      markersRef.current.forEach((marker) => marker.remove());
-      markersRef.current = [];
-      map.remove();
-      mapRef.current = null;
-      setLoaded(false);
-    };
-  }, [center, zoom, onMapClick]);
-
-  useEffect(() => {
     const map = mapRef.current;
-    if (!map || !loaded) return;
-
-    const groupedMarkers = new Map<string, MapMarker[]>();
-    for (const marker of markers) {
-      // Bucket nearby points together so real-world GPS jitter still clusters on the analytics map.
-      const key = `${marker.lat.toFixed(4)}:${marker.lng.toFixed(4)}`;
-      const group = groupedMarkers.get(key) ?? [];
-      group.push(marker);
-      groupedMarkers.set(key, group);
-    }
-
-    const displayedMarkers = Array.from(groupedMarkers.values()).map(
-      (group) => {
-        if (group.length === 1) {
-          return {
-            ...group[0],
-            count: 1,
-            isCluster: false,
-            popupHtml: renderPopupHtml(group[0]),
-          };
-        }
-
-        const sightedCount = group.filter(
-          (marker) => marker.variant !== "not_sighted",
-        ).length;
-        const notSightedCount = group.length - sightedCount;
-        const label = `${group.length} reports here`;
-        return {
-          ...group[0],
-          label,
-          popupHtml: renderClusterPopupHtml(group),
-          count: group.length,
-          isCluster: true,
-          variant:
-            sightedCount > 0 && notSightedCount > 0
-              ? "sighted"
-              : group[0].variant,
-        };
-      },
-    );
-
-    markersRef.current.forEach((marker) => marker.remove());
-    markersRef.current = displayedMarkers.map((marker) => {
-      const el = document.createElement("div");
-      const markerCount = marker.count ?? 1;
-      const isCluster = marker.isCluster === true;
-      const isNotSighted = marker.variant === "not_sighted";
-      el.style.width = isCluster ? "26px" : "16px";
-      el.style.height = isCluster ? "26px" : "16px";
-      el.style.display = "flex";
-      el.style.alignItems = "center";
-      el.style.justifyContent = "center";
-      el.style.cursor = "pointer";
-      el.style.boxSizing = "border-box";
-      el.style.fontFamily = "system-ui, sans-serif";
-
-      if (isCluster) {
-        el.style.backgroundColor = "#16a34a";
-        el.style.border = "2px solid #ffffff";
-        el.style.borderRadius = "999px";
-        el.style.boxShadow = "0 4px 12px rgba(15, 23, 42, 0.28)";
-        el.style.color = "#ffffff";
-        el.style.fontSize = markerCount >= 10 ? "10px" : "11px";
-        el.style.fontWeight = "700";
-        el.style.lineHeight = "1";
-        el.textContent = String(markerCount);
-      } else if (isNotSighted) {
-        el.style.backgroundColor = marker.color || "#f59e0b";
-        el.style.border = "2px solid #7c2d12";
-        el.style.borderRadius = "4px";
-        el.style.boxShadow = "0 2px 8px rgba(15, 23, 42, 0.25)";
-        el.style.color = "#ffffff";
-        el.style.fontSize = "14px";
-        el.style.fontWeight = "700";
-        el.style.lineHeight = "1";
-        el.textContent = "-";
-      } else {
-        el.style.backgroundColor = marker.color || "#16a34a";
-        el.style.border = "2px solid #ffffff";
-        el.style.borderRadius = "999px";
-        el.style.boxShadow = "0 2px 8px rgba(15, 23, 42, 0.25)";
-      }
-
-      el.title = marker.label || "";
-
-      const mapMarker = new mapboxgl.Marker(el).setLngLat([
-        marker.lng,
-        marker.lat,
-      ]);
-
-      if (marker.popupHtml) {
-        mapMarker.setPopup(
-          new mapboxgl.Popup({
-            offset: isCluster ? 16 : isNotSighted ? 10 : 14,
-          }).setHTML(marker.popupHtml),
-        );
-      }
-
-      return mapMarker.addTo(map);
-    });
-
-    setOneMapMarkers(
-      displayedMarkers.map((m) => {
-        return {
-          position: [m.lat, m.lng],
-          content: m.popupHtml,
-          colorHex: m.color,
-        };
-      }),
-    );
-
-    map2Ref.current?.fitBounds(
-      latLngBounds(displayedMarkers.map((m) => [m.lat, m.lng])),
-      {
-        maxZoom: 14,
-      },
-    );
-
-    if (markers.length === 0) {
-      map.easeTo({ center, zoom, duration: 500 });
-      map2Ref.current?.flyTo(center);
-      return;
-    }
+    if (!map) return;
 
     if (markers.length === 1) {
-      map.flyTo({
-        center: [markers[0].lng, markers[0].lat],
-        zoom: Math.max(zoom, 13),
-      });
-      map2Ref.current?.flyTo([markers[0].lat, markers[0].lng]);
+      map.flyTo([markers[0].lat, markers[0].lng], Math.max(zoom, 13));
       return;
     }
 
-    const bounds = new mapboxgl.LngLatBounds();
-    displayedMarkers.forEach((marker) =>
-      bounds.extend([marker.lng, marker.lat]),
-    );
-    map.fitBounds(bounds, { padding: 72, maxZoom: 14 });
-  }, [center, zoom, markers, loaded, setOneMapMarkers]);
+    if (markers.length > 1) {
+      map.fitBounds(
+        latLngBounds(oneMapMarkers.map((m) => m.position)),
+        { padding: [72, 72], maxZoom: 14 },
+      );
+    }
+  }, [markers, zoom, oneMapMarkers, mapReadyTick]);
 
-  if (!MAPBOX_TOKEN) {
-    return (
-      <div
-        className={`${className} bg-gray-100 flex items-center justify-center border border-gray-200`}
-      >
-        <p className="text-sm text-gray-400">
-          Map requires NEXT_PUBLIC_MAPBOX_TOKEN
-        </p>
-      </div>
-    );
-  }
-
-  if (!loaded && !online) {
+  if (!online) {
     return (
       <div
         className={`${className} bg-gray-100 flex items-center justify-center border border-gray-200`}
@@ -374,16 +237,18 @@ export function MapView({
   }
 
   return (
-    <>
-      <div>
-        <OneMap
-          ref={map2Ref}
-          points={oneMapMarkers}
-          heightPx={300}
-          initialZoom={13.5}
-        />
-      </div>
-      <div ref={mapContainer} className={className} />
-    </>
+    <OneMap
+      ref={mapRef}
+      points={oneMapMarkers}
+      heightPx={300}
+      initialZoom={13.5}
+      initialCenter={center}
+      onClick={
+        onMapClick
+          ? (coordinates) => onMapClick(coordinates[0], coordinates[1])
+          : undefined
+      }
+      onReady={() => setMapReadyTick((tick) => tick + 1)}
+    />
   );
 }

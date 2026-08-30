@@ -21,47 +21,49 @@ export default async function ProfilePage() {
 
   if (!profile) redirect('/login')
 
-  const [{ data: activeMemberships }, { data: submittedObservationHistory }] = await Promise.all([
-    supabase
-      .from('slot_memberships')
-      .select(`
+  const { data: activeMemberships } = await supabase
+    .from('slot_memberships')
+    .select(`
+      id,
+      slot_id,
+      walk_slots (
         id,
-        walk_slots (
-          id,
-          location_name,
-          walk_date,
-          start_time,
-          end_time,
-          survey_rounds (name)
-        )
-      `)
-      .eq('user_id', user.id)
-      .eq('status', 'ACTIVE')
-      .order('joined_at', { ascending: false })
-      .limit(20),
-    supabase
-      .from('observations')
-      .select(`
-        id,
-        slot_id,
-        status,
-        outcome,
-        lat,
-        lng,
-        walk_slots (
-          id,
-          location_name,
-          walk_date,
-          start_time,
-          end_time,
-          survey_rounds (name)
-        )
-      `)
-      .eq('user_id', user.id)
-      .eq('status', 'SUBMITTED'),
-  ])
-
+        location_name,
+        walk_date,
+        start_time,
+        end_time,
+        survey_rounds (name)
+      )
+    `)
+    .eq('user_id', user.id)
+    .eq('status', 'ACTIVE')
+    .order('joined_at', { ascending: false })
+    .limit(20)
+  
   const activeWalkHistory = activeMemberships || []
+  const userSlotIds = activeWalkHistory.map((m) => m.slot_id)
+
+  const { data: submittedObservationHistory } = await supabase
+    .from('observations')
+    .select(`
+      id,
+      slot_id,
+      status,
+      outcome,
+      lat,
+      lng,
+      walk_slots (
+        id,
+        location_name,
+        walk_date,
+        start_time,
+        end_time,
+        survey_rounds (name)
+      )
+    `)
+    .eq('status', 'SUBMITTED')
+    .in('slot_id', userSlotIds)
+
   const activeSlotIds = activeWalkHistory
     .map((membership) => (membership.walk_slots as WalkRef | undefined)?.id)
     .filter(Boolean)
@@ -96,7 +98,6 @@ export default async function ProfilePage() {
     ? await supabase
         .from('observations')
         .select('id, slot_id, status, outcome, lat, lng')
-        .eq('user_id', user.id)
         .in('slot_id', walkSlotIds)
     : { data: [] }
 
@@ -183,37 +184,32 @@ export default async function ProfilePage() {
 
   const currentRound = findCurrentRound(rounds || [])
 
-  const { data: currentRoundSlots } = currentRound
+  const { data: currentRoundUserSlotIdsData } = currentRound
     ? await supabase
         .from('walk_slots')
         .select('id')
         .eq('round_id', currentRound.id)
+        .in('id', userSlotIds)
     : { data: [] }
 
-  const currentRoundSlotIds = (currentRoundSlots || []).map((slot) => slot.id)
+  const currentRoundUserSlotIds = (currentRoundUserSlotIdsData || []).map((slot) => slot.id)
 
-  const [{ count: walksJoined }, { count: draftsPending }, { count: reportsSubmitted }] = currentRoundSlotIds.length > 0
+  const [{ count: draftsPending }, { count: reportsSubmitted }] = currentRoundUserSlotIds.length > 0
     ? await Promise.all([
         supabase
-          .from('slot_memberships')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .eq('status', 'ACTIVE')
-          .in('slot_id', currentRoundSlotIds),
-        supabase
           .from('observations')
           .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
           .eq('status', 'DRAFT')
-          .in('slot_id', currentRoundSlotIds),
+          .in('slot_id', currentRoundUserSlotIds),
         supabase
           .from('observations')
           .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
           .eq('status', 'SUBMITTED')
-          .in('slot_id', currentRoundSlotIds),
+          .in('slot_id', currentRoundUserSlotIds),
       ])
-    : [{ count: 0 }, { count: 0 }, { count: 0 }]
+    : [{ count: 0 }, { count: 0 }]
+  
+  const walksJoined = (draftsPending || 0) + (reportsSubmitted || 0)
 
   return (
     <ProfileClient
@@ -227,7 +223,7 @@ export default async function ProfilePage() {
         createdAt: profile.created_at,
       }}
       stats={{
-        walksJoined: walksJoined || 0,
+        walksJoined: walksJoined,
         reportsSubmitted: reportsSubmitted || 0,
         draftsPending: draftsPending || 0,
         requiredWalks: settings?.required_walks_per_round || 4,

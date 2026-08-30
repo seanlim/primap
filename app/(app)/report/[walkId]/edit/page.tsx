@@ -33,7 +33,6 @@ export default async function EditReportPage({
       .from('observations')
       .select('*, sightings(*, media:media!media_sighting_id_fkey(*)), media:media!media_observation_id_fkey(*)')
       .eq('slot_id', walkId)
-      .eq('user_id', user.id)
       .single(),
     supabase
       .from('app_settings')

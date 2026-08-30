@@ -86,10 +86,11 @@ describe('HomePage', () => {
         },
       ],
       slot_memberships: [
-        { data: [] },
+        { data: [] }, // upcomingWalks
+        { data: [] }, // allUserMemberships
       ],
       observations: [
-        { count: 0 },
+        { data: [] },
       ],
     }
 

@@ -340,7 +340,7 @@ describe('walk-actions', () => {
       expect(result).toEqual({ success: true })
       expect(mockSupabase.rpc).toHaveBeenCalledWith('cancel_slot_with_draft_cleanup', {
         p_slot_id: 'slot-1',
-        p_cancellation_reason: null,
+        p_cancellation_reason: undefined,
       })
       expect(sendWalkCancellationEmail).toHaveBeenCalledWith(
         ['other@test.com'],

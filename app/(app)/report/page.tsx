@@ -90,45 +90,25 @@ export default async function ReportListPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [membershipResult, submittedResult] = await Promise.all([
-    supabase
-      .from('slot_memberships')
-      .select(`
-        id,
-        status,
-        walk_slots (
-          id,
-          location_name,
-          walk_date,
-          start_time,
-          end_time,
-          survey_rounds (name)
-        )
-      `)
-      .eq('user_id', user.id)
-      .eq('status', 'ACTIVE')
-      .order('joined_at', { ascending: false }),
-    supabase
-      .from('observations')
-      .select(`
-        id,
-        slot_id,
-        status,
-        walk_slots (
-          id,
-          location_name,
-          walk_date,
-          start_time,
-          end_time,
-          survey_rounds (name)
-        )
-      `)
-      .eq('user_id', user.id)
-      .eq('status', 'SUBMITTED'),
-  ])
+  const membershipResult = await supabase
+  .from('slot_memberships')
+  .select(`
+    id,
+    status,
+    walk_slots (
+      id,
+      location_name,
+      walk_date,
+      start_time,
+      end_time,
+      survey_rounds (name)
+    )
+  `)
+  .eq('user_id', user.id)
+  .eq('status', 'ACTIVE')
+  .order('joined_at', { ascending: false })
 
   const memberships = membershipResult.data || []
-  const submittedObservations = submittedResult.data || []
 
   const slotIds = memberships
     .map((membership) => {
@@ -137,11 +117,30 @@ export default async function ReportListPage() {
     })
     .filter((id): id is string => Boolean(id))
 
+  const submittedResult = await supabase
+  .from('observations')
+  .select(`
+    id,
+    slot_id,
+    status,
+    walk_slots (
+      id,
+      location_name,
+      walk_date,
+      start_time,
+      end_time,
+      survey_rounds (name)
+    )
+  `)
+  .in('slot_id', slotIds)
+  .eq('status', 'SUBMITTED')
+  
+  const submittedObservations = submittedResult.data || []
+
   const { data: observations } = slotIds.length > 0
     ? await supabase
         .from('observations')
         .select('id, slot_id, status')
-        .eq('user_id', user.id)
         .in('slot_id', slotIds)
     : { data: [] }
 

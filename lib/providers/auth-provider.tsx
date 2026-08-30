@@ -3,7 +3,7 @@
 import { createContext, useEffect, useState, useCallback, useMemo } from 'react'
 import { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
-import { Profile } from '@/lib/types/database'
+import type { Profile } from '../types/supabase-helpers'
 
 interface AuthContextType {
   user: User | null

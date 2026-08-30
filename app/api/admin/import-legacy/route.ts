@@ -160,7 +160,6 @@ export async function POST(request: NextRequest) {
         .from('observations')
         .insert({
           slot_id: slotId,
-          user_id: userId,
           status: 'SUBMITTED',
           outcome: outcome as 'SIGHTED' | 'NOT_SIGHTED',
           walk_completion: walkCompletion as 'COMPLETED' | 'PARTIAL' | 'ABORTED',

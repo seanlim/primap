@@ -49,6 +49,11 @@ interface AdminUpdateObservationInput {
   sightings?: SightingInput[]
 }
 
+interface ObservationMember {
+  userId: string
+  userName: string
+}
+
 export async function adminGetObservation(observationId: string) {
   await requireAdmin()
   const supabase = createAdminClient()
@@ -57,7 +62,6 @@ export async function adminGetObservation(observationId: string) {
     .from('observations')
     .select(`
       *,
-      profiles:user_id (full_name, email),
       sightings (*, media:media!media_sighting_id_fkey(*)),
       media:media!media_observation_id_fkey(*)
     `)
@@ -66,10 +70,18 @@ export async function adminGetObservation(observationId: string) {
 
   if (error || !data) return null
 
+  const { data: memberships } = await supabase
+    .from('slot_memberships')
+    .select('user_id, status, profiles:user_id(full_name, email)')
+    .eq('slot_id', data.slot_id)
+    .eq('status', 'ACTIVE')
+
   return {
     id: data.id,
-    userId: data.user_id,
-    userName: data.profiles.full_name || data.profiles.email,
+    members: (memberships || []).map<ObservationMember>((member) => ({
+      userId: member.user_id,
+      userName: member.profiles?.full_name || member.profiles?.email || 'Unknown',
+    })),
     slotId: data.slot_id,
     walkCompletion: data.walk_completion,
     outcome: data.outcome,

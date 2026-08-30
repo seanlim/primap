@@ -63,7 +63,7 @@ interface MemberData {
 
 export interface SlotReportViewData {
   slot: SlotData
-  observations: ObservationData[]
+  observations: ObservationData
   members: MemberData[]
   incidents: IncidentData[]
   isParticipant: boolean
@@ -85,7 +85,6 @@ export async function getSlotReportViewData(
       .from('observations')
       .select(`
         *,
-        profiles:user_id (full_name, email, avatar_url),
         sightings (*, media:media!media_sighting_id_fkey(*)),
         media:media!media_observation_id_fkey(*)
       `)
@@ -122,12 +121,12 @@ export async function getSlotReportViewData(
   const incidents = incidentsResult.data
   const round = slot.survey_rounds as unknown as { name: string }
   const activeMemberIds = new Set((members || []).map((member) => member.user_id))
-  const visibleObservations = (observations || []).filter(
-    (observation) => observation.status === 'SUBMITTED' || activeMemberIds.has(observation.user_id)
-  )
   const isParticipant = activeMemberIds.has(currentUserId)
-  const hasSubmittedOwnObservation = visibleObservations.some(
-    obs => obs.user_id === currentUserId && obs.status === 'SUBMITTED'
+  const visibleObservations = (observations || []).filter(
+    (observation) => observation.status === 'SUBMITTED' || isParticipant
+  )
+  const hasSubmittedOwnObservation = isParticipant && visibleObservations.some(
+    obs => obs.status === 'SUBMITTED'
   )
 
   return {
@@ -139,10 +138,12 @@ export async function getSlotReportViewData(
       endTime: slot.end_time,
       roundName: round.name,
     },
-    observations: visibleObservations.map(obs => ({
+    observations: visibleObservations.map(obs => { // TODO: Currently, we select a random primary member, to fix in issue #105
+      const primaryMember = (members || [])[0]
+      return {
       id: obs.id,
-      userId: obs.user_id,
-      userName: obs.profiles.full_name || obs.profiles.email,
+      userId: primaryMember?.user_id || '',
+      userName: primaryMember?.profiles?.full_name || primaryMember?.profiles?.email || 'Unknown',
       walkCompletion: obs.walk_completion,
       completionComment: obs.completion_comment,
       outcome: obs.outcome,
@@ -163,7 +164,8 @@ export async function getSlotReportViewData(
         media: s.media,
       })),
       media: obs.media,
-    })),
+    }
+    })[0],
     members: (members || []).map(m => ({
       userId: m.user_id,
       fullName: m.profiles.full_name,

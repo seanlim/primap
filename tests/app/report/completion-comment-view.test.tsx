@@ -5,12 +5,12 @@
  * - Comment displayed when present
  * - Comment hidden when null
  * - Comment hidden when empty string
- * - Multiple observations with mixed comments
  * - Special characters in comment
+ * - Long comment text
  * - Admin view (via backHref="/admin/reports") also shows the comment
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { render, screen, cleanup } from '@testing-library/react'
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -73,29 +73,22 @@ const baseObservation = {
   media: [],
 }
 
+const defaultMembers = [{ userId: 'user-a', fullName: 'Alice', email: 'alice@example.com' }]
+
 function renderGroupView(
-  observations: typeof baseObservation[],
+  observation: typeof baseObservation,
   overrides: Partial<Parameters<typeof GroupViewClient>[0]> = {}
 ) {
   return render(
     <GroupViewClient
       slot={defaultSlot}
-      observations={observations}
-      members={[{ userId: 'user-a', fullName: 'Alice', email: 'alice@example.com' }]}
+      observation={observation}
+      members={defaultMembers}
       incidents={[]}
       currentUserId="admin-user"
       {...overrides}
     />
   )
-}
-
-/**
- * Helper: expand an observation card to reveal ObservationDetails.
- * Cards start collapsed; clicking the header row expands them.
- */
-function expandObservation(userName: string) {
-  const header = screen.getByText(userName)
-  fireEvent.click(header)
 }
 
 beforeEach(() => {
@@ -108,126 +101,74 @@ afterEach(() => {
 
 describe('Completion comment display in ObservationDetails', () => {
   it('shows completion comment when present on a PARTIAL observation', () => {
-    renderGroupView([
-      {
-        ...baseObservation,
-        walkCompletion: 'PARTIAL',
-        completionComment: 'Rain started, had to cut short',
-      },
-    ])
-    expandObservation('Alice')
+    renderGroupView({
+      ...baseObservation,
+      walkCompletion: 'PARTIAL',
+      completionComment: 'Rain started, had to cut short',
+    })
     expect(screen.getByText('Completion Comment')).toBeInTheDocument()
     expect(screen.getByText('Rain started, had to cut short')).toBeInTheDocument()
   })
 
   it('shows completion comment when present on an ABORTED observation', () => {
-    renderGroupView([
-      {
-        ...baseObservation,
-        walkCompletion: 'ABORTED',
-        completionComment: 'Trail blocked by fallen tree',
-      },
-    ])
-    expandObservation('Alice')
+    renderGroupView({
+      ...baseObservation,
+      walkCompletion: 'ABORTED',
+      completionComment: 'Trail blocked by fallen tree',
+    })
     expect(screen.getByText('Completion Comment')).toBeInTheDocument()
     expect(screen.getByText('Trail blocked by fallen tree')).toBeInTheDocument()
   })
 
   it('does not show completion comment section when comment is null', () => {
-    renderGroupView([
-      {
-        ...baseObservation,
-        walkCompletion: 'COMPLETED',
-        completionComment: null,
-      },
-    ])
-    expandObservation('Alice')
+    renderGroupView({
+      ...baseObservation,
+      walkCompletion: 'COMPLETED',
+      completionComment: null,
+    })
     expect(screen.queryByText('Completion Comment')).not.toBeInTheDocument()
   })
 
   it('does not show completion comment section when comment is empty string', () => {
-    renderGroupView([
-      {
-        ...baseObservation,
-        walkCompletion: 'PARTIAL',
-        completionComment: '',
-      },
-    ])
-    expandObservation('Alice')
+    renderGroupView({
+      ...baseObservation,
+      walkCompletion: 'PARTIAL',
+      completionComment: '',
+    })
     // Empty string is falsy, so the conditional block should not render
     expect(screen.queryByText('Completion Comment')).not.toBeInTheDocument()
   })
 
   it('handles special characters in completion comment', () => {
     const specialComment = 'Weather: <thunderstorm> & heavy 🌧️ rain'
-    renderGroupView([
-      {
-        ...baseObservation,
-        walkCompletion: 'ABORTED',
-        completionComment: specialComment,
-      },
-    ])
-    expandObservation('Alice')
+    renderGroupView({
+      ...baseObservation,
+      walkCompletion: 'ABORTED',
+      completionComment: specialComment,
+    })
     expect(screen.getByText(specialComment)).toBeInTheDocument()
   })
 
   it('handles long completion comment text', () => {
     const longComment = 'A'.repeat(500)
-    renderGroupView([
-      {
-        ...baseObservation,
-        walkCompletion: 'PARTIAL',
-        completionComment: longComment,
-      },
-    ])
-    expandObservation('Alice')
+    renderGroupView({
+      ...baseObservation,
+      walkCompletion: 'PARTIAL',
+      completionComment: longComment,
+    })
     expect(screen.getByText(longComment)).toBeInTheDocument()
   })
 
   it('shows comment for admin view (via backHref)', () => {
     renderGroupView(
-      [
-        {
-          ...baseObservation,
-          walkCompletion: 'PARTIAL',
-          completionComment: 'Admin should see this',
-        },
-      ],
+      {
+        ...baseObservation,
+        walkCompletion: 'PARTIAL',
+        completionComment: 'Admin should see this',
+      },
       { backHref: '/admin/reports', backLabel: 'Back to Admin Reports' }
     )
-    expandObservation('Alice')
     expect(screen.getByText('Completion Comment')).toBeInTheDocument()
     expect(screen.getByText('Admin should see this')).toBeInTheDocument()
-  })
-
-  it('shows comments independently for multiple observations', () => {
-    renderGroupView([
-      {
-        ...baseObservation,
-        id: 'obs-1',
-        userId: 'user-a',
-        userName: 'Alice',
-        walkCompletion: 'PARTIAL',
-        completionComment: 'Rain',
-      },
-      {
-        ...baseObservation,
-        id: 'obs-2',
-        userId: 'user-b',
-        userName: 'Bob',
-        walkCompletion: 'COMPLETED',
-        completionComment: null,
-      },
-    ])
-
-    // Expand Alice — should have comment
-    expandObservation('Alice')
-    expect(screen.getByText('Rain')).toBeInTheDocument()
-
-    // Expand Bob — should NOT have comment label
-    expandObservation('Bob')
-    // Only one "Completion Comment" label (for Alice)
-    const labels = screen.getAllByText('Completion Comment')
-    expect(labels).toHaveLength(1)
   })
 })

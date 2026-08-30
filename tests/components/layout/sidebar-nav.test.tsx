@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import type { AnchorHTMLAttributes, ReactNode } from 'react'
 import { SidebarNav } from '@/components/layout/sidebar-nav'
 import { useAuth } from '@/lib/hooks/use-auth'
-import type { Profile } from '@/lib/types/database'
+import type { Profile } from '@/lib/types/supabase-helpers'
 
 vi.mock('next/link', () => ({
   default: ({

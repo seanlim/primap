@@ -127,7 +127,6 @@ describe('observation-actions', () => {
       expect(methods.insert).toHaveBeenCalledWith(
         expect.objectContaining({
           slot_id: 'slot-1',
-          user_id: 'user-1',
           status: 'DRAFT',
         })
       )
@@ -183,9 +182,8 @@ describe('observation-actions', () => {
 
     it('returns error when updating existing draft fails', async () => {
       setupUser()
-      // update().eq().eq().eq() — third eq returns error
+      // update().eq().eq() — second eq returns error
       methods.eq
-        .mockReturnValueOnce(methods)
         .mockReturnValueOnce(methods)
         .mockReturnValueOnce({ error: { message: 'Update failed' } })
 
@@ -242,10 +240,9 @@ describe('observation-actions', () => {
 
     it('removes sightings no longer in form', async () => {
       setupUser()
-      // For the update (3 eq calls), then sightings select (1 eq call)
+      // For the update (2 eq calls), then sightings select (1 eq call)
       methods.eq
         .mockReturnValueOnce(methods) // update eq('id', obsId)
-        .mockReturnValueOnce(methods) // update eq('user_id', userId)
         .mockReturnValueOnce(methods) // update eq('status', 'DRAFT')
         .mockReturnValueOnce({ data: [{ id: 'old-sight-1' }] }) // sightings select eq
 
@@ -272,9 +269,8 @@ describe('observation-actions', () => {
 
     it('removes all existing sightings when no sightings in form', async () => {
       setupUser()
-      // update chain (3 eq), then sightings select (1 eq)
+      // update chain (2 eq), then sightings select (1 eq)
       methods.eq
-        .mockReturnValueOnce(methods)
         .mockReturnValueOnce(methods)
         .mockReturnValueOnce(methods)
         .mockReturnValueOnce({ data: [{ id: 'sight-a' }, { id: 'sight-b' }] })
@@ -878,17 +874,15 @@ describe('observation-actions', () => {
             select: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnValue({
                 eq: vi.fn().mockReturnValue({
-                  eq: vi.fn().mockReturnValue({
-                    single: vi.fn().mockResolvedValue({
-                      data: {
-                        walk_completion: 'COMPLETED',
-                        outcome: 'SIGHTED',
-                        lat: 1.35,
-                        lng: 103.82,
-                        sightings: [{ lat: 1.36, lng: 103.83, species: 'RBL', species_other: null }],
-                      },
-                      error: null,
-                    }),
+                  single: vi.fn().mockResolvedValue({
+                    data: {
+                      walk_completion: 'COMPLETED',
+                      outcome: 'SIGHTED',
+                      lat: 1.35,
+                      lng: 103.82,
+                      sightings: [{ lat: 1.36, lng: 103.83, species: 'RBL', species_other: null }],
+                    },
+                    error: null,
                   }),
                 }),
               }),
@@ -945,17 +939,15 @@ describe('observation-actions', () => {
             select: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnValue({
                 eq: vi.fn().mockReturnValue({
-                  eq: vi.fn().mockReturnValue({
-                    single: vi.fn().mockResolvedValue({
-                      data: {
-                        walk_completion: 'COMPLETED',
-                        outcome: 'SIGHTED',
-                        lat: null,
-                        lng: null,
-                        sightings: [{ lat: 1.36, lng: 103.83, species: 'LTM', species_other: null }],
-                      },
-                      error: null,
-                    }),
+                  single: vi.fn().mockResolvedValue({
+                    data: {
+                      walk_completion: 'COMPLETED',
+                      outcome: 'SIGHTED',
+                      lat: null,
+                      lng: null,
+                      sightings: [{ lat: 1.36, lng: 103.83, species: 'LTM', species_other: null }],
+                    },
+                    error: null,
                   }),
                 }),
               }),
@@ -995,17 +987,15 @@ describe('observation-actions', () => {
             select: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnValue({
                 eq: vi.fn().mockReturnValue({
-                  eq: vi.fn().mockReturnValue({
-                    single: vi.fn().mockResolvedValue({
-                      data: {
-                        walk_completion: 'COMPLETED',
-                        outcome: 'NOT_SIGHTED',
-                        lat: 1.35,
-                        lng: 103.82,
-                        sightings: [],
-                      },
-                      error: null,
-                    }),
+                  single: vi.fn().mockResolvedValue({
+                    data: {
+                      walk_completion: 'COMPLETED',
+                      outcome: 'NOT_SIGHTED',
+                      lat: 1.35,
+                      lng: 103.82,
+                      sightings: [],
+                    },
+                    error: null,
                   }),
                 }),
               }),
@@ -1037,17 +1027,15 @@ describe('observation-actions', () => {
             select: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnValue({
                 eq: vi.fn().mockReturnValue({
-                  eq: vi.fn().mockReturnValue({
-                    single: vi.fn().mockResolvedValue({
-                      data: {
-                        walk_completion: 'COMPLETED',
-                        outcome: 'SIGHTED',
-                        lat: 1.35,
-                        lng: 103.82,
-                        sightings: [{ lat: 1.36, lng: 103.83, species: 'DUSKY', species_other: null }],
-                      },
-                      error: null,
-                    }),
+                  single: vi.fn().mockResolvedValue({
+                    data: {
+                      walk_completion: 'COMPLETED',
+                      outcome: 'SIGHTED',
+                      lat: 1.35,
+                      lng: 103.82,
+                      sightings: [{ lat: 1.36, lng: 103.83, species: 'DUSKY', species_other: null }],
+                    },
+                    error: null,
                   }),
                 }),
               }),
@@ -1084,17 +1072,15 @@ describe('observation-actions', () => {
             select: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnValue({
                 eq: vi.fn().mockReturnValue({
-                  eq: vi.fn().mockReturnValue({
-                    single: vi.fn().mockResolvedValue({
-                      data: {
-                        walk_completion: 'PARTIAL',
-                        outcome: 'SIGHTED',
-                        lat: 1.35,
-                        lng: 103.82,
-                        sightings: [{ lat: 1.36, lng: 103.83, species: 'RBL', species_other: null }],
-                      },
-                      error: null,
-                    }),
+                  single: vi.fn().mockResolvedValue({
+                    data: {
+                      walk_completion: 'PARTIAL',
+                      outcome: 'SIGHTED',
+                      lat: 1.35,
+                      lng: 103.82,
+                      sightings: [{ lat: 1.36, lng: 103.83, species: 'RBL', species_other: null }],
+                    },
+                    error: null,
                   }),
                 }),
               }),
@@ -1139,14 +1125,12 @@ describe('observation-actions', () => {
         },
         error: null,
       })
-      // select chain: eq x3, then nuke media select: eq x1, then update chain: eq x2
+      // select chain: eq x2, then nuke media select: eq x1, then update chain: eq x1
       methods.eq
         .mockReturnValueOnce(methods) // select eq('id', obsId)
-        .mockReturnValueOnce(methods) // select eq('user_id', userId)
         .mockReturnValueOnce(methods) // select eq('status', 'DRAFT')
         .mockReturnValueOnce({ data: null, error: null }) // nuke: media select eq('observation_id', obsId)
-        .mockReturnValueOnce(methods) // update eq('id', obsId)
-        .mockReturnValueOnce({ error: { message: 'Submit failed' } }) // update eq('user_id', userId)
+        .mockReturnValueOnce({ error: { message: 'Submit failed' } }) // update eq('id', obsId)
 
       const result = await submitObservation('obs-1', 'slot-1')
 

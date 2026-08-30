@@ -37,6 +37,7 @@ function makeObservation(overrides: Record<string, unknown> = {}) {
     userId: 'user-1',
     userName: 'Alice',
     walkCompletion: 'COMPLETED',
+    completionComment: null,
     outcome: 'SIGHTED',
     notes: null,
     lat: null,
@@ -74,13 +75,13 @@ describe('GroupViewClient – admin edit buttons', () => {
   })
 
   describe('admin view (backHref starts with /admin)', () => {
-    it('shows Edit button on other users\' observations', () => {
-      const obs = makeObservation({ id: 'obs-1', userId: 'user-1', userName: 'Alice' })
+    it('shows Edit button linking to the admin edit path for the observation', () => {
+      const obs = makeObservation({ id: 'obs-1' })
 
       render(
         <GroupViewClient
           slot={defaultSlot}
-          observations={[obs]}
+          observation={obs}
           members={defaultMembers}
           incidents={[]}
           currentUserId="admin-99"
@@ -89,75 +90,21 @@ describe('GroupViewClient – admin edit buttons', () => {
         />
       )
 
-      const editLinks = screen.getAllByRole('link', { name: /edit/i })
-      const adminEditLink = editLinks.find(
-        (el) => el.getAttribute('href') === '/admin/reports/slot-1/obs-1/edit'
-      )
-      expect(adminEditLink).toBeDefined()
-    })
-
-    it('shows Edit button on admin\'s own observation', () => {
-      const myObs = makeObservation({
-        id: 'obs-admin',
-        userId: 'admin-1',
-        userName: 'Admin',
-        status: 'SUBMITTED',
-      })
-
-      render(
-        <GroupViewClient
-          slot={defaultSlot}
-          observations={[myObs]}
-          members={[...defaultMembers, { userId: 'admin-1', fullName: 'Admin', email: 'admin@test.com' }]}
-          incidents={[]}
-          currentUserId="admin-1"
-          backHref="/admin/reports"
-          backLabel="Back to Admin Reports"
-        />
-      )
-
-      const editLinks = screen.getAllByRole('link', { name: /edit/i })
-      const adminEditLink = editLinks.find(
-        (el) => el.getAttribute('href') === '/admin/reports/slot-1/obs-admin/edit'
-      )
-      expect(adminEditLink).toBeDefined()
-    })
-
-    it('shows Edit buttons for multiple observations', () => {
-      const obs1 = makeObservation({ id: 'obs-1', userId: 'user-1', userName: 'Alice' })
-      const obs2 = makeObservation({ id: 'obs-2', userId: 'user-2', userName: 'Bob' })
-
-      render(
-        <GroupViewClient
-          slot={defaultSlot}
-          observations={[obs1, obs2]}
-          members={defaultMembers}
-          incidents={[]}
-          currentUserId="admin-99"
-          backHref="/admin/reports"
-          backLabel="Back to Admin Reports"
-        />
-      )
-
-      const editLinks = screen.getAllByRole('link', { name: /edit/i })
-      const hrefs = editLinks.map((el) => el.getAttribute('href'))
-      expect(hrefs).toContain('/admin/reports/slot-1/obs-1/edit')
-      expect(hrefs).toContain('/admin/reports/slot-1/obs-2/edit')
+      const editLink = screen.getByRole('link', { name: /edit/i })
+      expect(editLink.getAttribute('href')).toBe('/admin/reports/slot-1/obs-1/edit')
     })
 
     it('does not show user draft Edit/Submit buttons in admin view', () => {
       const draftObs = makeObservation({
         id: 'obs-draft',
-        userId: 'admin-1',
-        userName: 'Admin',
         status: 'DRAFT',
       })
 
       render(
         <GroupViewClient
           slot={defaultSlot}
-          observations={[draftObs]}
-          members={[{ userId: 'admin-1', fullName: 'Admin', email: 'admin@test.com' }]}
+          observation={draftObs}
+          members={defaultMembers}
           incidents={[]}
           currentUserId="admin-1"
           backHref="/admin/reports"
@@ -180,7 +127,7 @@ describe('GroupViewClient – admin edit buttons', () => {
       render(
         <GroupViewClient
           slot={defaultSlot}
-          observations={[]}
+          observation={null as never}
           members={[]}
           incidents={[]}
           currentUserId="admin-1"
@@ -198,12 +145,12 @@ describe('GroupViewClient – admin edit buttons', () => {
 
   describe('volunteer view (backHref does NOT start with /admin)', () => {
     it('does NOT show admin Edit buttons', () => {
-      const obs = makeObservation({ id: 'obs-1', userId: 'user-2', userName: 'Bob' })
+      const obs = makeObservation({ id: 'obs-1', status: 'SUBMITTED' })
 
       render(
         <GroupViewClient
           slot={defaultSlot}
-          observations={[obs]}
+          observation={obs}
           members={defaultMembers}
           incidents={[]}
           currentUserId="user-1"
@@ -219,18 +166,16 @@ describe('GroupViewClient – admin edit buttons', () => {
       expect(adminEditLink).toBeUndefined()
     })
 
-    it('shows user draft Edit/Submit buttons for own DRAFT observation', () => {
+    it('shows user draft Edit/Submit buttons for a DRAFT observation', () => {
       const draftObs = makeObservation({
         id: 'obs-draft',
-        userId: 'user-1',
-        userName: 'Alice',
         status: 'DRAFT',
       })
 
       render(
         <GroupViewClient
           slot={defaultSlot}
-          observations={[draftObs]}
+          observation={draftObs}
           members={defaultMembers}
           incidents={[]}
           currentUserId="user-1"
@@ -247,18 +192,16 @@ describe('GroupViewClient – admin edit buttons', () => {
       expect(screen.getByText('Submit')).toBeInTheDocument()
     })
 
-    it('does not show Edit/Submit for own SUBMITTED observation', () => {
+    it('does not show Edit/Submit for a SUBMITTED observation', () => {
       const submittedObs = makeObservation({
         id: 'obs-1',
-        userId: 'user-1',
-        userName: 'Alice',
         status: 'SUBMITTED',
       })
 
       render(
         <GroupViewClient
           slot={defaultSlot}
-          observations={[submittedObs]}
+          observation={submittedObs}
           members={defaultMembers}
           incidents={[]}
           currentUserId="user-1"
@@ -278,11 +221,11 @@ describe('GroupViewClient – admin edit buttons', () => {
   })
 
   describe('edge cases', () => {
-    it('renders without crashing when observations is empty', () => {
+    it('renders without crashing when there is no observation', () => {
       render(
         <GroupViewClient
           slot={defaultSlot}
-          observations={[]}
+          observation={null as never}
           members={defaultMembers}
           incidents={[]}
           currentUserId="admin-1"
@@ -298,8 +241,6 @@ describe('GroupViewClient – admin edit buttons', () => {
     it('renders NOT_SIGHTED observation details correctly', () => {
       const notSightedObs = makeObservation({
         id: 'obs-ns',
-        userId: 'user-1',
-        userName: 'Alice',
         outcome: 'NOT_SIGHTED',
         lat: 1.35,
         lng: 103.82,
@@ -309,7 +250,7 @@ describe('GroupViewClient – admin edit buttons', () => {
       render(
         <GroupViewClient
           slot={defaultSlot}
-          observations={[notSightedObs]}
+          observation={notSightedObs}
           members={defaultMembers}
           incidents={[]}
           currentUserId="admin-99"
@@ -319,28 +260,6 @@ describe('GroupViewClient – admin edit buttons', () => {
       )
 
       expect(screen.getByText('Not Sighted')).toBeInTheDocument()
-    })
-
-    it('shows "No Report Yet" for members who have not submitted', () => {
-      const obs = makeObservation({ id: 'obs-1', userId: 'user-1', userName: 'Alice' })
-
-      render(
-        <GroupViewClient
-          slot={defaultSlot}
-          observations={[obs]}
-          members={[
-            ...defaultMembers,
-            { userId: 'user-3', fullName: 'Charlie', email: 'charlie@test.com' },
-          ]}
-          incidents={[]}
-          currentUserId="admin-99"
-          backHref="/admin/reports"
-          backLabel="Back to Admin Reports"
-        />
-      )
-
-      expect(screen.getByText('No Report Yet')).toBeInTheDocument()
-      expect(screen.getByText('Charlie')).toBeInTheDocument()
     })
   })
 })

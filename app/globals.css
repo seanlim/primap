@@ -54,3 +54,8 @@ body {
 .stagger-children > *:nth-child(7) { animation-delay: 300ms; }
 .stagger-children > *:nth-child(8) { animation-delay: 350ms; }
 .stagger-children > *:nth-child(n+9) { animation-delay: 400ms; }
+
+div .leaflet-control-attribution {
+  display: flex;
+  flex-direction: row;
+}

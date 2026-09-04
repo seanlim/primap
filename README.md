@@ -18,7 +18,6 @@ Demo account credentials are also provided separately.
 
 - `Node.js 20+`
 - `npm`
-- A `Mapbox` access token
 - Optional: `Resend` API key for email delivery
 
 ## Setup
@@ -43,7 +42,7 @@ Use the Supabase values provided with the submission for:
 
 Additional setup notes:
 
-- Use your own Mapbox token unless one is also provided for evaluation.
+- Map features use OneMap tiles and require no access token.
 - If email delivery is not being tested, `RESEND_API_KEY` can be left blank.
 - Set `NEXT_PUBLIC_APP_URL` to `http://localhost:3000`.
 - `CRON_SECRET` can be any non-empty string unless the cron reminder route is being tested.
@@ -52,7 +51,6 @@ Additional setup notes:
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
-NEXT_PUBLIC_MAPBOX_TOKEN=
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=Primap <no-reply@primap.org>
 NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -218,5 +216,5 @@ Optional additional checks:
 - The required Supabase environment values and demo credentials are provided separately in the handoff note.
 - The shared backend already contains the required schema, seeded data, and deployed backend functionality used by the application.
 - The shared backend already includes report, incident, and media data. Fresh uploads may also be performed during testing if media upload flows are being evaluated directly.
-- Map features require `NEXT_PUBLIC_MAPBOX_TOKEN`.
+- Map features use OneMap tiles and require no access token.
 - Email features require `RESEND_API_KEY` only if email delivery itself is being evaluated.

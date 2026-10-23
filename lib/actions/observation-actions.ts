@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
@@ -195,67 +196,46 @@ export async function submitObservation(observationId: string, walkId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  // Verify the observation belongs to user and is DRAFT
-  const { data: obs } = await supabase
-    .from('observations')
-    .select('*, sightings(*)')
-    .eq('id', observationId)
-    .eq('status', 'DRAFT')
-    .single()
-
-  if (!obs) return { error: 'Observation not found or already submitted.' }
-
-  // Validation
-  if (!obs.walk_completion) return { error: 'Walk completion is required.' }
-  if (!obs.outcome) return { error: 'Outcome is required.' }
-
-  if (obs.outcome === 'SIGHTED') {
-    const sightings = obs.sightings
-    if (!sightings || sightings.length === 0) {
-      return { error: 'At least one sighting is required when outcome is Sighted.' }
-    }
-    for (const s of sightings) {
-      if (!s.lat || !s.lng) {
-        return { error: 'GPS location is required for each sighting.' }
-      }
-      if (s.species === 'OTHER' && !s.species_other?.trim()) {
-        return { error: 'Species name is required when "Other" is selected.' }
-      }
-    }
-
-    // Nuke observation-level data for SIGHTED reports
-    const { data: obsMedia } = await supabase
-      .from('media')
-      .select('id, file_path')
-      .eq('observation_id', observationId)
-
-    if (obsMedia && obsMedia.length > 0) {
-      const { error: storageError } = await supabase.storage
-        .from(OBSERVATION_MEDIA_BUCKET)
-        .remove(obsMedia.map(m => m.file_path))
-      if (storageError) return { error: 'Failed to clean up observation media files: ' + storageError.message }
-      const { error: mediaDeleteError } = await supabase
-        .from('media')
-        .delete()
-        .in('id', obsMedia.map(m => m.id))
-      if (mediaDeleteError) return { error: 'Failed to clean up observation media records: ' + mediaDeleteError.message }
-    }
-  }
-
-  if (obs.outcome === 'NOT_SIGHTED' && (!obs.lat || !obs.lng)) {
-    return { error: 'GPS location is required for Not Sighted reports.' }
-  }
-
-  const { error } = await supabase
-    .from('observations')
-    .update({
-      status: 'SUBMITTED',
-      submitted_at: new Date().toISOString(),
-      ...(obs.outcome === 'SIGHTED' ? { lat: null, lng: null } : {}),
-    })
-    .eq('id', observationId)
+  const { data, error } = await supabase.rpc('submit_observation_with_cleanup', {
+    p_observation_id: observationId,
+    p_walk_id: walkId,
+  })
 
   if (error) return { error: error.message }
+
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return { error: 'Failed to submit observation.' }
+  }
+
+  const result = data as { success?: boolean; error?: string; file_paths?: unknown }
+  if (result.error) return { error: result.error }
+  if (!result.success) return { error: 'Failed to submit observation.' }
+
+  const filePaths = Array.isArray(result.file_paths)
+    ? result.file_paths.filter((path): path is string => {
+        if (typeof path !== 'string' || path.includes('\\')) return false
+        const parts = path.split('/')
+        return parts.length === 3
+          && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(parts[0])
+          && parts[1] === observationId.toLowerCase()
+          && !['', '.', '..'].includes(parts[2])
+      })
+    : []
+
+  if (filePaths.length > 0) {
+    try {
+      const adminClient = createAdminClient()
+      const { error: storageError } = await adminClient.storage
+        .from(OBSERVATION_MEDIA_BUCKET)
+        .remove(filePaths)
+
+      if (storageError) {
+        console.error('Report submitted, but observation media storage cleanup failed:', storageError.message)
+      }
+    } catch (cleanupError) {
+      console.error('Report submitted, but observation media storage cleanup failed:', cleanupError)
+    }
+  }
 
   revalidatePath('/report')
   revalidatePath(`/report/${walkId}`)

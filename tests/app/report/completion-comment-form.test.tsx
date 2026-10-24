@@ -12,7 +12,7 @@
  * - Comment included in debounced save trigger
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 
 // ─── Browser API stubs ──────────────────────────────────────────────────────
 

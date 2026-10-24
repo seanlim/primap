@@ -10,7 +10,7 @@ import { MediaUploader, type MediaItem } from '@/components/report/media-uploade
 import { StepIndicator } from '@/components/report/step-indicator'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { Breadcrumb } from '@/components/ui/breadcrumb'
-import { getDraft, putDraft, deleteDraft, clearSyncStateForWalk, getMediaByClientParent, updateMediaResolvedParentId, getOutboxItems } from '@/lib/offline/db'
+import { getDraft, putDraft, deleteDraft, clearSyncStateForWalk, getMediaByClientParent, updateMediaResolvedParentId } from '@/lib/offline/db'
 import { processOutbox } from '@/lib/offline/sync-engine'
 import { type SightingForm } from '@/lib/types/observation'
 import { DEFAULT_MAX_MEDIA_PER_REPORT } from '@/lib/constants/settings'
@@ -184,27 +184,6 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
     lastServerSnapshotRef.current = snap
   }, [serializeFormState])
 
-  // Cached serverUpdatedAt for fast IndexedDB flushes (avoids extra getDraft call)
-  const lastServerUpdatedAtRef = useRef<string | null>(null)
-
-  const flushToIndexedDB = useCallback(async () => {
-    const fs = formStateRef.current
-    const filtered = fs.sightings.filter(s => s.species)
-    const has = filtered.length > 0
-    await putDraft(slot.id, {
-      observationId: fs.observationId,
-      clientDraftId: fs.clientDraftId,
-      walkCompletion: fs.walkCompletion as 'COMPLETED' | 'PARTIAL' | 'ABORTED',
-      completionComment: fs.completionComment || undefined,
-      outcome: has ? 'SIGHTED' : 'NOT_SIGHTED',
-      notes: fs.notes || undefined,
-      lat: fs.lat ?? undefined,
-      lng: fs.lng ?? undefined,
-      sightings: filtered,
-    }, lastServerUpdatedAtRef.current)
-    updateLocalSnapshot()
-  }, [slot.id, updateLocalSnapshot])
-
   // --- LOCAL-FIRST INITIALIZATION ---
   useEffect(() => {
     async function initializeFromLocalFirst() {
@@ -220,7 +199,6 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
         setLng(data.lng ?? null)
         setObservationId(data.observationId)
         if (data.observationId) setClientDraftId(data.observationId)
-        lastServerUpdatedAtRef.current = draft.serverUpdatedAt ?? null
         // Merge media from server props (media can't be stored in IndexedDB)
         setSightings((data.sightings ?? []).map(ds => {
           const withOther = { ...ds, speciesOther: ds.speciesOther || '' }
@@ -254,7 +232,6 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
             media: s.media || [],
           })),
         }, existingObservation.serverUpdatedAt)
-        lastServerUpdatedAtRef.current = existingObservation.serverUpdatedAt
         // State already initialized from props
       }
       // If neither: empty defaults (new observation or offline first visit)
@@ -504,7 +481,6 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
         lng: serverData.lng ?? undefined,
         sightings: serverSightings,
       }, serverData.serverUpdatedAt)
-      lastServerUpdatedAtRef.current = serverData.serverUpdatedAt
 
       setWalkCompletion(serverData.walkCompletion)
       setCompletionComment(serverData.completionComment ?? '')
@@ -689,7 +665,6 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
     // 1. Always write to IndexedDB first (local-first)
     const existingDraft = await getDraft(slot.id)
     const cachedServerUpdatedAt = existingDraft?.serverUpdatedAt ?? null
-    lastServerUpdatedAtRef.current = cachedServerUpdatedAt
     await putDraft(slot.id, formData, cachedServerUpdatedAt)
     updateLocalSnapshot()
 
@@ -746,7 +721,6 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
         ...s,
         id: i < newSightingIds.length ? newSightingIds[i] : s.id,
       }))
-      lastServerUpdatedAtRef.current = result.serverUpdatedAt ?? null
       await putDraft(slot.id, {
         ...formData,
         observationId: newObsId,

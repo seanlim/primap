@@ -42,10 +42,9 @@ async function upsertAppSettings(
   if (rows.length === 0) return result
 
   const importedRow = rows[0]
-  // Extract only data columns, not the id
-  const { id: _importedId, ...dataColumns } = importedRow
   const cleanedData: ImportRow = {}
-  for (const [key, val] of Object.entries(dataColumns)) {
+  for (const [key, val] of Object.entries(importedRow)) {
+    if (key === 'id') continue
     cleanedData[key] = val === '' ? null : val
   }
 

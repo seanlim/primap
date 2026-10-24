@@ -497,6 +497,8 @@ describe('POST /api/admin/import', () => {
     const response = await POST(makeRequest())
     const body = await response.json()
 
+    expect(body.summary.media.errors).toEqual([])
+
     // With no media folder, uploadedPaths is empty, so all media rows are attempted
     // (re-import on same environment where blobs already exist)
     expect(mockAdminFrom).toHaveBeenCalledWith('media')

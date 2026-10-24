@@ -23,7 +23,7 @@ const {
     throw new Error('NEXT_NOT_FOUND')
   })
   const mockAdminGetObservation = vi.fn()
-  const mockAdminEditFormClient = vi.fn((_props: unknown) => (
+  const mockAdminEditFormClient = vi.fn<(props: unknown) => import('react').ReactElement>(() => (
     <div data-testid="admin-edit-form-client" />
   ))
   return {

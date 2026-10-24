@@ -1,7 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import ExcelJS from 'exceljs'
 import { validateLegacyWorkbook } from '@/lib/export-import/import-validators'
-import { LEGACY_REQUIRED_COLUMNS } from '@/lib/export-import/constants'
 
 const ALL_HEADERS = [
   'round_name', 'location_name', 'walk_date', 'start_time', 'end_time',

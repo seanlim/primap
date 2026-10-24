@@ -3,7 +3,6 @@ import { redirect, notFound } from 'next/navigation'
 import { WalkDetailClient } from './walk-detail-client'
 import type { MembershipWithProfile } from '@/lib/types/supabase-helpers'
 import { getJoinBlockInfo, getWalkStartDateTime } from '@/lib/utils/walk-participation'
-import { isLateCancellationActive } from '@/lib/utils/reminder-schedule'
 
 export const dynamic = 'force-dynamic'
 

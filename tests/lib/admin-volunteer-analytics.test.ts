@@ -157,7 +157,7 @@ describe('getAdminUsersAnalytics indicators', () => {
   it('flags high participation by active sign-ups, not submitted reports', async () => {
     const supabase = {
       from: (table: string) => ({
-        select: (..._args: unknown[]) => {
+        select: () => {
           if (table === 'profiles') {
             return createQuery({ data: [{ id: 'user-1' }, { id: 'user-2' }] })
           }
@@ -202,7 +202,7 @@ describe('getAdminUsersAnalytics indicators', () => {
   it('counts late cancellations inside and on the threshold boundary only', async () => {
     const supabase = {
       from: (table: string) => ({
-        select: (..._args: unknown[]) => {
+        select: () => {
           if (table === 'profiles') return createQuery({ data: [{ id: 'user-1' }] })
           if (table === 'slot_memberships') {
             return createQuery({
@@ -263,7 +263,7 @@ describe('getAdminWalksAnalyticsPageSnapshotByRound', () => {
   it('returns an empty snapshot instead of crashing when rounds are missing', async () => {
     const supabase = {
       from: (table: string) => ({
-        select: (..._args: unknown[]) => {
+        select: () => {
           if (table === 'survey_rounds') return createQuery({ data: [] })
           if (table === 'walk_slots') {
             return createQuery({
@@ -303,7 +303,7 @@ describe('getAdminWalksAnalyticsPageSnapshotByRound', () => {
   it('includes sighted and not-sighted coordinates for the selected walk', async () => {
     const supabase = {
       from: (table: string) => ({
-        select: (..._args: unknown[]) => {
+        select: () => {
           if (table === 'survey_rounds') {
             return createQuery({
               data: [
@@ -397,7 +397,7 @@ describe('getAdminWalksAnalyticsPageSnapshotByRound', () => {
   it('uses the custom species name for OTHER sighting map labels', async () => {
     const supabase = {
       from: (table: string) => ({
-        select: (..._args: unknown[]) => {
+        select: () => {
           if (table === 'survey_rounds') {
             return createQuery({
               data: [
@@ -488,7 +488,7 @@ describe('admin analytics report maps', () => {
 
     return {
       from: (table: string) => ({
-        select: (..._args: unknown[]) => {
+        select: () => {
           if (table === 'survey_rounds') {
             return createQuery({
               data: [

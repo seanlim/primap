@@ -5,9 +5,7 @@
  * Corner cases: empty string, undefined, null, whitespace-only, long text,
  * comment with COMPLETED status (should be stored as null), switching statuses.
  */
-import { revalidatePath } from 'next/cache'
-
-const { mockSupabase, methods, mockStorage } = vi.hoisted(() => {
+const { mockSupabase, methods } = vi.hoisted(() => {
   const methods = {
     select: vi.fn(),
     insert: vi.fn(),

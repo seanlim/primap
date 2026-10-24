@@ -31,6 +31,7 @@ export interface ObservationViewRow {
   observationStatus: string
   outcome: string
   walkCompletion: string
+  completionComment: string
   observationLat: number | ''
   observationLng: number | ''
   notes: string
@@ -47,6 +48,7 @@ export interface SightingViewRow {
   observerName: string
   observerEmail: string
   species: string
+  speciesOther: string
   count: number | ''
   sightingLat: number | ''
   sightingLng: number | ''
@@ -290,7 +292,7 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
 
     return {
       ...walkContext,
-      joinedVolunteers: memberships.filter(row => asString(row.status) === 'JOINED').length,
+      joinedVolunteers: memberships.filter(row => asString(row.status) === 'ACTIVE').length,
       cancelledVolunteers: memberships.filter(row => asString(row.status) === 'CANCELLED').length,
       observationCount: observations.length,
       sightingCount,
@@ -313,6 +315,7 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
       observationStatus: asString(observation.status),
       outcome: asString(observation.outcome),
       walkCompletion: asString(observation.walk_completion),
+      completionComment: asString(observation.completion_comment),
       observationLat: asNumber(observation.lat),
       observationLng: asNumber(observation.lng),
       notes: asString(observation.notes),
@@ -338,6 +341,7 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
       observerName: user.name,
       observerEmail: user.email,
       species: asString(sighting.species),
+      speciesOther: asString(sighting.species_other),
       count: asNumber(sighting.count),
       sightingLat: asNumber(sighting.lat),
       sightingLng: asNumber(sighting.lng),

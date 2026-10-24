@@ -264,7 +264,7 @@ describe('POST /api/admin/import-legacy', () => {
       errors: [],
     })
 
-    const mocks = setupAdminMocks()
+    setupAdminMocks()
 
     const response = await POST(makeRequest())
     const body = await response.json()
@@ -371,16 +371,6 @@ describe('POST /api/admin/import-legacy', () => {
       errors: [],
     })
 
-    const mocks = setupAdminMocks()
-    // Override sightings mock to capture insert args
-    mockAdminFrom.mockImplementation((table: string) => {
-      if (table === 'sightings') {
-        return { insert: sightingInsert }
-      }
-      return setupAdminMocks(), mockAdminFrom.getMockImplementation()!(table)
-    })
-    // Re-setup properly
-    const originalImpl = setupAdminMocks()
     mockAdminFrom.mockImplementation((table: string) => {
       const result = (() => {
         switch (table) {

@@ -49,7 +49,6 @@ describe('withTimeout', () => {
     const thenable: PromiseLike<string> = {
       then<TResult1 = string, TResult2 = never>(
         onfulfilled?: ((value: string) => TResult1 | PromiseLike<TResult1>) | null | undefined,
-        _onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null | undefined,
       ): PromiseLike<TResult1 | TResult2> {
         if (onfulfilled) {
           return Promise.resolve(onfulfilled('from thenable'))

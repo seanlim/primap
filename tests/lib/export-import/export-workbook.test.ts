@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import ExcelJS from 'exceljs'
 import { buildExportWorkbook } from '@/lib/export-import/export-workbook'
+import { parseWorkbookToTableData } from '@/lib/export-import/import-workbook'
 import { TABLE_ORDER, TABLE_COLUMNS, type TableName } from '@/lib/export-import/constants'
 
 function makeTableData(overrides: Partial<Record<TableName, Record<string, unknown>[]>> = {}) {
@@ -226,4 +227,16 @@ describe('buildExportWorkbook', () => {
     const workbook = await parseWorkbook(buffer)
     expect(workbook.creator).toBe('Primap')
   })
+  it('round-trips report details through an actual backup workbook', async () => {
+    const input = makeTableData({
+      observations: [{ id: 'o1', slot_id: 'w1', walk_completion: 'PARTIAL', completion_comment: 'Trail flooded\nStopped early' }],
+      sightings: [{ id: 's1', observation_id: 'o1', species: 'OTHER', species_other: 'Silvered langur' }],
+    })
+    const buffer = await buildExportWorkbook(input)
+    const restored = await parseWorkbookToTableData(Buffer.from(buffer))
+    expect(restored.observations[0]).toMatchObject({ id: 'o1', completion_comment: 'Trail flooded\nStopped early' })
+    expect(restored.observations[0]).not.toHaveProperty('user_id')
+    expect(restored.sightings[0]).toMatchObject({ species: 'OTHER', species_other: 'Silvered langur' })
+  })
+
 })

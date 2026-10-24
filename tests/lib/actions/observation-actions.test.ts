@@ -1,6 +1,6 @@
 import { revalidatePath } from 'next/cache'
 
-const { mockSupabase, methods, mockStorage, adminStorage } = vi.hoisted(() => {
+const { mockSupabase, methods, mockStorage, adminStorage, adminFrom, adminMethods, adminBucket } = vi.hoisted(() => {
   const methods = {
     select: vi.fn(),
     insert: vi.fn(),
@@ -12,9 +12,10 @@ const { mockSupabase, methods, mockStorage, adminStorage } = vi.hoisted(() => {
     in: vi.fn(),
     limit: vi.fn(),
     single: vi.fn().mockResolvedValue({ data: null, error: null }),
+    maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
   }
   for (const key of Object.keys(methods) as (keyof typeof methods)[]) {
-    if (key !== 'single') methods[key].mockReturnThis()
+    if (key !== 'single' && key !== 'maybeSingle') methods[key].mockReturnThis()
   }
   const mockStorage = {
     upload: vi.fn().mockResolvedValue({ error: null }),
@@ -24,6 +25,11 @@ const { mockSupabase, methods, mockStorage, adminStorage } = vi.hoisted(() => {
     }),
   }
   const adminStorage = { remove: vi.fn().mockResolvedValue({ error: null }) }
+  const adminMethods = {
+    select: vi.fn(), delete: vi.fn(), eq: vi.fn(), in: vi.fn(),
+  }
+  const adminFrom = vi.fn(() => adminMethods)
+  const adminBucket = vi.fn(() => adminStorage)
   const mockSupabase = {
     rpc: vi.fn(),
     auth: {
@@ -34,7 +40,7 @@ const { mockSupabase, methods, mockStorage, adminStorage } = vi.hoisted(() => {
       from: vi.fn().mockReturnValue(mockStorage),
     },
   }
-  return { mockSupabase, methods, mockStorage, adminStorage }
+  return { mockSupabase, methods, mockStorage, adminStorage, adminFrom, adminMethods, adminBucket }
 })
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -42,7 +48,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 vi.mock('@/lib/supabase/admin', () => ({
-  createAdminClient: vi.fn(() => ({ storage: { from: vi.fn(() => adminStorage) } })),
+  createAdminClient: vi.fn(() => ({ from: adminFrom, storage: { from: adminBucket } })),
 }))
 
 import {
@@ -62,6 +68,7 @@ function resetChain() {
   methods.in.mockReturnThis()
   methods.limit.mockReturnThis()
   methods.single.mockResolvedValue({ data: null, error: null })
+  methods.maybeSingle.mockResolvedValue({ data: null, error: null })
   mockStorage.upload.mockResolvedValue({ error: null })
   mockStorage.remove.mockResolvedValue({ error: null })
 }
@@ -105,6 +112,8 @@ describe('observation-actions', () => {
     mockSupabase.storage.from.mockReturnValue(mockStorage)
     mockSupabase.rpc.mockResolvedValue({ data: { success: true, file_paths: [] }, error: null })
     adminStorage.remove.mockResolvedValue({ error: null })
+    adminFrom.mockReturnValue(adminMethods)
+    for (const method of Object.values(adminMethods)) method.mockReturnValue(adminMethods)
     resetChain()
   })
 
@@ -509,59 +518,121 @@ describe('observation-actions', () => {
     const uploaderId = '11111111-1111-4111-8111-111111111111'
     const walkId = '33333333-3333-4333-8333-333333333333'
     const path = `${uploaderId}/${observationId}/photo.jpg`
+    const draft = {
+      id: observationId, slot_id: walkId, status: 'DRAFT',
+      walk_completion: 'COMPLETED', outcome: 'SIGHTED',
+      lat: 1.35, lng: 103.82, updated_at: '2026-10-24T12:00:00Z',
+      sightings: [{ species: 'RBL', species_other: null, lat: 1.36, lng: 103.83 }],
+    }
+
+    beforeEach(() => {
+      setupUser()
+      methods.single.mockResolvedValue({ data: draft, error: null })
+      methods.maybeSingle.mockResolvedValue({ data: { id: observationId }, error: null })
+      adminMethods.select.mockResolvedValue({ data: [], error: null })
+      adminMethods.in.mockResolvedValue({ data: [], error: null })
+    })
+
+    function withMedia(paths: string[] = [path]) {
+      adminMethods.select
+        .mockResolvedValueOnce({ data: paths.map(file_path => ({ file_path })), error: null })
+        .mockReturnValueOnce(adminMethods)
+    }
 
     it('does not submit when unauthenticated', async () => {
       mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
       expect(await submitObservation(observationId, walkId)).toEqual({ error: 'Not authenticated' })
-      expect(mockSupabase.rpc).not.toHaveBeenCalled()
-      expect(adminStorage.remove).not.toHaveBeenCalled()
+      expect(mockSupabase.from).not.toHaveBeenCalled()
+      expect(adminFrom).not.toHaveBeenCalled()
     })
 
-    it('delegates submission to the authenticated RPC', async () => {
-      setupUser()
+    it('uses an authenticated, scoped draft update instead of the RPC', async () => {
       expect(await submitObservation(observationId, walkId)).toEqual({ success: true })
-      expect(mockSupabase.rpc).toHaveBeenCalledWith('submit_observation_with_cleanup', {
-        p_observation_id: observationId, p_walk_id: walkId,
+      expect(mockSupabase.rpc).not.toHaveBeenCalled()
+      expect(methods.eq).toHaveBeenCalledWith('id', observationId)
+      expect(methods.eq).toHaveBeenCalledWith('slot_id', walkId)
+      expect(methods.eq).toHaveBeenCalledWith('status', 'DRAFT')
+      expect(methods.eq).toHaveBeenCalledWith('updated_at', draft.updated_at)
+      expect(methods.update).toHaveBeenCalledWith({
+        status: 'SUBMITTED', submitted_at: expect.any(String), lat: null, lng: null,
       })
-      expect(mockSupabase.from).not.toHaveBeenCalled()
-      expect(adminStorage.remove).not.toHaveBeenCalled()
       for (const route of ['/report', `/report/${walkId}`, '/home', '/profile']) {
         expect(revalidatePath).toHaveBeenCalledWith(route)
       }
     })
 
-    it('preserves storage when the database submission fails', async () => {
-      setupUser()
-      mockSupabase.rpc.mockResolvedValue({ data: null, error: { message: 'Submission rolled back' } })
-      expect(await submitObservation(observationId, walkId)).toEqual({ error: 'Submission rolled back' })
+    it('does not elevate privileges when RLS hides the draft or the walk ID is wrong', async () => {
+      methods.single.mockResolvedValue({ data: null, error: null })
+      expect(await submitObservation(observationId, walkId)).toHaveProperty('error')
+      expect(methods.update).not.toHaveBeenCalled()
+      expect(adminFrom).not.toHaveBeenCalled()
+    })
+
+    it('preserves media when the authenticated update fails', async () => {
+      methods.maybeSingle.mockResolvedValue({ data: null, error: { message: 'RLS rejected submission' } })
+      expect(await submitObservation(observationId, walkId)).toEqual({ error: 'RLS rejected submission' })
+      expect(adminFrom).not.toHaveBeenCalled()
       expect(adminStorage.remove).not.toHaveBeenCalled()
-      expect(mockStorage.remove).not.toHaveBeenCalled()
       expect(revalidatePath).not.toHaveBeenCalled()
     })
 
-    it('preserves storage when the RPC rejects authorization or validation', async () => {
-      setupUser()
-      mockSupabase.rpc.mockResolvedValue({ data: { error: 'Not actively joined', file_paths: [path] }, error: null })
-      expect(await submitObservation(observationId, walkId)).toEqual({ error: 'Not actively joined' })
+    it('does not clean up when the draft was changed, submitted or membership was revoked concurrently', async () => {
+      methods.maybeSingle.mockResolvedValue({ data: null, error: null })
+      expect(await submitObservation(observationId, walkId)).toHaveProperty('error')
+      expect(adminFrom).not.toHaveBeenCalled()
       expect(adminStorage.remove).not.toHaveBeenCalled()
     })
 
-    it.each([null, [], 'success', {}, { success: false }].map(data => ({ data })))('rejects invalid RPC response %j', async ({ data }) => {
-      setupUser()
-      mockSupabase.rpc.mockResolvedValue({ data, error: null })
-      expect(await submitObservation(observationId, walkId)).toEqual({ error: 'Failed to submit observation.' })
-      expect(adminStorage.remove).not.toHaveBeenCalled()
+    it.each([
+      [{ walk_completion: null }, 'Walk completion is required.'],
+      [{ outcome: null }, 'Outcome is required.'],
+      [{ sightings: [] }, 'At least one sighting is required when outcome is Sighted.'],
+      [{ sightings: [{ lat: 0, lng: 1 }] }, 'GPS location is required for each sighting.'],
+      [{ sightings: [{ lat: 1, lng: null }] }, 'GPS location is required for each sighting.'],
+      [{ outcome: 'NOT_SIGHTED', lat: null }, 'GPS location is required for Not Sighted reports.'],
+      [{ outcome: 'NOT_SIGHTED', lng: 0 }, 'GPS location is required for Not Sighted reports.'],
+    ])('validates the draft in TypeScript: %j', async (patch, error) => {
+      methods.single.mockResolvedValue({ data: { ...draft, ...patch }, error: null })
+      expect(await submitObservation(observationId, walkId)).toEqual({ error })
+      expect(methods.update).not.toHaveBeenCalled()
+      expect(adminFrom).not.toHaveBeenCalled()
     })
 
-    it('waits for successful submission before removing another member’s observation files', async () => {
-      setupUser('another-member')
+    it.each([null, '', ' ', '\t\n', '\u00a0', '\u2003', '\ufeff'])('rejects blank Other species names: %j', async name => {
+      methods.single.mockResolvedValue({ data: {
+        ...draft, sightings: [{ lat: 1, lng: 2, species: 'OTHER', species_other: name }],
+      }, error: null })
+      expect(await submitObservation(observationId, walkId)).toEqual({ error: 'Species name is required when "Other" is selected.' })
+      expect(methods.update).not.toHaveBeenCalled()
+    })
+
+    it('accepts a named Other sighting', async () => {
+      methods.single.mockResolvedValue({ data: {
+        ...draft, sightings: [{ lat: 1, lng: 2, species: 'OTHER', species_other: ' Langur ' }],
+      }, error: null })
+      expect(await submitObservation(observationId, walkId)).toEqual({ success: true })
+    })
+
+    it('preserves not-sighted location and media', async () => {
+      methods.single.mockResolvedValue({ data: { ...draft, outcome: 'NOT_SIGHTED' }, error: null })
+      expect(await submitObservation(observationId, walkId)).toEqual({ success: true })
+      expect(methods.update).toHaveBeenCalledWith({ status: 'SUBMITTED', submitted_at: expect.any(String) })
+      expect(adminFrom).not.toHaveBeenCalled()
+    })
+
+    it('waits for a confirmed update before deleting another member’s observation media', async () => {
+      withMedia()
       let resolve!: (value: unknown) => void
-      mockSupabase.rpc.mockReturnValue(new Promise(r => { resolve = r }))
+      methods.maybeSingle.mockReturnValue(new Promise(r => { resolve = r }))
       const submission = submitObservation(observationId, walkId)
       await Promise.resolve()
-      expect(adminStorage.remove).not.toHaveBeenCalled()
-      resolve({ data: { success: true, file_paths: [path] }, error: null })
+      await Promise.resolve()
+      expect(adminFrom).not.toHaveBeenCalled()
+      resolve({ data: { id: observationId }, error: null })
       expect(await submission).toEqual({ success: true })
+      expect(adminMethods.delete).toHaveBeenCalled()
+      expect(adminMethods.eq).toHaveBeenCalledWith('observation_id', observationId)
+      expect(adminBucket).toHaveBeenCalledWith('observation-media')
       expect(adminStorage.remove).toHaveBeenCalledWith([path])
       expect(mockStorage.remove).not.toHaveBeenCalled()
     })
@@ -574,31 +645,33 @@ describe('observation-actions', () => {
       `${uploaderId}/${observationId}/nested/photo.jpg`,
       `${uploaderId}/${observationId}/back\\slash.jpg`,
       `invalid-uploader/${observationId}/photo.jpg`,
-      42,
-      null,
-    ])('never passes an unsafe cleanup path to the service role: %j', async unsafePath => {
-      setupUser()
-      mockSupabase.rpc.mockResolvedValue({ data: { success: true, file_paths: [unsafePath, path] }, error: null })
+    ])('never deletes an unsafe legacy path: %s', async unsafePath => {
+      withMedia([unsafePath, path])
       expect(await submitObservation(observationId, walkId)).toEqual({ success: true })
       expect(adminStorage.remove).toHaveBeenCalledWith([path])
     })
 
-    it.each([{ error: { message: 'Storage unavailable' } }, new Error('Network unavailable')])(
-      'keeps submission successful when post-commit storage cleanup fails: %j', async failure => {
-        setupUser()
-        mockSupabase.rpc.mockResolvedValue({ data: { success: true, file_paths: [path] }, error: null })
-        if (failure instanceof Error) adminStorage.remove.mockRejectedValue(failure)
-        else adminStorage.remove.mockResolvedValue(failure)
-        const log = vi.spyOn(console, 'error').mockImplementation(() => {})
-        try {
-          expect(await submitObservation(observationId, walkId)).toEqual({ success: true })
-          expect(revalidatePath).toHaveBeenCalledWith('/report')
-          expect(log).toHaveBeenCalled()
-        } finally {
-          log.mockRestore()
-        }
+    it('keeps files referenced by surviving media rows', async () => {
+      withMedia()
+      adminMethods.in.mockResolvedValue({ data: [{ file_path: path }], error: null })
+      expect(await submitObservation(observationId, walkId)).toEqual({ success: true })
+      expect(adminStorage.remove).not.toHaveBeenCalled()
+    })
+
+    it.each(['delete', 'references', 'storage'])('keeps submission successful after a %s cleanup failure', async stage => {
+      withMedia()
+      if (stage === 'delete') adminMethods.select.mockReset().mockResolvedValue({ data: null, error: { message: 'Delete failed' } })
+      if (stage === 'references') adminMethods.in.mockResolvedValue({ data: null, error: { message: 'Reference check failed' } })
+      if (stage === 'storage') adminStorage.remove.mockResolvedValue({ error: { message: 'Storage failed' } })
+      const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+      try {
+        expect(await submitObservation(observationId, walkId)).toEqual({ success: true })
+        expect(log).toHaveBeenCalled()
+        if (stage !== 'storage') expect(adminStorage.remove).not.toHaveBeenCalled()
+      } finally {
+        log.mockRestore()
       }
-    )
+    })
   })
 
   // ─── deleteMedia ─────────────────────────────────────────────────────

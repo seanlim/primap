@@ -196,44 +196,92 @@ export async function submitObservation(observationId: string, walkId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  const { data, error } = await supabase.rpc('submit_observation_with_cleanup', {
-    p_observation_id: observationId,
-    p_walk_id: walkId,
-  })
+  const { data: obs, error: readError } = await supabase
+    .from('observations')
+    .select('id, updated_at, walk_completion, outcome, lat, lng, sightings(lat, lng, species, species_other)')
+    .eq('id', observationId)
+    .eq('slot_id', walkId)
+    .eq('status', 'DRAFT')
+    .single()
 
-  if (error) return { error: error.message }
+  if (readError) return { error: readError.message }
+  if (!obs) return { error: 'Observation not found or already submitted.' }
+  if (!obs.walk_completion) return { error: 'Walk completion is required.' }
+  if (!obs.outcome) return { error: 'Outcome is required.' }
 
-  if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    return { error: 'Failed to submit observation.' }
+  if (obs.outcome === 'SIGHTED') {
+    if (obs.sightings.length === 0) {
+      return { error: 'At least one sighting is required when outcome is Sighted.' }
+    }
+    for (const sighting of obs.sightings) {
+      if (!sighting.lat || !sighting.lng) {
+        return { error: 'GPS location is required for each sighting.' }
+      }
+      if (sighting.species === 'OTHER' && !sighting.species_other?.trim()) {
+        return { error: 'Species name is required when "Other" is selected.' }
+      }
+    }
+  } else if (!obs.lat || !obs.lng) {
+    return { error: 'GPS location is required for Not Sighted reports.' }
   }
 
-  const result = data as { success?: boolean; error?: string; file_paths?: unknown }
-  if (result.error) return { error: result.error }
-  if (!result.success) return { error: 'Failed to submit observation.' }
+  const { data: submitted, error } = await supabase
+    .from('observations')
+    .update({
+      status: 'SUBMITTED',
+      submitted_at: new Date().toISOString(),
+      ...(obs.outcome === 'SIGHTED' ? { lat: null, lng: null } : {}),
+    })
+    .eq('id', obs.id)
+    .eq('slot_id', walkId)
+    .eq('status', 'DRAFT')
+    .eq('updated_at', obs.updated_at)
+    .select('id')
+    .maybeSingle()
 
-  const filePaths = Array.isArray(result.file_paths)
-    ? result.file_paths.filter((path): path is string => {
-        if (typeof path !== 'string' || path.includes('\\')) return false
+  if (error) return { error: error.message }
+  if (!submitted) return { error: 'Observation changed or already submitted. Refresh and try again.' }
+
+  if (obs.outcome === 'SIGHTED') {
+    try {
+      // Media DELETE RLS allows drafts only. Elevate only after the caller's
+      // authenticated update has confirmed submission of this observation.
+      const adminClient = createAdminClient()
+      const { data: media, error: deleteError } = await adminClient
+        .from('media')
+        .delete()
+        .eq('observation_id', submitted.id)
+        .select('file_path')
+      if (deleteError) throw new Error(deleteError.message)
+
+      const filePaths = [...new Set((media ?? []).map(m => m.file_path))].filter(path => {
+        if (path.includes('\\')) return false
         const parts = path.split('/')
         return parts.length === 3
           && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(parts[0])
-          && parts[1] === observationId.toLowerCase()
+          && parts[1] === submitted.id.toLowerCase()
           && !['', '.', '..'].includes(parts[2])
       })
-    : []
 
-  if (filePaths.length > 0) {
-    try {
-      const adminClient = createAdminClient()
-      const { error: storageError } = await adminClient.storage
-        .from(OBSERVATION_MEDIA_BUCKET)
-        .remove(filePaths)
+      if (filePaths.length > 0) {
+        // Legacy imports can reference the same file from another media row.
+        const { data: retained, error: referenceError } = await adminClient
+          .from('media')
+          .select('file_path')
+          .in('file_path', filePaths)
+        if (referenceError) throw new Error(referenceError.message)
 
-      if (storageError) {
-        console.error('Report submitted, but observation media storage cleanup failed:', storageError.message)
+        const retainedPaths = new Set((retained ?? []).map(m => m.file_path))
+        const removablePaths = filePaths.filter(path => !retainedPaths.has(path))
+        if (removablePaths.length > 0) {
+          const { error: storageError } = await adminClient.storage
+            .from(OBSERVATION_MEDIA_BUCKET)
+            .remove(removablePaths)
+          if (storageError) throw new Error(storageError.message)
+        }
       }
     } catch (cleanupError) {
-      console.error('Report submitted, but observation media storage cleanup failed:', cleanupError)
+      console.error('Report submitted, but observation media cleanup failed:', cleanupError)
     }
   }
 

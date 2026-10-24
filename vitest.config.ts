@@ -23,7 +23,7 @@ export default defineConfig({
         'lib/supabase/client.ts',
         'lib/supabase/server.ts',
         'lib/supabase/admin.ts',
-        'lib/config/mapbox.ts',
+        'lib/config/onemap.tsx',
       ],
       thresholds: {
         statements: 90,

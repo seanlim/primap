@@ -88,7 +88,8 @@ describe('constants', () => {
     it('observations columns include all expected fields', () => {
       const cols = TABLE_COLUMNS.observations
       expect(cols).toContain('slot_id')
-      expect(cols).toContain('user_id')
+      expect(cols).not.toContain('user_id')
+      expect(cols).toContain('completion_comment')
       expect(cols).toContain('outcome')
       expect(cols).toContain('walk_completion')
       expect(cols).toContain('lat')
@@ -113,6 +114,7 @@ describe('constants', () => {
       const cols = TABLE_COLUMNS.sightings
       expect(cols).toContain('observation_id')
       expect(cols).toContain('species')
+      expect(cols).toContain('species_other')
       expect(cols).toContain('count')
       expect(cols).toContain('lat')
       expect(cols).toContain('lng')

@@ -727,4 +727,22 @@ describe('POST /api/admin/import', () => {
     const updateArg = mockUpdate.mock.calls[0][0]
     expect(updateArg).not.toHaveProperty('id')
   })
+  it('restores old observation backups without sending removed user_id to Supabase', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'admin1' } } })
+    mockProfileSingle.mockResolvedValue({ data: { role: 'ADMIN' } })
+    mockParseWorkbook.mockResolvedValue({
+      observations: [{ id: 'obs-old', slot_id: 'walk-old', user_id: 'old-owner', walk_completion: 'PARTIAL' }],
+      slot_memberships: [{ id: 'membership', slot_id: 'walk-old', user_id: 'old-owner', status: 'ACTIVE' }],
+    })
+    await POST(makeRequest())
+    expect(mockUpsert).toHaveBeenCalledWith(
+      [{ id: 'obs-old', slot_id: 'walk-old', walk_completion: 'PARTIAL' }],
+      { onConflict: 'id', ignoreDuplicates: true }
+    )
+    expect(mockUpsert).toHaveBeenCalledWith(
+      [expect.objectContaining({ id: 'membership', user_id: 'old-owner' })],
+      { onConflict: 'id', ignoreDuplicates: true }
+    )
+  })
+
 })

@@ -133,6 +133,7 @@ export async function buildViewExportWorkbook(data: ViewExportData): Promise<Exc
     { header: 'Sighting Count', key: 'sightingCount', width: 16 },
     { header: 'Media Count', key: 'mediaCount', width: 14 },
     { header: 'Media Files', key: 'mediaFiles', width: 40, kind: 'path' },
+    { header: 'Completion Comment', key: 'completionComment', width: 32, kind: 'multiline' },
   ], data.observationRows)
 
   addWorksheet(workbook, 'Sightings', [
@@ -150,6 +151,7 @@ export async function buildViewExportWorkbook(data: ViewExportData): Promise<Exc
     { header: 'Observation Outcome', key: 'observationOutcome', width: 20 },
     { header: 'Media Count', key: 'mediaCount', width: 14 },
     { header: 'Media Files', key: 'mediaFiles', width: 40, kind: 'path' },
+    { header: 'Other Species Name', key: 'speciesOther', width: 24 },
   ], data.sightingRows)
 
   addWorksheet(workbook, 'Incidents', [

@@ -22,10 +22,12 @@ function resolveMediaBucket(row: ImportRow | undefined): MediaBucket {
   return row?.incident_id ? INCIDENT_MEDIA_BUCKET : OBSERVATION_MEDIA_BUCKET
 }
 
-function cleanImportRows(rows: ImportRow[]) {
+function cleanImportRows(rows: ImportRow[], table: TableName) {
   return rows.map(row => {
     const cleaned: ImportRow = {}
     for (const [key, val] of Object.entries(row)) {
+      // Legacy backups can contain the owner column removed by slot-shared reports.
+      if (table === 'observations' && key === 'user_id') continue
       cleaned[key] = val === '' ? null : val
     }
     return cleaned
@@ -154,7 +156,7 @@ export async function POST(request: NextRequest) {
         const batch = rows.slice(i, i + BATCH_SIZE)
 
         // Clean rows: remove empty string values for nullable fields, keep nulls
-        const cleanedBatch = cleanImportRows(batch)
+        const cleanedBatch = cleanImportRows(batch, table)
         const tableClient = adminClient.from(table) as unknown as {
           upsert: (values: unknown[], options: { onConflict: string; ignoreDuplicates: boolean }) => {
             select: (columns: string) => Promise<{ data: Array<{ id: string }> | null; error: { message: string } | null }>
@@ -233,7 +235,7 @@ export async function POST(request: NextRequest) {
 
       for (let i = 0; i < eligibleRows.length; i += BATCH_SIZE) {
         const batch = eligibleRows.slice(i, i + BATCH_SIZE)
-        const cleanedBatch = cleanImportRows(batch)
+        const cleanedBatch = cleanImportRows(batch, 'media')
 
         const { data, error } = await adminClient
           .from('media')

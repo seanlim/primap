@@ -23,7 +23,7 @@ describe('buildViewExportData', () => {
         { id: 'w1', round_id: 'r1', location_name: 'Pasir Ris Park', walk_date: '2026-03-14', start_time: '07:00', end_time: '09:00', max_volunteers: 8 },
       ],
       slot_memberships: [
-        { id: 'm1', slot_id: 'w1', user_id: 'u1', status: 'JOINED' },
+        { id: 'm1', slot_id: 'w1', user_id: 'u1', status: 'ACTIVE' },
       ],
       observations: [
         { id: 'o1', slot_id: 'w1', user_id: 'u1', status: 'SUBMITTED', outcome: 'SIGHTED', walk_completion: 'COMPLETED', notes: 'Saw movement', submitted_at: '2026-03-14T09:15:00Z' },
@@ -128,4 +128,34 @@ describe('buildViewExportData', () => {
     expect(result.sightingRows[0].mediaCount).toBe(1)
     expect(result.observationRows[0].mediaFiles).toContain('/sg-RBL-2/sighting.jpg')
   })
+  it('counts active signups for completed and upcoming walks, excluding cancellations', () => {
+    const walks = [
+      { id: 'completed-2', walk_date: '2026-03-16', location_name: 'Thomson Nature Park' },
+      { id: 'completed-3', walk_date: '2026-03-23', location_name: 'Lower Peirce Reservoir Park' },
+      { id: 'upcoming', walk_date: '2026-10-26', location_name: 'Test walk' },
+    ]
+    const memberships = walks.flatMap((walk, index) => [
+      ...Array.from({ length: index === 1 ? 3 : 2 }, (_, n) => ({
+        id: `${walk.id}-${n}`, slot_id: walk.id, user_id: `u-${n}`, status: 'ACTIVE',
+      })),
+      { id: `${walk.id}-cancelled`, slot_id: walk.id, user_id: 'cancelled-user', status: 'CANCELLED' },
+    ])
+    const result = buildViewExportData(makeTableData({
+      walk_slots: walks,
+      slot_memberships: memberships,
+      observations: walks.slice(0, 2).map(walk => ({ id: `obs-${walk.id}`, slot_id: walk.id, status: 'SUBMITTED' })),
+    }))
+    expect(result.walkRows.map(row => row.joinedVolunteers)).toEqual([2, 3, 2])
+    expect(result.walkRows.map(row => row.cancelledVolunteers)).toEqual([1, 1, 1])
+  })
+
+  it('preserves Other species names and completion comments in viewing rows', () => {
+    const result = buildViewExportData(makeTableData({
+      observations: [{ id: 'o1', slot_id: 'w1', walk_completion: 'ABORTED', completion_comment: 'Heavy rain\nReturned early' }],
+      sightings: [{ id: 's1', observation_id: 'o1', species: 'OTHER', species_other: 'Silvered langur' }],
+    }))
+    expect(result.observationRows[0]).toMatchObject({ walkCompletion: 'ABORTED', completionComment: 'Heavy rain\nReturned early' })
+    expect(result.sightingRows[0]).toMatchObject({ species: 'OTHER', speciesOther: 'Silvered langur' })
+  })
+
 })

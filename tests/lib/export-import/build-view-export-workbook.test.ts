@@ -35,6 +35,7 @@ function makeViewExportData(): ViewExportData {
       observationStatus: 'SUBMITTED',
       outcome: 'SIGHTED',
       walkCompletion: 'COMPLETED',
+      completionComment: '',
       observationLat: 1.234,
       observationLng: 103.456,
       notes: 'Saw movement',
@@ -50,6 +51,7 @@ function makeViewExportData(): ViewExportData {
       observerName: 'Tan Wei Ming',
       observerEmail: 'volunteer@example.com',
       species: 'RBL',
+      speciesOther: '',
       count: 2,
       sightingLat: 1.234,
       sightingLng: 103.456,
@@ -137,4 +139,20 @@ describe('buildViewExportWorkbook', () => {
     expect(walks.getRow(2).getCell(1).value).toBe('2026-03-14')
     expect(walks.getRow(2).getCell(2).value).toBeInstanceOf(Date)
   })
+  it('writes completion comments and Other species names into the viewing workbook', async () => {
+    const data = makeViewExportData()
+    Object.assign(data.observationRows[0], { completionComment: 'Heavy rain\nReturned early' })
+    Object.assign(data.sightingRows[0], { species: 'OTHER', speciesOther: 'Silvered langur' })
+    const workbook = await parseWorkbook(await buildViewExportWorkbook(data))
+    function value(sheetName: string, header: string) {
+      const sheet = workbook.getWorksheet(sheetName)!
+      const headers = sheet.getRow(1).values as unknown[]
+      const column = headers.indexOf(header)
+      expect(column).toBeGreaterThan(0)
+      return sheet.getRow(2).getCell(column).value
+    }
+    expect(value('Observations', 'Completion Comment')).toBe('Heavy rain\nReturned early')
+    expect(value('Sightings', 'Other Species Name')).toBe('Silvered langur')
+  })
+
 })

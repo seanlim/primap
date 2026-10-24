@@ -50,7 +50,7 @@ describe('email utilities', () => {
 
       expect(mockSend).toHaveBeenCalledTimes(1)
       const call = mockSend.mock.calls[0][0]
-      expect(call.from).toBe('Primap <no-reply@primap.org>')
+      expect(call.from).toBe('Primap <no-reply@primap.app>')
       expect(call.to).toBe('test@example.com')
       expect(call.subject).toBe('Primap Account Approved')
       expect(call.html).toContain('Hi Test User')

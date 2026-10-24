@@ -1,6 +1,6 @@
 import { revalidatePath } from 'next/cache'
 
-const { mockSupabase, methods, mockStorage } = vi.hoisted(() => {
+const { mockSupabase, methods, mockStorage, adminStorage } = vi.hoisted(() => {
   const methods = {
     select: vi.fn(),
     insert: vi.fn(),
@@ -23,7 +23,9 @@ const { mockSupabase, methods, mockStorage } = vi.hoisted(() => {
       data: { publicUrl: 'https://example.com/public/file.jpg' },
     }),
   }
+  const adminStorage = { remove: vi.fn().mockResolvedValue({ error: null }) }
   const mockSupabase = {
+    rpc: vi.fn(),
     auth: {
       getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
     },
@@ -32,11 +34,15 @@ const { mockSupabase, methods, mockStorage } = vi.hoisted(() => {
       from: vi.fn().mockReturnValue(mockStorage),
     },
   }
-  return { mockSupabase, methods, mockStorage }
+  return { mockSupabase, methods, mockStorage, adminStorage }
 })
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => mockSupabase),
+}))
+
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: vi.fn(() => ({ storage: { from: vi.fn(() => adminStorage) } })),
 }))
 
 import {
@@ -94,7 +100,11 @@ const otherSightingInput = {
 
 describe('observation-actions', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    vi.resetAllMocks()
+    mockSupabase.from.mockReturnValue(methods)
+    mockSupabase.storage.from.mockReturnValue(mockStorage)
+    mockSupabase.rpc.mockResolvedValue({ data: { success: true, file_paths: [] }, error: null })
+    adminStorage.remove.mockResolvedValue({ error: null })
     resetChain()
   })
 
@@ -494,648 +504,101 @@ describe('observation-actions', () => {
     })
   })
 
-  // ─── submitObservation ───────────────────────────────────────────────
-
   describe('submitObservation', () => {
-    it('returns error when not authenticated', async () => {
+    const observationId = '22222222-2222-4222-8222-222222222222'
+    const uploaderId = '11111111-1111-4111-8111-111111111111'
+    const walkId = '33333333-3333-4333-8333-333333333333'
+    const path = `${uploaderId}/${observationId}/photo.jpg`
+
+    it('does not submit when unauthenticated', async () => {
       mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
-
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      expect(result).toEqual({ error: 'Not authenticated' })
+      expect(await submitObservation(observationId, walkId)).toEqual({ error: 'Not authenticated' })
+      expect(mockSupabase.rpc).not.toHaveBeenCalled()
+      expect(adminStorage.remove).not.toHaveBeenCalled()
     })
 
-    it('returns error when observation not found', async () => {
+    it('delegates submission to the authenticated RPC', async () => {
       setupUser()
-      methods.single.mockResolvedValueOnce({ data: null, error: null })
-
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      expect(result).toEqual({
-        error: 'Observation not found or already submitted.',
+      expect(await submitObservation(observationId, walkId)).toEqual({ success: true })
+      expect(mockSupabase.rpc).toHaveBeenCalledWith('submit_observation_with_cleanup', {
+        p_observation_id: observationId, p_walk_id: walkId,
       })
+      expect(mockSupabase.from).not.toHaveBeenCalled()
+      expect(adminStorage.remove).not.toHaveBeenCalled()
+      for (const route of ['/report', `/report/${walkId}`, '/home', '/profile']) {
+        expect(revalidatePath).toHaveBeenCalledWith(route)
+      }
     })
 
-    // TC-UNIT-OBS-03 (UC-06 A2): Missing completion status is blocked
-    it('returns error when walk_completion is missing', async () => {
+    it('preserves storage when the database submission fails', async () => {
       setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: {
-          walk_completion: null,
-          outcome: 'SIGHTED',
-          sightings: [{ lat: 1, lng: 2 }],
-        },
-        error: null,
-      })
-
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      expect(result).toEqual({ error: 'Walk completion is required.' })
-    })
-
-    // TC-UNIT-OBS-04 (UC-06 A2): Missing outcome is blocked
-    it('returns error when outcome is missing', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: {
-          walk_completion: 'COMPLETED',
-          outcome: null,
-          sightings: [],
-        },
-        error: null,
-      })
-
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      expect(result).toEqual({ error: 'Outcome is required.' })
-    })
-
-    it('returns error when SIGHTED with no sightings', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: {
-          walk_completion: 'COMPLETED',
-          outcome: 'SIGHTED',
-          sightings: [],
-        },
-        error: null,
-      })
-
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      expect(result).toEqual({
-        error: 'At least one sighting is required when outcome is Sighted.',
-      })
-    })
-
-    it('returns error when SIGHTED sighting missing lat', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: {
-          walk_completion: 'COMPLETED',
-          outcome: 'SIGHTED',
-          sightings: [{ lat: null, lng: 103.82 }],
-        },
-        error: null,
-      })
-
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      expect(result).toEqual({
-        error: 'GPS location is required for each sighting.',
-      })
-    })
-
-    it('returns error when SIGHTED sighting missing lng', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: {
-          walk_completion: 'COMPLETED',
-          outcome: 'SIGHTED',
-          sightings: [{ lat: 1.35, lng: null }],
-        },
-        error: null,
-      })
-
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      expect(result).toEqual({
-        error: 'GPS location is required for each sighting.',
-      })
-    })
-
-    // TC-UNIT-OBS-01 (UC-06): Sighted submission succeeds with required fields
-    it('submits SIGHTED observation successfully', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: {
-          walk_completion: 'COMPLETED',
-          outcome: 'SIGHTED',
-          lat: 1.35,
-          lng: 103.82,
-          sightings: [{ lat: 1.36, lng: 103.83 }],
-        },
-        error: null,
-      })
-
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      expect(result).toEqual({ success: true })
-      expect(methods.update).toHaveBeenCalledWith(
-        expect.objectContaining({ status: 'SUBMITTED', lat: null, lng: null })
-      )
-      expect(revalidatePath).toHaveBeenCalledWith('/report')
-      expect(revalidatePath).toHaveBeenCalledWith('/report/slot-1')
-      expect(revalidatePath).toHaveBeenCalledWith('/home')
-      expect(revalidatePath).toHaveBeenCalledWith('/profile')
-    })
-
-    it('returns error when NOT_SIGHTED without obs lat/lng', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: {
-          walk_completion: 'COMPLETED',
-          outcome: 'NOT_SIGHTED',
-          lat: null,
-          lng: null,
-          sightings: [],
-        },
-        error: null,
-      })
-
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      expect(result).toEqual({
-        error: 'GPS location is required for Not Sighted reports.',
-      })
-    })
-
-    // TC-UNIT-OBS-02 (UC-06): Not-sighted submission succeeds with required fields
-    it('submits NOT_SIGHTED observation successfully', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: {
-          walk_completion: 'COMPLETED',
-          outcome: 'NOT_SIGHTED',
-          lat: 1.35,
-          lng: 103.82,
-          sightings: [],
-        },
-        error: null,
-      })
-
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      expect(result).toEqual({ success: true })
-    })
-
-    // ─── OTHER species validation ───────────────────────────────────────
-
-    it('returns error when SIGHTED with OTHER species and null species_other', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: {
-          walk_completion: 'COMPLETED',
-          outcome: 'SIGHTED',
-          sightings: [{ lat: 1.36, lng: 103.83, species: 'OTHER', species_other: null }],
-        },
-        error: null,
-      })
-
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      expect(result).toEqual({
-        error: 'Species name is required when "Other" is selected.',
-      })
-    })
-
-    it('returns error when SIGHTED with OTHER species and empty species_other', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: {
-          walk_completion: 'COMPLETED',
-          outcome: 'SIGHTED',
-          sightings: [{ lat: 1.36, lng: 103.83, species: 'OTHER', species_other: '' }],
-        },
-        error: null,
-      })
-
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      expect(result).toEqual({
-        error: 'Species name is required when "Other" is selected.',
-      })
-    })
-
-    it('returns error when SIGHTED with OTHER species and whitespace-only species_other', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: {
-          walk_completion: 'COMPLETED',
-          outcome: 'SIGHTED',
-          sightings: [{ lat: 1.36, lng: 103.83, species: 'OTHER', species_other: '   ' }],
-        },
-        error: null,
-      })
-
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      expect(result).toEqual({
-        error: 'Species name is required when "Other" is selected.',
-      })
-    })
-
-    it('succeeds when SIGHTED with OTHER species and valid species_other', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: {
-          walk_completion: 'COMPLETED',
-          outcome: 'SIGHTED',
-          sightings: [{ lat: 1.36, lng: 103.83, species: 'OTHER', species_other: 'Silvered Langur' }],
-        },
-        error: null,
-      })
-
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      expect(result).toEqual({ success: true })
-    })
-
-    it('validates OTHER species_other even when mixed with non-OTHER sightings', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: {
-          walk_completion: 'COMPLETED',
-          outcome: 'SIGHTED',
-          sightings: [
-            { lat: 1.36, lng: 103.83, species: 'RBL', species_other: null },
-            { lat: 1.37, lng: 103.84, species: 'OTHER', species_other: null },
-          ],
-        },
-        error: null,
-      })
-
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      expect(result).toEqual({
-        error: 'Species name is required when "Other" is selected.',
-      })
-    })
-
-    it('succeeds with multiple sightings including valid OTHER', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: {
-          walk_completion: 'COMPLETED',
-          outcome: 'SIGHTED',
-          sightings: [
-            { lat: 1.36, lng: 103.83, species: 'RBL', species_other: null },
-            { lat: 1.37, lng: 103.84, species: 'OTHER', species_other: 'Silvered Langur' },
-            { lat: 1.38, lng: 103.85, species: 'LTM', species_other: null },
-          ],
-        },
-        error: null,
-      })
-
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      expect(result).toEqual({ success: true })
-    })
-
-    it('does not validate species_other for non-OTHER species (RBL with null species_other passes)', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: {
-          walk_completion: 'COMPLETED',
-          outcome: 'SIGHTED',
-          sightings: [{ lat: 1.36, lng: 103.83, species: 'RBL', species_other: null }],
-        },
-        error: null,
-      })
-
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      expect(result).toEqual({ success: true })
-    })
-
-    it('checks GPS before species_other (missing GPS error takes priority)', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: {
-          walk_completion: 'COMPLETED',
-          outcome: 'SIGHTED',
-          sightings: [{ lat: null, lng: 103.83, species: 'OTHER', species_other: null }],
-        },
-        error: null,
-      })
-
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      // GPS validation runs first in the loop
-      expect(result).toEqual({
-        error: 'GPS location is required for each sighting.',
-      })
-    })
-
-    // ─── Nuke observation-level data for SIGHTED ─────────────────────────
-
-    it('nulls lat/lng in update for SIGHTED submissions', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: {
-          walk_completion: 'COMPLETED',
-          outcome: 'SIGHTED',
-          lat: 1.35,
-          lng: 103.82,
-          sightings: [{ lat: 1.36, lng: 103.83, species: 'RBL', species_other: null }],
-        },
-        error: null,
-      })
-
-      await submitObservation('obs-1', 'slot-1')
-
-      expect(methods.update).toHaveBeenCalledWith(
-        expect.objectContaining({ lat: null, lng: null })
-      )
-    })
-
-    it('does NOT null lat/lng for NOT_SIGHTED submissions', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: {
-          walk_completion: 'COMPLETED',
-          outcome: 'NOT_SIGHTED',
-          lat: 1.35,
-          lng: 103.82,
-          sightings: [],
-        },
-        error: null,
-      })
-
-      await submitObservation('obs-1', 'slot-1')
-
-      expect(methods.update).toHaveBeenCalledWith(
-        expect.objectContaining({ status: 'SUBMITTED' })
-      )
-      expect(methods.update).not.toHaveBeenCalledWith(
-        expect.objectContaining({ lat: null })
-      )
-    })
-
-    it('deletes observation-level media from storage and DB for SIGHTED', async () => {
-      setupUser()
-
-      let fromCallCount = 0
-      mockSupabase.from.mockImplementation((table: string) => {
-        fromCallCount++
-        // Call 1: observations select (fetch observation with sightings)
-        if (fromCallCount === 1) {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  single: vi.fn().mockResolvedValue({
-                    data: {
-                      walk_completion: 'COMPLETED',
-                      outcome: 'SIGHTED',
-                      lat: 1.35,
-                      lng: 103.82,
-                      sightings: [{ lat: 1.36, lng: 103.83, species: 'RBL', species_other: null }],
-                    },
-                    error: null,
-                  }),
-                }),
-              }),
-            }),
-          }
-        }
-        // Call 2: media select (observation-level media query)
-        if (fromCallCount === 2 && table === 'media') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({
-                data: [
-                  { id: 'media-1', file_path: 'user-1/obs-1/photo1.jpg' },
-                  { id: 'media-2', file_path: 'user-1/obs-1/photo2.jpg' },
-                ],
-                error: null,
-              }),
-            }),
-          }
-        }
-        // Call 3: media delete (delete obs-level media records)
-        if (fromCallCount === 3 && table === 'media') {
-          return {
-            delete: vi.fn().mockReturnValue({
-              in: vi.fn().mockResolvedValue({ error: null }),
-            }),
-          }
-        }
-        // Call 4: observations update (status + nulling lat/lng)
-        return methods
-      })
-
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      expect(result).toEqual({ success: true })
-      expect(mockSupabase.storage.from).toHaveBeenCalledWith('observation-media')
-      expect(mockStorage.remove).toHaveBeenCalledWith([
-        'user-1/obs-1/photo1.jpg',
-        'user-1/obs-1/photo2.jpg',
-      ])
-
-      // Reset
-      mockSupabase.from.mockReturnValue(methods)
-    })
-
-    it('does NOT delete media when SIGHTED but no observation-level media exists', async () => {
-      setupUser()
-
-      let fromCallCount = 0
-      mockSupabase.from.mockImplementation((table: string) => {
-        fromCallCount++
-        if (fromCallCount === 1) {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  single: vi.fn().mockResolvedValue({
-                    data: {
-                      walk_completion: 'COMPLETED',
-                      outcome: 'SIGHTED',
-                      lat: null,
-                      lng: null,
-                      sightings: [{ lat: 1.36, lng: 103.83, species: 'LTM', species_other: null }],
-                    },
-                    error: null,
-                  }),
-                }),
-              }),
-            }),
-          }
-        }
-        // Call 2: media select returns empty
-        if (fromCallCount === 2 && table === 'media') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-            }),
-          }
-        }
-        return methods
-      })
-
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      expect(result).toEqual({ success: true })
-      // storage.remove should NOT be called since no media to delete
+      mockSupabase.rpc.mockResolvedValue({ data: null, error: { message: 'Submission rolled back' } })
+      expect(await submitObservation(observationId, walkId)).toEqual({ error: 'Submission rolled back' })
+      expect(adminStorage.remove).not.toHaveBeenCalled()
       expect(mockStorage.remove).not.toHaveBeenCalled()
-
-      mockSupabase.from.mockReturnValue(methods)
+      expect(revalidatePath).not.toHaveBeenCalled()
     })
 
-    it('does NOT query or delete observation-level media for NOT_SIGHTED', async () => {
+    it('preserves storage when the RPC rejects authorization or validation', async () => {
       setupUser()
+      mockSupabase.rpc.mockResolvedValue({ data: { error: 'Not actively joined', file_paths: [path] }, error: null })
+      expect(await submitObservation(observationId, walkId)).toEqual({ error: 'Not actively joined' })
+      expect(adminStorage.remove).not.toHaveBeenCalled()
+    })
 
-      const fromSpy = vi.fn()
-      let fromCallCount = 0
-      mockSupabase.from.mockImplementation((table: string) => {
-        fromCallCount++
-        fromSpy(table)
-        if (fromCallCount === 1) {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  single: vi.fn().mockResolvedValue({
-                    data: {
-                      walk_completion: 'COMPLETED',
-                      outcome: 'NOT_SIGHTED',
-                      lat: 1.35,
-                      lng: 103.82,
-                      sightings: [],
-                    },
-                    error: null,
-                  }),
-                }),
-              }),
-            }),
-          }
-        }
-        return methods
-      })
+    it.each([null, [], 'success', {}, { success: false }].map(data => ({ data })))('rejects invalid RPC response %j', async ({ data }) => {
+      setupUser()
+      mockSupabase.rpc.mockResolvedValue({ data, error: null })
+      expect(await submitObservation(observationId, walkId)).toEqual({ error: 'Failed to submit observation.' })
+      expect(adminStorage.remove).not.toHaveBeenCalled()
+    })
 
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      expect(result).toEqual({ success: true })
-      // For NOT_SIGHTED, the only from() calls should be observations (select + update), NOT media
-      const mediaCalls = fromSpy.mock.calls.filter((c: string[]) => c[0] === 'media')
-      expect(mediaCalls).toHaveLength(0)
+    it('waits for successful submission before removing another member’s observation files', async () => {
+      setupUser('another-member')
+      let resolve!: (value: unknown) => void
+      mockSupabase.rpc.mockReturnValue(new Promise(r => { resolve = r }))
+      const submission = submitObservation(observationId, walkId)
+      await Promise.resolve()
+      expect(adminStorage.remove).not.toHaveBeenCalled()
+      resolve({ data: { success: true, file_paths: [path] }, error: null })
+      expect(await submission).toEqual({ success: true })
+      expect(adminStorage.remove).toHaveBeenCalledWith([path])
       expect(mockStorage.remove).not.toHaveBeenCalled()
-
-      mockSupabase.from.mockReturnValue(methods)
     })
 
-    it('handles null data from media select for SIGHTED gracefully', async () => {
+    it.each([
+      `${uploaderId}/44444444-4444-4444-8444-444444444444/photo.jpg`,
+      `${uploaderId}/${observationId}/../photo.jpg`,
+      `${uploaderId}/${observationId}/..`,
+      `${uploaderId}/${observationId}/`,
+      `${uploaderId}/${observationId}/nested/photo.jpg`,
+      `${uploaderId}/${observationId}/back\\slash.jpg`,
+      `invalid-uploader/${observationId}/photo.jpg`,
+      42,
+      null,
+    ])('never passes an unsafe cleanup path to the service role: %j', async unsafePath => {
       setupUser()
-
-      let fromCallCount = 0
-      mockSupabase.from.mockImplementation((table: string) => {
-        fromCallCount++
-        if (fromCallCount === 1) {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  single: vi.fn().mockResolvedValue({
-                    data: {
-                      walk_completion: 'COMPLETED',
-                      outcome: 'SIGHTED',
-                      lat: 1.35,
-                      lng: 103.82,
-                      sightings: [{ lat: 1.36, lng: 103.83, species: 'DUSKY', species_other: null }],
-                    },
-                    error: null,
-                  }),
-                }),
-              }),
-            }),
-          }
-        }
-        // media select returns null data
-        if (fromCallCount === 2 && table === 'media') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ data: null, error: null }),
-            }),
-          }
-        }
-        return methods
-      })
-
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      expect(result).toEqual({ success: true })
-      expect(mockStorage.remove).not.toHaveBeenCalled()
-
-      mockSupabase.from.mockReturnValue(methods)
+      mockSupabase.rpc.mockResolvedValue({ data: { success: true, file_paths: [unsafePath, path] }, error: null })
+      expect(await submitObservation(observationId, walkId)).toEqual({ success: true })
+      expect(adminStorage.remove).toHaveBeenCalledWith([path])
     })
 
-    it('nukes obs-level data with single media file for SIGHTED', async () => {
-      setupUser()
-
-      let fromCallCount = 0
-      mockSupabase.from.mockImplementation((table: string) => {
-        fromCallCount++
-        if (fromCallCount === 1) {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  single: vi.fn().mockResolvedValue({
-                    data: {
-                      walk_completion: 'PARTIAL',
-                      outcome: 'SIGHTED',
-                      lat: 1.35,
-                      lng: 103.82,
-                      sightings: [{ lat: 1.36, lng: 103.83, species: 'RBL', species_other: null }],
-                    },
-                    error: null,
-                  }),
-                }),
-              }),
-            }),
-          }
+    it.each([{ error: { message: 'Storage unavailable' } }, new Error('Network unavailable')])(
+      'keeps submission successful when post-commit storage cleanup fails: %j', async failure => {
+        setupUser()
+        mockSupabase.rpc.mockResolvedValue({ data: { success: true, file_paths: [path] }, error: null })
+        if (failure instanceof Error) adminStorage.remove.mockRejectedValue(failure)
+        else adminStorage.remove.mockResolvedValue(failure)
+        const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+        try {
+          expect(await submitObservation(observationId, walkId)).toEqual({ success: true })
+          expect(revalidatePath).toHaveBeenCalledWith('/report')
+          expect(log).toHaveBeenCalled()
+        } finally {
+          log.mockRestore()
         }
-        if (fromCallCount === 2 && table === 'media') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({
-                data: [{ id: 'media-solo', file_path: 'user-1/obs-1/only.jpg' }],
-                error: null,
-              }),
-            }),
-          }
-        }
-        if (fromCallCount === 3 && table === 'media') {
-          return {
-            delete: vi.fn().mockReturnValue({
-              in: vi.fn().mockResolvedValue({ error: null }),
-            }),
-          }
-        }
-        return methods
-      })
-
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      expect(result).toEqual({ success: true })
-      expect(mockStorage.remove).toHaveBeenCalledWith(['user-1/obs-1/only.jpg'])
-
-      mockSupabase.from.mockReturnValue(methods)
-    })
-
-    it('returns error on DB update failure', async () => {
-      setupUser()
-      methods.single.mockResolvedValueOnce({
-        data: {
-          walk_completion: 'COMPLETED',
-          outcome: 'SIGHTED',
-          sightings: [{ lat: 1.36, lng: 103.83 }],
-        },
-        error: null,
-      })
-      // select chain: eq x2, then nuke media select: eq x1, then update chain: eq x1
-      methods.eq
-        .mockReturnValueOnce(methods) // select eq('id', obsId)
-        .mockReturnValueOnce(methods) // select eq('status', 'DRAFT')
-        .mockReturnValueOnce({ data: null, error: null }) // nuke: media select eq('observation_id', obsId)
-        .mockReturnValueOnce({ error: { message: 'Submit failed' } }) // update eq('id', obsId)
-
-      const result = await submitObservation('obs-1', 'slot-1')
-
-      expect(result).toEqual({ error: 'Submit failed' })
-    })
+      }
+    )
   })
 
   // ─── deleteMedia ─────────────────────────────────────────────────────

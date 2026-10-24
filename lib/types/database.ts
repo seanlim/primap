@@ -683,8 +683,16 @@ export type Database = {
       }
       is_active_slot_member: { Args: { p_slot_id: string }; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
+      is_media_path_for_parent: {
+        Args: { p_file_path: string; p_parent_id: string }
+        Returns: boolean
+      }
       join_slot_with_observation: {
         Args: { p_slot_id: string; p_user_id: string }
+        Returns: Json
+      }
+      submit_observation_with_cleanup: {
+        Args: { p_observation_id: string; p_walk_id: string }
         Returns: Json
       }
     }

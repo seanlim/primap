@@ -7,7 +7,7 @@ function getResend(): Resend {
   return _resend;
 }
 
-const FROM_EMAIL = () => process.env.RESEND_FROM_EMAIL || 'Primap <no-reply@primap.org>';
+const FROM_EMAIL = () => process.env.RESEND_FROM_EMAIL || 'Primap <no-reply@primap.app>';
 
 // Escape user-controlled strings before interpolating into HTML email bodies.
 // All values that originate from user input (names, descriptions, free-text

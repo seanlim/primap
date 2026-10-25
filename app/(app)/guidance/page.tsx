@@ -112,8 +112,8 @@ export default async function GuidancePage() {
               <div className="flex items-start gap-3">
                 <div className={`${subStepNumberClass} bg-sky-100 text-sky-700`}>2</div>
                 <div className={subStepContentClass}>
-                  <p className="text-sm font-semibold text-gray-900">Join a walk slot</p>
-                  <p className="mt-1 text-sm text-gray-500">Open a slot and join if capacity holds.</p>
+                  <p className="text-sm font-semibold text-gray-900">Join a walk</p>
+                  <p className="mt-1 text-sm text-gray-500">Open a walk and join if there is space.</p>
                   <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />

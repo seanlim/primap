@@ -11,12 +11,6 @@ import { isSupportedMediaType, UNSUPPORTED_MEDIA_MESSAGE } from '@/lib/constants
 
 type ParentType = 'observation' | 'sighting' | 'incident'
 
-const PARENT_COLUMN: Record<ParentType, 'observation_id' | 'sighting_id' | 'incident_id'> = {
-  observation: 'observation_id',
-  sighting: 'sighting_id',
-  incident: 'incident_id',
-}
-
 const PARENT_BUCKET: Record<ParentType, MediaBucket> = {
   observation: OBSERVATION_MEDIA_BUCKET,
   sighting: OBSERVATION_MEDIA_BUCKET,
@@ -49,7 +43,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: UNSUPPORTED_MEDIA_MESSAGE }, { status: 415 })
   }
   const parentType: ParentType = parentTypeRaw
-  const column = PARENT_COLUMN[parentType]
   const bucket = PARENT_BUCKET[parentType]
 
   // Fetch configurable media limit
@@ -60,11 +53,11 @@ export async function POST(request: NextRequest) {
     .single()
   const maxMedia = settings?.max_media_per_report ?? DEFAULT_MAX_MEDIA_PER_REPORT
 
-  // Check current media count for this parent
-  const { count, error: countError } = await supabase
-    .from('media')
-    .select('*', { count: 'exact', head: true })
-    .eq(column, parentId)
+  // Use the same aggregate as the database trigger, including sibling sightings.
+  const { data: count, error: countError } = await supabase.rpc('get_report_media_count', {
+    p_parent_type: parentType,
+    p_parent_id: parentId,
+  })
 
   if (countError) {
     return NextResponse.json({ error: 'Failed to check media count' }, { status: 500 })
@@ -120,7 +113,7 @@ export async function POST(request: NextRequest) {
 
   if (insertError) {
     // The DB trigger `enforce_max_media_per_report_trigger` is the source of
-    // truth for the limit and serializes concurrent inserts per parent.
+    // truth for the limit and serializes concurrent inserts per report.
     // The pre-check above is only an optimization; if two requests race past
     // it, one will land here with the trigger's RAISE EXCEPTION message.
     // Either way, the storage object we just uploaded must be cleaned up.

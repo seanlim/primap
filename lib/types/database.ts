@@ -677,6 +677,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_report_media_count: {
+        Args: { p_parent_type: string; p_parent_id: string }
+        Returns: number
+      }
       cancel_slot_with_draft_cleanup: {
         Args: { p_cancellation_reason?: string; p_slot_id: string }
         Returns: Json

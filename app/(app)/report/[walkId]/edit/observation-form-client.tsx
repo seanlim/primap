@@ -6,6 +6,7 @@ import { Plus, Trash2, Loader2 } from 'lucide-react'
 import { formatDate, toLocalDateString } from '@/lib/utils/format-date'
 import { saveDraft, submitObservation, getMediaBySightingIds, getObservationMeta, getObservationFull } from '@/lib/actions/observation-actions'
 import { LocationPicker } from '@/components/map/location-picker'
+import { ReportMediaBudgetProvider } from '@/components/report/report-media-budget'
 import { MediaUploader, type MediaItem } from '@/components/report/media-uploader'
 import { StepIndicator } from '@/components/report/step-indicator'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
@@ -861,6 +862,10 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
   const hasSightings = sightings.some(s => s.species)
 
   return (
+    <ReportMediaBudgetProvider maxFiles={maxMediaPerReport} parents={[
+      { key: 'observation', clientParentId: clientDraftId, count: observationMedia.length },
+      ...sightings.map(s => ({ key: s.clientTempId, clientParentId: s.clientTempId, count: s.media.length })),
+    ]}>
     <div className="space-y-6">
       <Breadcrumb
         items={[
@@ -1067,6 +1072,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
                     parentId={sighting.id ?? null}
                     clientParentId={sighting.clientTempId}
                     existingMedia={sighting.media}
+                    onMediaChange={media => setSightings(prev => prev.map(s => s.clientTempId === sighting.clientTempId && s.media !== media ? { ...s, media } : s))}
                     maxFiles={maxMediaPerReport}
                     onExifGps={(exifLat, exifLng) => {
                       if (!sighting.lat && !sighting.lng) {
@@ -1133,6 +1139,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
             parentId={observationId ?? null}
             clientParentId={clientDraftId}
             existingMedia={observationMedia}
+            onMediaChange={setObservationMedia}
             maxFiles={maxMediaPerReport}
             onExifGps={(exifLat, exifLng) => {
               if (!lat && !lng) {
@@ -1198,5 +1205,6 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
       />
 
     </div>
+    </ReportMediaBudgetProvider>
   )
 }

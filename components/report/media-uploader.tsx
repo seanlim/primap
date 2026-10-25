@@ -17,6 +17,7 @@ import {
 } from '@/lib/offline/db'
 import { type QueuedMedia } from '@/lib/types/observation'
 import { useMediaUrls } from './use-media-urls'
+import { useReportMediaBudget } from './report-media-budget'
 import { SUPPORTED_MEDIA_TYPES, UNSUPPORTED_MEDIA_MESSAGE, isSupportedMediaType } from '@/lib/constants/media'
 
 export interface MediaItem {
@@ -53,6 +54,7 @@ interface MediaUploaderProps {
    * displayed (and deletable if not offline) but no new files can be added.
    * Used by admin edit where uploads go through a different auth path.
    */
+  onMediaChange?: (media: MediaItem[]) => void
   readOnly?: boolean
 }
 
@@ -70,6 +72,7 @@ export function MediaUploader({
   onUploadingChange,
   onDeleteMedia,
   readOnly = false,
+  onMediaChange,
 }: MediaUploaderProps) {
   // Pick the storage bucket based on parent type. Incidents live in
   // INCIDENT_MEDIA_BUCKET; observations and sightings share OBSERVATION_MEDIA_BUCKET.
@@ -82,6 +85,12 @@ export function MediaUploader({
     setMedia(existingMedia)
   }, [existingMedia])
   const [uploading, setUploading] = useState<Set<string>>(new Set())
+  const [localMediaLoaded, setLocalMediaLoaded] = useState(false)
+  const budget = useReportMediaBudget()
+  const budgetKey = parentType === 'observation' ? 'observation' : (clientParentId || parentId || '')
+  const onMediaChangeRef = useRef(onMediaChange)
+  onMediaChangeRef.current = onMediaChange
+  useEffect(() => { onMediaChangeRef.current?.(media) }, [media])
   const [localMedia, setLocalMedia] = useState<QueuedMedia[]>([])
   const [blobUrls, setBlobUrls] = useState<Record<string, string>>({})
   const inputRef = useRef<HTMLInputElement>(null)
@@ -108,6 +117,7 @@ export function MediaUploader({
         const items = await getMediaByClientParent(effectiveParentId!)
         if (cancelled) return
         setLocalMedia(items)
+        setLocalMediaLoaded(true)
         const urls: Record<string, string> = {}
         for (const item of items) {
           urls[item.id] = URL.createObjectURL(item.blob)
@@ -116,6 +126,7 @@ export function MediaUploader({
         setBlobUrls(urls)
       } catch {
         // IndexedDB might not be available
+        if (!cancelled) setLocalMediaLoaded(true)
       }
     }
     loadLocalMedia()
@@ -126,27 +137,35 @@ export function MediaUploader({
   }, [clientParentId, parentId, offline, syncKey])
 
   const totalMedia = media.length + localMedia.length
+  const reportCount = budget?.reportCount
+  useEffect(() => {
+    if (localMediaLoaded) reportCount?.(budgetKey, totalMedia + uploading.size)
+  }, [reportCount, budgetKey, totalMedia, uploading.size, localMediaLoaded])
+  const hasCapacity = budget ? budget.ready && budget.total < budget.maxFiles : totalMedia + uploading.size < maxFiles
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files) return
 
-    const effectiveParentId = parentId || clientParentId
+    const effectiveParentId = clientParentId || parentId
     if (!effectiveParentId) return
 
-    const filesToUpload = Array.from(files).slice(0, maxFiles - totalMedia)
-    if (filesToUpload.length === 0) return
+    const supportedFiles = Array.from(files).filter(file => isSupportedMediaType(file.type))
+    if (supportedFiles.length < files.length) setError(UNSUPPORTED_MEDIA_MESSAGE)
+    const allowed = budget
+      ? budget.reserve(budgetKey, supportedFiles.length)
+      : Math.max(0, maxFiles - totalMedia - uploading.size)
+    const filesToUpload = supportedFiles.slice(0, allowed).map(file => ({ file, tempId: crypto.randomUUID() }))
+    if (filesToUpload.length === 0) {
+      if (inputRef.current) inputRef.current.value = ''
+      return
+    }
+    setUploading(prev => new Set([...prev, ...filesToUpload.map(item => item.tempId)]))
 
     let gpsFired = false
     let datetimeFired = false
 
-    for (const file of filesToUpload) {
-      if (!isSupportedMediaType(file.type)) {
-        setError(UNSUPPORTED_MEDIA_MESSAGE)
-        continue
-      }
-      const tempId = crypto.randomUUID()
-
+    for (const { file, tempId } of filesToUpload) {
       try {
         // Extract EXIF (works offline)
         const exifData = await extractExifData(file)
@@ -165,7 +184,7 @@ export function MediaUploader({
           if (parentType === 'incident') {
             setError('Cannot upload incident media while offline')
             setTimeout(() => setError(null), 5000)
-            break
+            continue
           }
           // Offline path: save blob to IndexedDB
           const queuedItem: QueuedMedia = {
@@ -192,7 +211,6 @@ export function MediaUploader({
           setBlobUrls(prev => ({ ...prev, [tempId]: blobUrl }))
         } else {
           // Online path: upload directly
-          setUploading(prev => new Set(prev).add(tempId))
 
           const formData = new FormData()
           formData.append('file', file)
@@ -210,7 +228,7 @@ export function MediaUploader({
               // An explicit rejection must not become an offline upload.
               setError(result.error || 'Upload failed')
               setTimeout(() => setError(null), 5000)
-              break // Stop processing remaining files
+              continue
             }
 
             setMedia(prev => [...prev, result.media as MediaItem])
@@ -242,16 +260,16 @@ export function MediaUploader({
               blobUrlsRef.current[tempId] = blobUrl
               setBlobUrls(prev => ({ ...prev, [tempId]: blobUrl }))
             }
-          } finally {
-            setUploading(prev => {
-              const next = new Set(prev)
-              next.delete(tempId)
-              return next
-            })
           }
         }
       } catch {
-        // EXIF or queue failed silently
+        setError('Failed to prepare media. Please try again.')
+      } finally {
+        setUploading(prev => {
+          const next = new Set(prev)
+          next.delete(tempId)
+          return next
+        })
       }
     }
 
@@ -302,7 +320,7 @@ export function MediaUploader({
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-gray-500">{label}</span>
           <span className={`text-xs tabular-nums ${totalMedia >= maxFiles ? 'text-amber-500 font-medium' : 'text-gray-400'}`}>
-            {totalMedia}/{maxFiles}
+            {budget ? `${budget.total}/${budget.maxFiles} in report` : `${totalMedia}/${maxFiles}`}
           </span>
         </div>
       )}
@@ -343,6 +361,7 @@ export function MediaUploader({
               {!offline && (
                 <button
                   type="button"
+                  aria-label={`Remove ${item.file_name}`}
                   onClick={() => handleDelete(item.id)}
                   className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 hover:bg-black/80"
                 >
@@ -403,7 +422,7 @@ export function MediaUploader({
       )}
 
       {/* Upload button */}
-      {!readOnly && totalMedia < maxFiles && (
+      {!readOnly && hasCapacity && (
         <button
           type="button"
           onClick={() => inputRef.current?.click()}

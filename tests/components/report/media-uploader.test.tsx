@@ -56,3 +56,38 @@ it('keeps incident connectivity failures visible without offline fallback', asyn
   await screen.findByText(/Failed to upload incident media/)
   expect(saveMediaToQueue).not.toHaveBeenCalled()
 })
+
+it('shares capacity across sightings, reserves pending files, and frees a place after deletion', async () => {
+  // The report form supplies one budget to all its uploaders.
+  const { ReportMediaBudgetProvider } = await import('@/components/report/report-media-budget')
+  const uploaded = { id: 'uploaded', file_path: 'path', file_name: 'one.png', media_type: 'PHOTO' }
+  let finish!: (response: Response) => void
+  const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+  const { container } = render(
+    <ReportMediaBudgetProvider maxFiles={2} parents={[
+      { key: 'a', clientParentId: 'a', count: 1 }, { key: 'b', clientParentId: 'b', count: 0 },
+    ]}>
+      <MediaUploader parentType="sighting" parentId="a" clientParentId="a" existingMedia={[{ ...uploaded, id: 'existing' }]} label="A" />
+      <MediaUploader parentType="sighting" parentId="b" clientParentId="b" existingMedia={[]} label="B" />
+    </ReportMediaBudgetProvider>
+  )
+  await screen.findAllByText('1/2 in report')
+  const [a, b] = Array.from(container.querySelectorAll('input[type=file]'))
+  fireEvent.change(b, { target: { files: [new File(['photo'], 'two.png', { type: 'image/png' })] } })
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+  // A second picker cannot claim the place reserved by B's in-flight upload.
+  fireEvent.change(a, { target: { files: [new File(['photo'], 'three.png', { type: 'image/png' })] } })
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+  finish(new Response(JSON.stringify({ success: true, media: uploaded })))
+  await screen.findAllByText('2/2 in report')
+  expect(screen.queryByRole('button', { name: 'Add Photos/Videos' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getAllByRole('button', { name: 'Remove one.png' })[0])
+  await screen.findAllByText('1/2 in report')
+  expect(screen.getAllByRole('button', { name: 'Add Photos/Videos' })).toHaveLength(2)
+})
+
+it('queues files under the stable client parent so reload counts them after ID assignment', async () => {
+  const { container } = render(<MediaUploader parentType="sighting" parentId="server-id" clientParentId="client-id" existingMedia={[]} offline label="Photos" />)
+  fireEvent.change(container.querySelector('input[type=file]')!, { target: { files: [new File(['photo'], 'test.png', { type: 'image/png' })] } })
+  await waitFor(() => expect(saveMediaToQueue).toHaveBeenCalledWith(expect.objectContaining({ clientParentId: 'client-id', resolvedParentId: 'server-id' })))
+})

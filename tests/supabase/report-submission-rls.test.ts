@@ -72,6 +72,7 @@ beforeAll(async () => {
     '20261023090000_fix_shared_report_cancellation.sql',
     migration,
     '20261024150000_remove_submission_rpc.sql',
+    '20261025090000_enforce_report_media_limit.sql',
   ]) await db.exec(sqlFile(name))
   // Mirror the WITH CHECK fix already applied through the production dashboard.
   await db.exec(`ALTER POLICY "Users can update own draft observations" ON public.observations
@@ -107,6 +108,15 @@ beforeEach(async () => {
 })
 
 describe('TypeScript submission database permissions', () => {
+  it('counts the whole shared report as a member without exposing rows to an outsider', async () => {
+    const count = () => db.query<{ total: number }>('SELECT public.get_report_media_count($1, $2) AS total', ['observation', observation])
+    expect((await count()).rows).toEqual([{ total: 2 }])
+    await asMember(bob)
+    expect((await count()).rows).toEqual([{ total: 2 }])
+    await asMember(outsider)
+    expect((await count()).rows).toEqual([{ total: 0 }])
+  })
+
   it('retires both functions while keeping the media INSERT safeguard inline', async () => {
     await db.exec('RESET ROLE')
     const { rows } = await db.query(`SELECT

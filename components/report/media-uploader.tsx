@@ -42,8 +42,9 @@ interface MediaUploaderProps {
    * Fired whenever the in-flight upload count changes. Useful for parents
    * that need to block navigation/dismissal while files are still uploading
    * (e.g., the IncidentModal phase 2 step).
+   * The instance ID distinguishes overlapping uploads after an uploader remounts.
    */
-  onUploadingChange?: (uploadingCount: number) => void
+  onUploadingChange?: (uploadingCount: number, uploaderId: string) => void
   /**
    * Custom delete handler. If provided, called instead of the default
    * `deleteMedia` action. Used by admin edit to bypass RLS via service role.
@@ -85,6 +86,10 @@ export function MediaUploader({
     setMedia(existingMedia)
   }, [existingMedia])
   const [uploading, setUploading] = useState<Set<string>>(new Set())
+  const [uploaderId] = useState(() => crypto.randomUUID())
+  const uploadingCountRef = useRef(0)
+  const onUploadingChangeRef = useRef(onUploadingChange)
+  onUploadingChangeRef.current = onUploadingChange
   const [localMediaLoaded, setLocalMediaLoaded] = useState(false)
   const budget = useReportMediaBudget()
   const budgetKey = parentType === 'observation' ? 'observation' : (clientParentId || parentId || '')
@@ -100,11 +105,11 @@ export function MediaUploader({
   // race-safe blob cleanup, offline-aware).
   const signedUrls = useMediaUrls(media, bucket)
 
-  // Notify parent when upload count changes (used by IncidentModal to block
-  // dismissal while files are still uploading).
-  useEffect(() => {
-    onUploadingChange?.(uploading.size)
-  }, [uploading, onUploadingChange])
+  // Requests can outlive an uploader hidden or removed from the report form.
+  const updateUploadingCount = (delta: number) => {
+    uploadingCountRef.current += delta
+    onUploadingChangeRef.current?.(uploadingCountRef.current, uploaderId)
+  }
 
   // Load locally queued media from IndexedDB
   useEffect(() => {
@@ -160,6 +165,7 @@ export function MediaUploader({
       if (inputRef.current) inputRef.current.value = ''
       return
     }
+    updateUploadingCount(filesToUpload.length)
     setUploading(prev => new Set([...prev, ...filesToUpload.map(item => item.tempId)]))
 
     let gpsFired = false
@@ -265,6 +271,7 @@ export function MediaUploader({
       } catch {
         setError('Failed to prepare media. Please try again.')
       } finally {
+        updateUploadingCount(-1)
         setUploading(prev => {
           const next = new Set(prev)
           next.delete(tempId)

@@ -101,7 +101,13 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
   const syncingRef = useRef(false)
   const wasOfflineRef = useRef(false)
   const leavingRef = useRef(false)
+  const pendingUploadsRef = useRef(new Set<string>())
   const router = useRouter()
+
+  const trackUploads = useCallback((count: number, uploaderId: string) => {
+    if (count > 0) pendingUploadsRef.current.add(uploaderId)
+    else pendingUploadsRef.current.delete(uploaderId)
+  }, [])
 
   // Step indicator setup
   const hasSightingsForSteps = sightings.some(s => s.species)
@@ -540,6 +546,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
   // --- UNSAVED CHANGES ON NAVIGATION ---
   const hasUnsavedChanges = useCallback(() => {
     if (leavingRef.current) return false
+    if (pendingUploadsRef.current.size > 0) return true
     const { localDirty, serverDirty } = getDirtyState()
     return localDirty || (navigator.onLine && serverDirty)
   }, [getDirtyState])
@@ -1072,6 +1079,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
                     parentId={sighting.id ?? null}
                     clientParentId={sighting.clientTempId}
                     existingMedia={sighting.media}
+                    onUploadingChange={trackUploads}
                     onMediaChange={media => setSightings(prev => prev.map(s => s.clientTempId === sighting.clientTempId && s.media !== media ? { ...s, media } : s))}
                     maxFiles={maxMediaPerReport}
                     onExifGps={(exifLat, exifLng) => {
@@ -1139,6 +1147,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
             parentId={observationId ?? null}
             clientParentId={clientDraftId}
             existingMedia={observationMedia}
+            onUploadingChange={trackUploads}
             onMediaChange={setObservationMedia}
             maxFiles={maxMediaPerReport}
             onExifGps={(exifLat, exifLng) => {

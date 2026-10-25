@@ -99,6 +99,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
   } | null>(null)
   const syncingRef = useRef(false)
   const wasOfflineRef = useRef(false)
+  const leavingRef = useRef(false)
   const router = useRouter()
 
   // Step indicator setup
@@ -171,12 +172,12 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
     }
   }, [serializeFormState])
 
-  const updateLocalSnapshot = useCallback(() => {
-    lastLocalSnapshotRef.current = serializeFormState(formStateRef.current)
+  const updateLocalSnapshot = useCallback((snapshot?: string) => {
+    lastLocalSnapshotRef.current = snapshot ?? serializeFormState(formStateRef.current)
   }, [serializeFormState])
 
-  const updateServerSnapshot = useCallback(() => {
-    lastServerSnapshotRef.current = serializeFormState(formStateRef.current)
+  const updateServerSnapshot = useCallback((snapshot?: string) => {
+    lastServerSnapshotRef.current = snapshot ?? serializeFormState(formStateRef.current)
   }, [serializeFormState])
 
   const updateBothSnapshots = useCallback(() => {
@@ -535,7 +536,38 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
     }
   }, [])
 
-  // --- SILENT SAVE ON NAVIGATION ---
+  // --- UNSAVED CHANGES ON NAVIGATION ---
+  const hasUnsavedChanges = useCallback(() => {
+    if (leavingRef.current) return false
+    const { localDirty, serverDirty } = getDirtyState()
+    return localDirty || (navigator.onLine && serverDirty)
+  }, [getDirtyState])
+
+  useEffect(() => {
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges()) return
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    // Restore the current editor entry on Stay before Next handles traversal.
+    const editorUrl = window.location.href
+    const editorState = window.history.state
+    const onPopState = (event: PopStateEvent) => {
+      if (!hasUnsavedChanges()) return
+      if (window.confirm('Leave without saving your latest report changes?')) {
+        leavingRef.current = true
+        return
+      }
+      event.stopImmediatePropagation()
+      window.history.pushState(editorState, '', editorUrl)
+    }
+    window.addEventListener('popstate', onPopState, true)
+    window.addEventListener('beforeunload', beforeUnload)
+    return () => {
+      window.removeEventListener('popstate', onPopState, true)
+      window.removeEventListener('beforeunload', beforeUnload)
+    }
+  }, [hasUnsavedChanges])
   // Ref for handleSaveDraft (assigned after function is defined below)
   const handleSaveDraftRef = useRef<(silent?: boolean) => Promise<void>>(() => Promise.resolve())
 
@@ -544,7 +576,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
     const handler = () => {
       if (document.visibilityState === 'hidden') {
         const { localDirty } = getDirtyState()
-        if (localDirty) {
+        if (localDirty && !leavingRef.current) {
           handleSaveDraftRef.current(true)
         }
       }
@@ -553,39 +585,36 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
     return () => document.removeEventListener('visibilitychange', handler)
   }, [getDirtyState])
 
-  // Global link click interceptor: full save before navigating
+  // Ask before internal navigation; Leave explicitly permits unsaved changes.
   useEffect(() => {
-    const handler = async (e: MouseEvent) => {
-      const anchor = (e.target as HTMLElement).closest('a')
-      if (!anchor) return
+    const handler = (e: MouseEvent) => {
+      const anchor = (e.target as Element).closest('a')
+      if (!anchor || e.defaultPrevented) return
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return
-      if (anchor.target === '_blank') return
+      if (anchor.target === '_blank' || anchor.hasAttribute('download')) return
       const href = anchor.getAttribute('href')
-      if (!href || href.startsWith('http') || href.startsWith('#')) return
-      if (href === window.location.pathname) return
-
-      const { localDirty } = getDirtyState()
-      if (!localDirty) return // clean state, let navigation proceed normally
+      if (!href || href.startsWith('#')) return
+      const destination = new URL(href, window.location.href)
+      if (destination.origin !== window.location.origin) return // beforeunload handles external links
+      if (destination.pathname === window.location.pathname && destination.search === window.location.search) return
+      if (!hasUnsavedChanges()) return
 
       e.preventDefault()
       e.stopPropagation()
-      try {
-        await handleSaveDraftRef.current(true)
-        router.push(href)
-      } catch {
-        setError('Failed to save draft. Please try again.')
-      }
+      if (!window.confirm('Leave without saving your latest report changes?')) return
+      leavingRef.current = true
+      router.push(destination.pathname + destination.search + destination.hash)
     }
     document.addEventListener('click', handler, true)
     return () => document.removeEventListener('click', handler, true)
-  }, [getDirtyState, router])
+  }, [hasUnsavedChanges, router])
 
   // Component unmount: fire-and-forget full save (covers browser back, programmatic navigation)
   // Page doesn't unload during Next.js client-side nav, so the async operation completes.
   useEffect(() => {
     return () => {
       const { localDirty } = getDirtyState()
-      if (localDirty) {
+      if (localDirty && !leavingRef.current) {
         handleSaveDraftRef.current(true)
       }
     }
@@ -654,7 +683,8 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
 
   // --- SAVE DRAFT (LOCAL-FIRST) ---
   const handleSaveDraft = async (silent = false): Promise<void> => {
-    if (syncingRef.current) return // Don't save during sync
+    if (syncingRef.current || leavingRef.current) return // Don't save during sync or after intentional departure
+    const savingSnapshot = serializeFormState(formStateRef.current)
     setSaving(true)
     if (!silent) { setError(''); setSavedMessage('') }
 
@@ -676,7 +706,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
     const existingDraft = await getDraft(slot.id)
     const cachedServerUpdatedAt = existingDraft?.serverUpdatedAt ?? null
     await putDraft(slot.id, formData, cachedServerUpdatedAt)
-    updateLocalSnapshot()
+    updateLocalSnapshot(savingSnapshot)
 
     // 2. If offline, we're done
     if (!navigator.onLine) {
@@ -736,7 +766,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
         observationId: newObsId,
         sightings: updatedSightings,
       }, result.serverUpdatedAt ?? null)
-      updateServerSnapshot()
+      updateServerSnapshot(savingSnapshot)
 
       setSavedMessage('Synced')
       setTimeout(() => setSavedMessage(''), 2000)
@@ -821,6 +851,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
       // Only time we delete the draft — observation is finalized
       await deleteDraft(slot.id)
       await clearSyncStateForWalk(slot.id)
+      leavingRef.current = true
       router.push(`/report/${slot.id}`)
     }
     setSaving(false)

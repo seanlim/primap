@@ -9,7 +9,16 @@ import { createClient } from '@/lib/supabase/client'
 
 const MAX_RETRIES = 5
 
-export async function processOutbox(): Promise<number> {
+let processing: Promise<number> | null = null
+
+export function processOutbox(): Promise<number> {
+  if (!processing) {
+    processing = drainOutbox().finally(() => { processing = null })
+  }
+  return processing
+}
+
+async function drainOutbox(): Promise<number> {
   const items = await getOutboxItems()
   if (items.length === 0) return 0
 
@@ -46,15 +55,9 @@ export async function processOutbox(): Promise<number> {
 
           const res = await fetch('/api/media', { method: 'POST', body: formData })
 
-          if (res.status === 422) {
-            // Media limit reached — drop from queue, don't retry
-            await removeMediaFromQueue(mediaQueueId)
-            break
-          }
-
           const result = await res.json()
 
-          if (!result.success) throw new Error(result.error || 'Media upload failed')
+          if (!res.ok || !result.success) throw new Error(result.error || 'Media upload failed')
 
           await removeMediaFromQueue(mediaQueueId)
           break

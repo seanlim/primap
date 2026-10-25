@@ -3,8 +3,12 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { reportIncident } from '@/lib/actions/incident-actions'
-import { MediaUploader } from '@/components/report/media-uploader'
+import { MediaUploader, type MediaItem } from '@/components/report/media-uploader'
 import { INCIDENT_TYPES, type IncidentType } from '@/lib/constants/incident-types'
+
+// The uploader owns uploads during this dialog session; progress rerenders
+// must not replace its media list with a new empty array.
+const EMPTY_INCIDENT_MEDIA: MediaItem[] = []
 
 interface IncidentModalProps {
   walkId: string
@@ -134,7 +138,7 @@ export function IncidentModal({ walkId, onClose, onSubmitted }: IncidentModalPro
             <MediaUploader
               parentType="incident"
               parentId={incidentId}
-              existingMedia={[]}
+              existingMedia={EMPTY_INCIDENT_MEDIA}
               label="Photos / Videos"
               onUploadingChange={setUploadingCount}
             />

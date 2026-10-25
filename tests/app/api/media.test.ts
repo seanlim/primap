@@ -12,6 +12,7 @@ const mockSupabase = {
     getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
   },
   from: vi.fn(),
+  rpc: vi.fn(),
   storage: {
     from: vi.fn().mockReturnValue(mockStorage),
   },
@@ -57,13 +58,7 @@ function makeFormData(overrides: Record<string, string> = {}) {
   return formData
 }
 
-/**
- * Configure mock chain for the media upload flow.
- * The route handler calls from() three times:
- * 1. from('app_settings').select().limit().single() → settings
- * 2. from('media').select(*,{count,head}).eq(column, parentId) → {count, error}
- * 3. from('media').insert({...}).select().single() → {data, error}
- */
+/** Configure the settings/insert boundaries and shared report-count RPC. */
 function setupMediaUploadMocks(opts: {
   settings?: { max_media_per_report: number } | null
   settingsError?: boolean
@@ -73,20 +68,13 @@ function setupMediaUploadMocks(opts: {
   insertError?: { message: string } | null
   uploadError?: { message: string } | null
 }) {
+  mockSupabase.rpc.mockResolvedValue({ data: opts.count ?? 0, error: opts.countError ?? null })
   const settingsChain = {
     select: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
     single: vi.fn().mockResolvedValue({
       data: opts.settingsError ? null : (opts.settings ?? { max_media_per_report: 10 }),
       error: opts.settingsError ? { message: 'Settings error' } : null,
-    }),
-  }
-
-  const countChain = {
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockResolvedValue({
-      count: opts.count ?? 0,
-      error: opts.countError ?? null,
     }),
   }
 
@@ -99,15 +87,9 @@ function setupMediaUploadMocks(opts: {
     }),
   }
 
-  // Track if countChain has been used already
-  let countChainUsed = false
   mockSupabase.from.mockImplementation((table: string) => {
     if (table === 'app_settings') return settingsChain
-    // Differentiate the two 'media' calls: count has .select().eq(), insert has .insert()
-    // We return countChain first, then insertChain
-    if (countChainUsed) return insertChain
-    countChainUsed = true
-    return countChain
+    return insertChain
   })
 
   if (opts.uploadError) {
@@ -116,7 +98,7 @@ function setupMediaUploadMocks(opts: {
     mockStorage.upload.mockResolvedValue({ error: null })
   }
 
-  return { settingsChain, countChain, insertChain }
+  return { settingsChain, insertChain }
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
@@ -146,6 +128,15 @@ describe('POST /api/media', () => {
   // ─── Input validation ─────────────────────────────────────────────────
 
   describe('input validation', () => {
+    it('rejects WebM before querying counts or Storage', async () => {
+      setupUser()
+      const response = await POST(makeRequest(makeFormData({ fileName: 'test.webm', fileType: 'video/webm' })))
+      expect(response.status).toBe(415)
+      expect((await response.json()).error).toMatch(/unsupported.*format/i)
+      expect(mockStorage.upload).not.toHaveBeenCalled()
+      expect(mockSupabase.from).not.toHaveBeenCalled()
+    })
+
     it('returns error when no file is provided', async () => {
       setupUser()
       const formData = new FormData()
@@ -246,26 +237,26 @@ describe('POST /api/media', () => {
       expect(body.error).toBe('Failed to check media count')
     })
 
-    it('queries observation_id column for observation parentType', async () => {
+    it('uses report-wide count for observation parentType', async () => {
       setupUser()
-      const { countChain } = setupMediaUploadMocks({
+      setupMediaUploadMocks({
         count: 10,
       })
 
       await POST(makeRequest(makeFormData({ parentType: 'observation', parentId: 'obs-1' })))
 
-      expect(countChain.eq).toHaveBeenCalledWith('observation_id', 'obs-1')
+      expect(mockSupabase.rpc).toHaveBeenCalledWith('get_report_media_count', { p_parent_type: 'observation', p_parent_id: 'obs-1' })
     })
 
-    it('queries sighting_id column for sighting parentType', async () => {
+    it('uses report-wide count for sighting parentType', async () => {
       setupUser()
-      const { countChain } = setupMediaUploadMocks({
+      setupMediaUploadMocks({
         count: 10,
       })
 
       await POST(makeRequest(makeFormData({ parentType: 'sighting', parentId: 'sight-1' })))
 
-      expect(countChain.eq).toHaveBeenCalledWith('sighting_id', 'sight-1')
+      expect(mockSupabase.rpc).toHaveBeenCalledWith('get_report_media_count', { p_parent_type: 'sighting', p_parent_id: 'sight-1' })
     })
 
     it('rejects when count equals limit exactly (boundary)', async () => {
@@ -537,15 +528,15 @@ describe('POST /api/media', () => {
   // Storage cleanup on insert failure must also use the incident-media bucket.
 
   describe('incident parentType', () => {
-    it('queries incident_id column for incident parentType', async () => {
+    it('keeps the independent incident media count', async () => {
       setupUser()
-      const { countChain } = setupMediaUploadMocks({
+      setupMediaUploadMocks({
         count: 10,
       })
 
       await POST(makeRequest(makeFormData({ parentType: 'incident', parentId: 'inc-1' })))
 
-      expect(countChain.eq).toHaveBeenCalledWith('incident_id', 'inc-1')
+      expect(mockSupabase.rpc).toHaveBeenCalledWith('get_report_media_count', { p_parent_type: 'incident', p_parent_id: 'inc-1' })
     })
 
     it('returns 422 when incident already has max media files', async () => {

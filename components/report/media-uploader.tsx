@@ -17,6 +17,7 @@ import {
 } from '@/lib/offline/db'
 import { type QueuedMedia } from '@/lib/types/observation'
 import { useMediaUrls } from './use-media-urls'
+import { SUPPORTED_MEDIA_TYPES, UNSUPPORTED_MEDIA_MESSAGE, isSupportedMediaType } from '@/lib/constants/media'
 
 export interface MediaItem {
   id: string
@@ -140,6 +141,10 @@ export function MediaUploader({
     let datetimeFired = false
 
     for (const file of filesToUpload) {
+      if (!isSupportedMediaType(file.type)) {
+        setError(UNSUPPORTED_MEDIA_MESSAGE)
+        continue
+      }
       const tempId = crypto.randomUUID()
 
       try {
@@ -201,18 +206,14 @@ export function MediaUploader({
             const res = await fetch('/api/media', { method: 'POST', body: formData })
             const result = await res.json()
 
-            if (res.status === 422) {
-              // Server-side limit reached — show error, don't queue offline
-              setError(result.error || 'Media limit reached')
+            if (!res.ok || !result.success || !result.media) {
+              // An explicit rejection must not become an offline upload.
+              setError(result.error || 'Upload failed')
               setTimeout(() => setError(null), 5000)
               break // Stop processing remaining files
             }
 
-            if (result.success && result.media) {
-              setMedia(prev => [...prev, result.media as MediaItem])
-            } else {
-              throw new Error(result.error || 'Upload failed')
-            }
+            setMedia(prev => [...prev, result.media as MediaItem])
           } catch {
             // Incidents have no offline fallback — surface the error to the user.
             if (parentType === 'incident') {
@@ -417,7 +418,7 @@ export function MediaUploader({
         <input
           ref={inputRef}
           type="file"
-          accept="image/*,video/*"
+          accept={SUPPORTED_MEDIA_TYPES.join(',')}
           multiple
           onChange={handleFileSelect}
           className="hidden"

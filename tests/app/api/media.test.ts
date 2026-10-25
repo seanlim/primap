@@ -146,6 +146,15 @@ describe('POST /api/media', () => {
   // ─── Input validation ─────────────────────────────────────────────────
 
   describe('input validation', () => {
+    it('rejects WebM before querying counts or Storage', async () => {
+      setupUser()
+      const response = await POST(makeRequest(makeFormData({ fileName: 'test.webm', fileType: 'video/webm' })))
+      expect(response.status).toBe(415)
+      expect((await response.json()).error).toMatch(/unsupported.*format/i)
+      expect(mockStorage.upload).not.toHaveBeenCalled()
+      expect(mockSupabase.from).not.toHaveBeenCalled()
+    })
+
     it('returns error when no file is provided', async () => {
       setupUser()
       const formData = new FormData()

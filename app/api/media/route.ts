@@ -7,6 +7,8 @@ import {
   type MediaBucket,
 } from '@/lib/utils/storage'
 
+import { isSupportedMediaType, UNSUPPORTED_MEDIA_MESSAGE } from '@/lib/constants/media'
+
 type ParentType = 'observation' | 'sighting' | 'incident'
 
 const PARENT_COLUMN: Record<ParentType, 'observation_id' | 'sighting_id' | 'incident_id'> = {
@@ -42,6 +44,9 @@ export async function POST(request: NextRequest) {
   if (!parentId) return NextResponse.json({ error: 'No parentId provided' })
   if (!isParentType(parentTypeRaw)) {
     return NextResponse.json({ error: 'Invalid parentType' }, { status: 400 })
+  }
+  if (!isSupportedMediaType(file.type)) {
+    return NextResponse.json({ error: UNSUPPORTED_MEDIA_MESSAGE }, { status: 415 })
   }
   const parentType: ParentType = parentTypeRaw
   const column = PARENT_COLUMN[parentType]
@@ -79,7 +84,7 @@ export async function POST(request: NextRequest) {
     .from(bucket)
     .upload(filePath, file)
 
-  if (uploadError) return NextResponse.json({ error: uploadError.message })
+  if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 400 })
 
   const mediaType = file.type.startsWith('video/') ? 'VIDEO' : 'PHOTO'
 

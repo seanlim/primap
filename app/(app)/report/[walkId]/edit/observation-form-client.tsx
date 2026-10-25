@@ -92,6 +92,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
   const [activeStep, setActiveStep] = useState('walk-completion')
   const [isOnline, setIsOnline] = useState(true)
   const [mediaSyncKey, setMediaSyncKey] = useState(0)
+  const [observationMedia, setObservationMedia] = useState<MediaItem[]>(existingObservation?.media ?? [])
   const [conflictState, setConflictState] = useState<{
     serverUpdatedAt: string
     localLastModified: number
@@ -326,9 +327,6 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
     // Upload queued media
     await processOutbox()
 
-    // Clean up outbox + media-queue for this walk (NOT the draft)
-    await clearSyncStateForWalk(slot.id)
-
     // Update draft with server IDs + serverUpdatedAt
     const updatedSightings = draftSightings.map((s, i) => ({
       ...s,
@@ -366,13 +364,24 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
         })
       })
     }
+    const refreshed = await getObservationFull(slot.id)
+    if (refreshed) setObservationMedia(refreshed.media)
     setMediaSyncKey(k => k + 1)
+
+    // Only the worker acknowledges successful uploads. Keep failed files for retry.
+    const parentIds = new Set([draft.data.clientDraftId, draft.data.observationId, ...draftSightings.map(s => s.clientTempId)].filter(Boolean) as string[])
+    for (const parentId of parentIds) {
+      if ((await getMediaByClientParent(parentId)).length > 0) {
+        throw new Error('Some photos/videos are still queued. Reconnect to retry or remove them before uploading again.')
+      }
+    }
   }
 
   const syncOnReconnectRef = useRef<() => Promise<void>>(async () => {})
   const syncOnReconnect = async () => {
     if (syncingRef.current) return
     syncingRef.current = true
+    setError('')
     try {
       // Write current form state to IndexedDB
       const fs = formStateRef.current
@@ -489,6 +498,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
       setLng(serverData.lng ?? null)
       setObservationId(serverData.id)
       setSightings(serverSightings)
+      setObservationMedia(serverData.media)
 
       // Clean up any queued offline items
       await clearSyncStateForWalk(slot.id)
@@ -1091,7 +1101,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
             parentType="observation"
             parentId={observationId ?? null}
             clientParentId={clientDraftId}
-            existingMedia={existingObservation?.media || []}
+            existingMedia={observationMedia}
             maxFiles={maxMediaPerReport}
             onExifGps={(exifLat, exifLng) => {
               if (!lat && !lng) {

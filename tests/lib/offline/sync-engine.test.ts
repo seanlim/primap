@@ -50,6 +50,18 @@ beforeEach(() => {
 })
 
 describe('processOutbox', () => {
+  it('shares one processor across overlapping reconnect callers', async () => {
+    let release!: (items: never[]) => void
+    mockGetOutboxItems.mockResolvedValue([])
+    mockGetOutboxItems.mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
+    const { processOutbox } = await import('@/lib/offline/sync-engine')
+    const first = processOutbox()
+    const second = processOutbox()
+    release([])
+    await Promise.all([first, second])
+    expect(mockGetOutboxItems).toHaveBeenCalledTimes(1)
+  })
+
   it('empty outbox returns 0', async () => {
     mockGetOutboxItems.mockResolvedValue([])
 
@@ -227,7 +239,7 @@ describe('processOutbox', () => {
 
   // ─── 422 handling (media limit reached) ─────────────────────────────
 
-  it('UPLOAD_MEDIA with 422 response removes media from queue and outbox (does not retry)', async () => {
+  it('UPLOAD_MEDIA with 422 retains the file and outbox for recovery', async () => {
     const blob = new Blob(['img'], { type: 'image/png' })
     mockGetQueuedMediaById.mockResolvedValue({
       id: 'mq-limit',
@@ -254,15 +266,15 @@ describe('processOutbox', () => {
     const { processOutbox } = await import('@/lib/offline/sync-engine')
     const result = await processOutbox()
 
-    expect(result).toBe(1)
-    expect(mockRemoveMediaFromQueue).toHaveBeenCalledWith('mq-limit')
-    expect(mockRemoveFromOutbox).toHaveBeenCalledWith(1)
-    expect(mockIncrementRetry).not.toHaveBeenCalled()
+    expect(result).toBe(0)
+    expect(mockRemoveMediaFromQueue).not.toHaveBeenCalled()
+    expect(mockRemoveFromOutbox).not.toHaveBeenCalled()
+    expect(mockIncrementRetry).toHaveBeenCalledWith(1)
 
     fetchSpy.mockRestore()
   })
 
-  it('UPLOAD_MEDIA with 422 does NOT call incrementRetry', async () => {
+  it('UPLOAD_MEDIA with 422 records a failed attempt', async () => {
     const blob = new Blob(['img'], { type: 'image/png' })
     mockGetQueuedMediaById.mockResolvedValue({
       id: 'mq-no-retry',
@@ -289,7 +301,7 @@ describe('processOutbox', () => {
     const { processOutbox } = await import('@/lib/offline/sync-engine')
     await processOutbox()
 
-    expect(mockIncrementRetry).not.toHaveBeenCalled()
+    expect(mockIncrementRetry).toHaveBeenCalledWith(1)
 
     fetchSpy.mockRestore()
   })
@@ -328,7 +340,7 @@ describe('processOutbox', () => {
     fetchSpy.mockRestore()
   })
 
-  it('UPLOAD_MEDIA with 422 is counted as processed in multi-item batch', async () => {
+  it('UPLOAD_MEDIA with 422 is not counted as processed in multi-item batch', async () => {
     const makeMedia = (id: string) => ({
       id,
       clientParentId: 'local-uuid',
@@ -360,9 +372,9 @@ describe('processOutbox', () => {
     const { processOutbox } = await import('@/lib/offline/sync-engine')
     const result = await processOutbox()
 
-    expect(result).toBe(2)
-    expect(mockRemoveFromOutbox).toHaveBeenCalledTimes(2)
-    expect(mockRemoveMediaFromQueue).toHaveBeenCalledTimes(2)
+    expect(result).toBe(1)
+    expect(mockRemoveFromOutbox).toHaveBeenCalledTimes(1)
+    expect(mockRemoveMediaFromQueue).toHaveBeenCalledTimes(1)
 
     fetchSpy.mockRestore()
   })

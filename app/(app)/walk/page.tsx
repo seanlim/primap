@@ -307,7 +307,7 @@ export default async function WalkPage({
             description="Check back when a new survey round opens"
             color="green"
           />
-        ) : paginatedSlots.length === 0 ? (
+        ) : paginatedSlots.length === 0 && mySlots.length === 0 ? (
           <EmptyState
             icon={Search}
             title={hasFilters ? 'No walks match your filters' : 'No more available walks'}

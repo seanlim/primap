@@ -59,6 +59,21 @@ describe('WalkPage', () => {
     vi.useRealTimers()
   })
 
+  it.each([{}, { date: '2026-04-12' }, { date: '2026-04-12', page: '99' }])('keeps joined-only walks visible with filters %j', async searchParams => {
+    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    const results: Record<string, unknown> = {
+      survey_rounds: [{ id: 'round-1', name: 'Round Alpha', status: 'OPEN', start_date: '2026-04-01', end_date: '2026-04-30' }],
+      walk_slots: [{ id: 'joined-only', round_id: 'round-1', location_name: 'Joined Forest Walk', walk_date: '2026-04-12', start_time: '08:00:00', end_time: '10:00:00', max_volunteers: 3, slot_memberships: [{ user_id: 'user-1', status: 'ACTIVE' }] }],
+      slot_memberships: [{ slot_id: 'joined-only' }],
+    }
+    mockSupabase.from.mockImplementation((table: string) => ({ select: () => createQuery({ data: results[table] }) }))
+    render(await WalkPage({ searchParams: Promise.resolve(searchParams) }))
+    expect(screen.getByText('Joined Forest Walk')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Joined Forest Walk/ })).toHaveAttribute('href', '/walk/joined-only')
+    expect(screen.queryByText('No walks match your filters')).not.toBeInTheDocument()
+    expect(screen.getByText('My Walks')).toBeInTheDocument()
+  })
+
   it('groups available and joined walks by round', async () => {
     mockSupabase.auth.getUser.mockResolvedValue({
       data: { user: { id: 'user-1' } },

@@ -22,7 +22,9 @@ export function SettingsClient({ settings }: {
   const [highParticipationThreshold, setHighParticipationThreshold] = useState(settings.highParticipationThreshold.toString())
   const [maxMedia, setMaxMedia] = useState(settings.maxMediaPerReport.toString())
   const [reminderSendWeekday, setReminderSendWeekday] = useState(settings.reminderSendWeekday.toString())
-  const [reminderSendTime, setReminderSendTime] = useState(settings.reminderSendTime)
+  const initialHour = Number(settings.reminderSendTime.split(':')[0])
+  const [reminderHour, setReminderHour] = useState(String(initialHour % 12 || 12))
+  const [reminderPeriod, setReminderPeriod] = useState(initialHour >= 12 ? 'PM' : 'AM')
   const [reminderWindowStartOffsetDays, setReminderWindowStartOffsetDays] = useState(settings.reminderWindowStartOffsetDays.toString())
   const [reminderWindowLengthDays, setReminderWindowLengthDays] = useState(settings.reminderWindowLengthDays.toString())
   const [saving, setSaving] = useState(false)
@@ -38,7 +40,7 @@ export function SettingsClient({ settings }: {
       highParticipationThreshold: parseInt(highParticipationThreshold),
       maxMediaPerReport: parseInt(maxMedia),
       reminderSendWeekday: parseInt(reminderSendWeekday),
-      reminderSendTime,
+      reminderSendTime: `${String(Number(reminderHour) % 12 + (reminderPeriod === 'PM' ? 12 : 0)).padStart(2, '0')}:00`,
       reminderWindowStartOffsetDays: parseInt(reminderWindowStartOffsetDays),
       reminderWindowLengthDays: parseInt(reminderWindowLengthDays),
     })
@@ -111,21 +113,37 @@ export function SettingsClient({ settings }: {
             <option value="6">Saturday</option>
           </select>
           <p className="text-xs text-gray-400 mt-1">
-            Weekly day when reminder batches are sent in Singapore time.
+            Weekly day when reminder batches are sent for upcoming walks based on Singapore time.
           </p>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Reminder Send Time
           </label>
-          <input
-            type="time"
-            value={reminderSendTime}
-            onChange={e => setReminderSendTime(e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-          />
+          <div className="flex items-center gap-2">
+            <select
+              aria-label="Reminder hour"
+              value={reminderHour}
+              onChange={e => setReminderHour(e.target.value)}
+              className="min-w-0 flex-1 px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              {Array.from({ length: 12 }, (_, i) => i + 1).map(hour => (
+                <option key={hour} value={hour}>{hour}</option>
+              ))}
+            </select>
+            <span className="text-sm text-gray-700" aria-label="Minutes fixed at 00">:00</span>
+            <select
+              aria-label="AM or PM"
+              value={reminderPeriod}
+              onChange={e => setReminderPeriod(e.target.value)}
+              className="min-w-0 flex-1 px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="AM">AM</option>
+              <option value="PM">PM</option>
+            </select>
+          </div>
           <p className="text-xs text-gray-400 mt-1">
-            Time in Singapore when the reminder batch becomes active.
+            Time in Singapore when the reminder batch is sent for both upcoming walks and pending report submission.
           </p>
         </div>
         <div>

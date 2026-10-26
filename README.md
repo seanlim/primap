@@ -45,7 +45,9 @@ Additional setup notes:
 - Map features use OneMap tiles and require no access token.
 - If email delivery is not being tested, `RESEND_API_KEY` can be left blank.
 - Set `NEXT_PUBLIC_APP_URL` to `http://localhost:3000`.
-- `CRON_SECRET` can be any non-empty string unless the cron reminder route is being tested.
+- `CRON_SECRET` is required by both reminder endpoints; requests must include `Authorization: Bearer <CRON_SECRET>`.
+- For scheduled reminders, deploy the reminder endpoints before applying `supabase/migrations/20261026090000_schedule_report_reminders.sql`. It registers an hourly Supabase Cron check and rounds existing reminder send times down to whole hours. In Supabase Vault, configure `primap_app_url` as the production app's base URL and `primap_cron_secret` with the same value as the deployed `CRON_SECRET`. The job makes no HTTP requests until both Vault values exist.
+- The hourly check uses Singapore time: upcoming-walk batches require the admin's configured weekday and hour; pending report reminders run at that hour on days 3 and 7 after a walk. Successful report reminders are recorded per participant to prevent repeat sends.
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=

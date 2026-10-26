@@ -49,16 +49,22 @@ function wrapHtml(content: string) {
   `;
 }
 
-async function sendEmail(to: string, subject: string, html: string) {
+async function sendEmail(to: string, subject: string, html: string, idempotencyKey?: string) {
   if (!process.env.RESEND_API_KEY) {
     console.warn('RESEND_API_KEY is not set. Skipping email.');
-    return;
+    return false;
   }
 
   try {
-    await getResend().emails.send({ from: FROM_EMAIL(), to, subject, html });
+    const message = { from: FROM_EMAIL(), to, subject, html };
+    const { error } = idempotencyKey
+      ? await getResend().emails.send(message, { idempotencyKey })
+      : await getResend().emails.send(message);
+    if (error) throw new Error(error.message);
+    return true;
   } catch (error) {
     console.error(`Failed to send email "${subject}" to ${to}:`, error);
+    return false;
   }
 }
 
@@ -232,6 +238,24 @@ export async function sendWalkReminderEmail(
     <p>If you cannot make it, please cancel your walk as soon as possible to allow others to join.</p>
     <a href="${APP_URL()}/walk" class="button">View My Walks</a>
   `));
+}
+
+export async function sendReportReminderEmail(
+  email: string,
+  name: string | null,
+  slotInfo: WalkEmailSlotInfo,
+  walkId: string,
+  reminderDay: 3 | 7
+) {
+  return sendEmail(email, 'Reminder: Submit Your Survey Walk Report', wrapHtml(`
+    <p>Hi ${escapeHtml(name || 'Volunteer')},</p>
+    <p>Your survey walk was ${reminderDay} days ago and its report has not been submitted.</p>
+    <p><strong>Date:</strong> ${escapeHtml(slotInfo.date)}<br />
+    <strong>Time:</strong> ${escapeHtml(slotInfo.time)}<br />
+    <strong>Location:</strong> ${escapeHtml(slotInfo.location)}</p>
+    <p>Please coordinate with your walk group to submit the shared report.</p>
+    <a href="${APP_URL()}/report/${encodeURIComponent(walkId)}" class="button">View Walk Report</a>
+  `), `report-reminder/${walkId}/${reminderDay}/${email}`);
 }
 
 export async function sendWalkParticipantUpdateEmail(

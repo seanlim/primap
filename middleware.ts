@@ -6,7 +6,7 @@ export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
   const pathname = request.nextUrl.pathname
 
-  if (pathname === '/api/cron/reminders') {
+  if (pathname === '/api/cron/reminders' || pathname === '/api/cron/report-reminders') {
     return supabaseResponse
   }
 

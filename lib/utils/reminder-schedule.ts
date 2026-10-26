@@ -42,7 +42,7 @@ function parseAppDate(date: string) {
 
 function addDays(date: Date, days: number) {
   const next = new Date(date)
-  next.setDate(next.getDate() + days)
+  next.setUTCDate(next.getUTCDate() + days)
   return next
 }
 
@@ -57,7 +57,7 @@ export function getMostRecentReminderScheduleTime(
   const config = getScheduleConfig(settings)
   const nowDateString = getAppDateString(now)
   const today = parseAppDate(nowDateString)
-  const currentWeekday = today.getDay()
+  const currentWeekday = new Date(`${nowDateString}T00:00:00Z`).getUTCDay()
   const daysSinceReminderDay =
     (currentWeekday - config.reminderSendWeekday + 7) % 7
 

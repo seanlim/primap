@@ -17,8 +17,11 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   // Simple authorization check for cron jobs
+  if (!process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'Reminder cron is not configured' }, { status: 503 });
+  }
   const authHeader = req.headers.get('Authorization');
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return new NextResponse('Unauthorized', { status: 401 });
   }
 

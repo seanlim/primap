@@ -33,6 +33,12 @@ describe('middleware', () => {
 
   // --- Unauthenticated ---
 
+  it.each(['/api/cron/reminders', '/api/cron/report-reminders'])('lets %s enforce its own cron authentication', async path => {
+    const response = await middleware(makeRequest(path))
+    expect(response.status).toBe(200)
+    expect(mockGetUser).not.toHaveBeenCalled()
+  })
+
   it('redirects unauthenticated user from /home to /login', async () => {
     const response = await middleware(makeRequest('/home'))
 

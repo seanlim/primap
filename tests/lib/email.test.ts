@@ -19,6 +19,8 @@ import {
   sendWalkReminderEmail,
   sendWalkParticipantUpdateEmail,
   sendIncidentReportedEmail,
+  sendReportReminderEmail,
+  sendReportSubmittedEmail,
 } from '@/lib/email'
 
 describe('email utilities', () => {
@@ -34,6 +36,33 @@ describe('email utilities', () => {
   })
 
   describe('sendEmail internals', () => {
+    it('notifies each participant separately without a report link', async () => {
+      await sendReportSubmittedEmail(['alice@example.test', 'bob@example.test'], {
+        date: '2026-10-25', time: '08:00', location: '<Park>',
+      })
+      expect(mockSend).toHaveBeenCalledTimes(2)
+      expect(mockSend.mock.calls.map(([message]) => message.to)).toEqual(['alice@example.test', 'bob@example.test'])
+      for (const [message] of mockSend.mock.calls) {
+        expect(message.subject).toBe('Survey Walk Report Submitted')
+        expect(message.html).toContain('has been submitted on behalf of your walk group')
+        expect(message.html).toContain('&lt;Park&gt;')
+        expect(message.html).not.toContain('href=')
+      }
+    })
+    it('sends report reminders with a stable provider idempotency key and report link', async () => {
+      const result = await sendReportReminderEmail('user@example.com', '<Alice>', { date: '2026-10-24', time: '08:00', location: '<Park>' }, 'slot-1', 3)
+      expect(result).toBe(true)
+      const [message, options] = mockSend.mock.calls[0]
+      expect(message.html).toContain('&lt;Alice&gt;')
+      expect(message.html).toContain('&lt;Park&gt;')
+      expect(message.html).toContain('/report/slot-1')
+      expect(message.html).toContain('3 days')
+      expect(options).toEqual({ idempotencyKey: 'report-reminder/slot-1/3/user@example.com' })
+    })
+    it('does not report delivery when the provider returns an error', async () => {
+      mockSend.mockResolvedValueOnce({ error: { message: 'Rate limited' } })
+      expect(await sendReportReminderEmail('user@example.com', null, { date: '2026-10-24', time: '08:00', location: 'Park' }, 'slot-1', 7)).toBe(false)
+    })
     it('skips sending when RESEND_API_KEY is not set', async () => {
       delete process.env.RESEND_API_KEY
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})

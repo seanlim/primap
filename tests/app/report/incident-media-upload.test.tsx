@@ -20,7 +20,7 @@ it('retains incident previews through upload progress rerenders, accumulates fil
   fireEvent.change(screen.getByRole('combobox'), { target: { value: 'OTHER' } })
   fireEvent.change(screen.getByPlaceholderText('Describe the incident...'), { target: { value: 'Synthetic incident' } })
   fireEvent.click(screen.getByRole('button', { name: 'Report' }))
-  await screen.findByText('Add Photos / Videos')
+  await screen.findByRole('heading', { name: 'Add Photos' })
   const fetchMock = vi.spyOn(globalThis, 'fetch')
 
   for (let i = 1; i <= 2; i++) {

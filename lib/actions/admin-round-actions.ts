@@ -619,8 +619,8 @@ export async function updateSettings(data: {
   if (!inRange(data.reminderSendWeekday, REMINDER_SEND_WEEKDAY_RANGE.min, REMINDER_SEND_WEEKDAY_RANGE.max)) {
     errors.push('Reminder weekday must be between Sunday (0) and Saturday (6)')
   }
-  if (!/^\d{2}:\d{2}$/.test(normalizedReminderTime)) {
-    errors.push('Reminder send time must be in HH:MM format')
+  if (!/^(?:[01]\d|2[0-3]):00$/.test(normalizedReminderTime)) {
+    errors.push('Reminder send time must be a whole hour in HH:00 format (00:00 to 23:00)')
   }
   if (!inRange(data.reminderWindowStartOffsetDays, REMINDER_WINDOW_START_OFFSET_DAYS_RANGE.min, REMINDER_WINDOW_START_OFFSET_DAYS_RANGE.max)) {
     errors.push(`Reminder window start offset must be an integer between ${REMINDER_WINDOW_START_OFFSET_DAYS_RANGE.min} and ${REMINDER_WINDOW_START_OFFSET_DAYS_RANGE.max} days`)

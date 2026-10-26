@@ -21,9 +21,14 @@ function picker(offline = false, parentType: 'observation' | 'sighting' | 'incid
   const { container } = render(<MediaUploader parentType={parentType} parentId="parent-1" existingMedia={[]} offline={offline} label="Photos" />)
   return container.querySelector('input[type=file]')!
 }
-it.each([false, true])('rejects WebM with visible feedback and no queued preview (offline=%s)', async offline => {
+it.each([
+  [false, 'video/webm'], [true, 'video/webm'],
+  [false, 'video/mp4'], [true, 'video/mp4'],
+  [false, 'video/quicktime'], [true, 'video/quicktime'],
+  [false, 'image/heic'], [true, 'image/heic'],
+] as const)('rejects unsupported files without uploading or queuing (offline=%s, type=%s)', async (offline, type) => {
   const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ error: 'Unsupported format' })))
-  fireEvent.change(picker(offline), { target: { files: [new File(['video'], 'test.webm', { type: 'video/webm' })] } })
+  fireEvent.change(picker(offline), { target: { files: [new File(['data'], 'test', { type })] } })
   await screen.findByText(/unsupported.*format/i)
   expect(fetchMock).not.toHaveBeenCalled()
   expect(saveMediaToQueue).not.toHaveBeenCalled()
@@ -44,7 +49,7 @@ it('still queues supported files on a connectivity failure', async () => {
   await screen.findByText('1/10')
   expect(addToOutbox).toHaveBeenCalled()
 })
-it.each(['image/png', 'video/mp4'])('uploads supported %s without queuing', async type => {
+it.each(['image/jpeg', 'image/png', 'image/webp'])('uploads supported %s without queuing', async type => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ success: true, media: { id: 'uploaded', file_path: 'path', file_name: 'test', media_type: type.startsWith('video') ? 'VIDEO' : 'PHOTO' } })))
   fireEvent.change(picker(), { target: { files: [new File(['data'], 'test', { type })] } })
   await screen.findByText('1/10')
@@ -80,10 +85,20 @@ it('shares capacity across sightings, reserves pending files, and frees a place 
   expect(fetchMock).toHaveBeenCalledTimes(1)
   finish(new Response(JSON.stringify({ success: true, media: uploaded })))
   await screen.findAllByText('2/2 in report')
-  expect(screen.queryByRole('button', { name: 'Add Photos/Videos' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Add Photos' })).not.toBeInTheDocument()
+  expect(screen.getAllByRole('link', { name: 'Email Dr. Andie' })).toHaveLength(2)
   fireEvent.click(screen.getAllByRole('button', { name: 'Remove one.png' })[0])
   await screen.findAllByText('1/2 in report')
-  expect(screen.getAllByRole('button', { name: 'Add Photos/Videos' })).toHaveLength(2)
+  expect(screen.getAllByRole('button', { name: 'Add Photos' })).toHaveLength(2)
+})
+
+it('offers only supported photos and an email link for videos and extra photos', async () => {
+  const input = picker()
+  expect(input).toHaveAttribute('accept', 'image/jpeg,image/png,image/webp')
+  expect(screen.getByRole('button', { name: 'Add Photos' })).toBeInTheDocument()
+  expect(screen.getByText(/For videos and additional photos beyond the report limit, email Dr\. Andie directly at/)).toHaveTextContent('primatewatching@gmail.com')
+  expect(screen.getByRole('link', { name: 'Email Dr. Andie' })).toHaveAttribute('href', 'mailto:primatewatching@gmail.com')
+  await waitFor(() => expect(screen.getByText('0/10')).toBeInTheDocument())
 })
 
 it('queues files under the stable client parent so reload counts them after ID assignment', async () => {

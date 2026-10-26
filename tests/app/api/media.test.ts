@@ -438,18 +438,14 @@ describe('POST /api/media', () => {
       )
     })
 
-    it('detects VIDEO media type for video/* MIME types', async () => {
+    it.each(['video/mp4', 'video/quicktime', 'image/heic'])('rejects %s before accessing Storage or database counts', async fileType => {
       setupUser()
-      const { insertChain } = setupMediaUploadMocks({
-        count: 0,
-        insertData: { id: 'media-1' },
-      })
-
-      await POST(makeRequest(makeFormData({ fileName: 'clip.mp4', fileType: 'video/mp4' })))
-
-      expect(insertChain.insert).toHaveBeenCalledWith(
-        expect.objectContaining({ media_type: 'VIDEO' })
-      )
+      const response = await POST(makeRequest(makeFormData({ fileName: 'test', fileType })))
+      expect(response.status).toBe(415)
+      expect((await response.json()).error).toBe('Unsupported media format. Use JPEG, PNG or WebP photos only.')
+      expect(mockStorage.upload).not.toHaveBeenCalled()
+      expect(mockSupabase.from).not.toHaveBeenCalled()
+      expect(mockSupabase.rpc).not.toHaveBeenCalled()
     })
 
     it('detects PHOTO media type for image/* MIME types', async () => {

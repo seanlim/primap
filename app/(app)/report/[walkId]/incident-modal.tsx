@@ -19,7 +19,7 @@ interface IncidentModalProps {
 /**
  * Two-phase incident report flow:
  *   Phase 1 (Details): collect type + description, create the incident row.
- *   Phase 2 (Media):   attach photos/videos to the just-created incident.
+ *   Phase 2 (Media):   attach photos to the just-created incident.
  *
  * Once phase 1 succeeds the incident is committed — text-only submissions
  * are valid, so closing the modal in phase 2 (Done/Skip) finalizes without
@@ -80,7 +80,7 @@ export function IncidentModal({ walkId, onClose, onSubmitted }: IncidentModalPro
         style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
       >
         <h2 className="text-lg font-bold text-gray-900 mb-4">
-          {phase === 'details' ? 'Report Incident' : 'Add Photos / Videos'}
+          {phase === 'details' ? 'Report Incident' : 'Add Photos'}
         </h2>
 
         {phase === 'details' && (
@@ -139,7 +139,7 @@ export function IncidentModal({ walkId, onClose, onSubmitted }: IncidentModalPro
               parentType="incident"
               parentId={incidentId}
               existingMedia={EMPTY_INCIDENT_MEDIA}
-              label="Photos / Videos"
+              label="Photos"
               onUploadingChange={setUploadingCount}
             />
             {isUploading && (

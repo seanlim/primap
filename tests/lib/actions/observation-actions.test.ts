@@ -1,4 +1,7 @@
 import { revalidatePath } from 'next/cache'
+import { sendReportSubmittedEmail } from '@/lib/email'
+
+vi.mock('@/lib/email', () => ({ sendReportSubmittedEmail: vi.fn() }))
 
 const { mockSupabase, methods, mockStorage, adminStorage, adminFrom, adminMethods, adminBucket } = vi.hoisted(() => {
   const methods = {
@@ -538,6 +541,77 @@ describe('observation-actions', () => {
         .mockResolvedValueOnce({ data: paths.map(file_path => ({ file_path })), error: null })
         .mockReturnValueOnce(adminMethods)
     }
+
+    function withRecipients() {
+      methods.single.mockResolvedValueOnce({ data: draft, error: null }).mockResolvedValueOnce({
+        data: { walk_date: '2026-10-25', start_time: '08:00', location_name: 'Park' }, error: null,
+      })
+      methods.neq.mockResolvedValueOnce({ data: [
+        { profiles: { email: 'alice@example.test', status: 'ACTIVE' } },
+        { profiles: { email: 'bob@example.test', status: 'ACTIVE' } },
+        { profiles: { email: 'alice@example.test', status: 'ACTIVE' } },
+        { profiles: { email: 'disabled@example.test', status: 'DISABLED' } },
+        { profiles: { email: '', status: 'ACTIVE' } },
+        { profiles: null },
+      ], error: null })
+    }
+
+    it('notifies the other active participants after successful submission', async () => {
+      withRecipients()
+      expect(await submitObservation(observationId, walkId)).toEqual({ success: true })
+      expect(methods.neq).toHaveBeenCalledWith('user_id', 'user-1')
+      expect(methods.eq).toHaveBeenCalledWith('status', 'ACTIVE')
+      expect(sendReportSubmittedEmail).toHaveBeenCalledExactlyOnceWith(
+        ['alice@example.test', 'bob@example.test'],
+        { date: '2026-10-25', time: '08:00', location: 'Park' }
+      )
+    })
+
+    it('never emails participants if the submission fails', async () => {
+      methods.maybeSingle.mockResolvedValue({ data: null, error: { message: 'Submission failed' } })
+      await submitObservation(observationId, walkId)
+      expect(sendReportSubmittedEmail).not.toHaveBeenCalled()
+    })
+
+    it('waits for a confirmed submission before sending notifications', async () => {
+      withRecipients()
+      let finish!: (result: unknown) => void
+      methods.maybeSingle.mockReturnValue(new Promise(resolve => { finish = resolve }))
+      const submission = submitObservation(observationId, walkId)
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(sendReportSubmittedEmail).not.toHaveBeenCalled()
+      finish({ data: { id: observationId }, error: null })
+      await submission
+      expect(sendReportSubmittedEmail).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps submission successful when recipient lookup fails', async () => {
+      methods.neq.mockResolvedValueOnce({ data: null, error: { message: 'Lookup failed' } })
+      const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+      try {
+        expect(await submitObservation(observationId, walkId)).toEqual({ success: true })
+        expect(sendReportSubmittedEmail).not.toHaveBeenCalled()
+        expect(log).toHaveBeenCalled()
+      } finally { log.mockRestore() }
+    })
+
+    it('keeps the report submitted if notification fails', async () => {
+      withRecipients()
+      vi.mocked(sendReportSubmittedEmail).mockRejectedValueOnce(new Error('Email service unavailable'))
+      const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+      try {
+        expect(await submitObservation(observationId, walkId)).toEqual({ success: true })
+        expect(log).toHaveBeenCalledWith('Failed to send report submission notification:', expect.any(Error))
+        expect(revalidatePath).toHaveBeenCalledWith(`/report/${walkId}`)
+      } finally { log.mockRestore() }
+    })
+
+    it('skips the notification when nobody else participates', async () => {
+      methods.neq.mockResolvedValueOnce({ data: [], error: null })
+      await submitObservation(observationId, walkId)
+      expect(sendReportSubmittedEmail).not.toHaveBeenCalled()
+    })
 
     it('does not submit when unauthenticated', async () => {
       mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })

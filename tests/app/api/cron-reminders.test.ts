@@ -47,14 +47,14 @@ import { sendWalkReminderEmail } from '@/lib/email'
 
 function makeRequest(path: string, headers?: Record<string, string>): NextRequest {
   return new NextRequest(`http://localhost:3000${path}`, {
-    headers: headers ?? {},
+    headers: headers ?? { Authorization: 'Bearer my-secret' },
   })
 }
 
 describe('GET /api/cron/reminders', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    delete process.env.CRON_SECRET
+    process.env.CRON_SECRET = 'my-secret'
     slotsChain.select.mockReturnThis()
     slotsChain.gte.mockReturnThis()
     slotsChain.lte.mockReturnThis()
@@ -74,16 +74,15 @@ describe('GET /api/cron/reminders', () => {
 
   // --- Auth ---
 
-  it('proceeds without auth check when CRON_SECRET is not set', async () => {
+  it('fails closed when CRON_SECRET is not set', async () => {
+    delete process.env.CRON_SECRET
     mockSlotsResult.mockResolvedValue({ data: [], error: null })
 
     const response = await GET(makeRequest('/api/cron/reminders'))
     const body = await response.json()
 
-    expect(response.status).toBe(200)
-    expect(body.message).toBe('No walks scheduled.')
-    expect(body.startDate).toBeDefined()
-    expect(body.endDate).toBeDefined()
+    expect(response.status).toBe(503)
+    expect(body.error).toBe('Reminder cron is not configured')
   })
 
   it('returns 401 when CRON_SECRET is set and token is invalid', async () => {

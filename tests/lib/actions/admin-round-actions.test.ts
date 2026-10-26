@@ -706,6 +706,11 @@ describe('admin-round-actions', () => {
     })
 
     describe('input validation', () => {
+      it.each(['13:30', '13:01', '24:00', '99:00', '9:00'])('rejects a non-hourly or invalid reminder time: %s', async reminderSendTime => {
+        const result = await updateSettings(buildSettingsInput({ reminderSendTime }))
+        expect(result.error).toContain('whole hour')
+        expect(methods.update).not.toHaveBeenCalled()
+      })
       it('rejects maxMediaPerReport below the allowed range', async () => {
         const result = await updateSettings(buildSettingsInput({ maxMediaPerReport: 0 }))
         expect(result).toEqual({

@@ -436,7 +436,7 @@ export function MediaUploader({
           className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 py-2"
         >
           <Camera className="w-4 h-4" />
-          {offline ? 'Add Photos/Videos (queued for upload)' : 'Add Photos/Videos'}
+          {offline ? 'Add Photos (queued for upload)' : 'Add Photos'}
         </button>
       )}
 
@@ -449,6 +449,19 @@ export function MediaUploader({
           onChange={handleFileSelect}
           className="hidden"
         />
+      )}
+      {!readOnly && (
+        <div className="space-y-2 text-xs text-gray-500">
+          <p>
+            For videos and additional photos beyond the report limit, email Dr. Andie directly at primatewatching@gmail.com.
+          </p>
+          <a
+            href="mailto:primatewatching@gmail.com"
+            className="inline-flex items-center rounded-lg border border-gray-300 px-3 py-2 font-medium text-green-700 hover:bg-green-50"
+          >
+            Email Dr. Andie
+          </a>
+        </div>
       )}
     </div>
   )

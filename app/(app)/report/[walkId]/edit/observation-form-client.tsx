@@ -1067,14 +1067,14 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
                     onChange={(e) => updateSighting(index, 'notes', e.target.value)}
                     rows={2}
                     className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-500"
-                    placeholder="Additional notes for this sighting..."
+                    placeholder="Describe behaviors and counts by age group (e.g. 2 adults, 1 juvenile, 1 infant)..."
                   />
                 </div>
 
                 {/* Media for this sighting */}
                 <div>
                   <MediaUploader
-                    label="Photos/Videos"
+                    label="Photos"
                     parentType="sighting"
                     parentId={sighting.id ?? null}
                     clientParentId={sighting.clientTempId}
@@ -1140,9 +1140,9 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
       {/* Step 5: Observation-level media (only when no sightings for NOT_SIGHTED) */}
       {!hasSightings && (
         <div id="step-photos" className="bg-white rounded-2xl p-5 shadow-sm space-y-3 scroll-mt-20">
-          <h2 className="text-sm font-semibold text-gray-900">5. Photos/Videos</h2>
+          <h2 className="text-sm font-semibold text-gray-900">5. Photos</h2>
           <MediaUploader
-            label="Photos/Videos"
+            label="Photos"
             parentType="observation"
             parentId={observationId ?? null}
             clientParentId={clientDraftId}

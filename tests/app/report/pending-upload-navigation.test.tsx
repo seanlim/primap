@@ -43,7 +43,7 @@ async function openEditor(sightingCount = 0) {
     }}
   /></>)
   await act(async () => { await new Promise(resolve => requestAnimationFrame(resolve)) })
-  await screen.findAllByRole('button', { name: 'Add Photos/Videos' })
+  await screen.findAllByRole('button', { name: 'Add Photos' })
   return container.querySelectorAll<HTMLInputElement>('input[type=file]')
 }
 function departure() {
@@ -132,7 +132,7 @@ it('keeps a remounted uploader protected when an older instance finishes first',
   await act(async () => { fireEvent.change(screen.getByRole('combobox'), { target: { value: 'RBL' } }) })
   await screen.findByRole('button', { name: 'Save Draft' })
   fireEvent.click(screen.getByText('Sighting #1').parentElement!.querySelector('button')!)
-  await screen.findByRole('button', { name: 'Add Photos/Videos' })
+  await screen.findByRole('button', { name: 'Add Photos' })
   selectPhoto(document.querySelector<HTMLInputElement>('input[type=file]')!, 'newer.png')
   await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2))
   fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }))

@@ -7,6 +7,7 @@ import { withTimeout } from '@/lib/utils/with-timeout'
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
@@ -55,6 +56,10 @@ export default function LoginPage() {
 
   const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (password !== confirmPassword) {
+      setError('Passwords do not match')
+      return
+    }
     setLoading(true)
     setError('')
 
@@ -127,6 +132,20 @@ export default function LoginPage() {
               required
             />
           </div>
+          {mode === 'signup' && (
+            <div>
+              <input
+                type="password"
+                placeholder="Confirm password"
+                aria-label="Confirm password"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                required
+              />
+            </div>
+          )}
           {error && (
             <p className={`text-sm ${error.includes('Check your email') ? 'text-green-600' : 'text-red-500'}`}>
               {error}

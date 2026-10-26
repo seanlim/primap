@@ -131,7 +131,7 @@ describe('IncidentModal', () => {
       })
       // Still on phase 1
       expect(screen.getByText('Report Incident')).toBeInTheDocument()
-      expect(screen.queryByText('Add Photos / Videos')).not.toBeInTheDocument()
+      expect(screen.queryByText('Add Photos')).not.toBeInTheDocument()
     })
 
     it('transitions to phase 2 on successful submission and passes incidentId to MediaUploader', async () => {
@@ -145,7 +145,7 @@ describe('IncidentModal', () => {
       fireEvent.click(screen.getByText('Report'))
 
       await waitFor(() => {
-        expect(screen.getByText('Add Photos / Videos')).toBeInTheDocument()
+        expect(screen.getByText('Add Photos')).toBeInTheDocument()
       })
       expect(screen.getByTestId('media-uploader')).toBeInTheDocument()
       expect(screen.getByTestId('parent-type')).toHaveTextContent('incident')
@@ -182,7 +182,7 @@ describe('IncidentModal', () => {
       })
       fireEvent.click(screen.getByText('Report'))
       await waitFor(() => {
-        expect(screen.getByText('Add Photos / Videos')).toBeInTheDocument()
+        expect(screen.getByText('Add Photos')).toBeInTheDocument()
       })
     }
 

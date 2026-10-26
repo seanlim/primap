@@ -73,6 +73,42 @@ export type Database = {
         }
         Relationships: []
       }
+      report_reminder_deliveries: {
+        Row: {
+          slot_id: string
+          user_id: string
+          reminder_day: number
+          sent_at: string
+        }
+        Insert: {
+          slot_id: string
+          user_id: string
+          reminder_day: number
+          sent_at?: string
+        }
+        Update: {
+          slot_id?: string
+          user_id?: string
+          reminder_day?: number
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_reminder_deliveries_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: false
+            referencedRelation: "walk_slots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_reminder_deliveries_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       guardian_contact_otps: {
         Row: {
           attempts: number
@@ -677,6 +713,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      dispatch_reminder_batches: {
+        Args: { p_now?: string }
+        Returns: undefined
+      }
       get_report_media_count: {
         Args: { p_parent_type: string; p_parent_id: string }
         Returns: number

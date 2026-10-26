@@ -240,6 +240,17 @@ export async function sendWalkReminderEmail(
   `));
 }
 
+export async function sendReportSubmittedEmail(recipients: string[], slotInfo: WalkEmailSlotInfo) {
+  const html = wrapHtml(`
+    <p>The survey walk report has been submitted on behalf of your walk group.</p>
+    <p><strong>Date:</strong> ${escapeHtml(slotInfo.date)}<br />
+    <strong>Time:</strong> ${escapeHtml(slotInfo.time)}<br />
+    <strong>Location:</strong> ${escapeHtml(slotInfo.location)}</p>
+    <p>Thank you for taking part in the survey walk.</p>
+  `);
+  await Promise.all(recipients.map(email => sendEmail(email, 'Survey Walk Report Submitted', html)));
+}
+
 export async function sendReportReminderEmail(
   email: string,
   name: string | null,

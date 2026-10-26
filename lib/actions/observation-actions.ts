@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
+import { sendReportSubmittedEmail } from '@/lib/email'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
 import {
@@ -283,6 +284,31 @@ export async function submitObservation(observationId: string, walkId: string) {
     } catch (cleanupError) {
       console.error('Report submitted, but observation media cleanup failed:', cleanupError)
     }
+  }
+
+  // Notify only after the authenticated DRAFT -> SUBMITTED update succeeds.
+  try {
+    const [walkResult, membersResult] = await Promise.all([
+      supabase.from('walk_slots')
+        .select('walk_date, start_time, location_name')
+        .eq('id', walkId).single(),
+      supabase.from('slot_memberships')
+        .select('profiles:user_id(email, status)')
+        .eq('slot_id', walkId).eq('status', 'ACTIVE').neq('user_id', user.id),
+    ])
+    if (walkResult.error) throw new Error(walkResult.error.message)
+    if (membersResult.error) throw new Error(membersResult.error.message)
+    const walk = walkResult.data
+    const recipients = [...new Set((membersResult.data ?? [])
+      .filter(member => member.profiles?.status === 'ACTIVE' && member.profiles.email)
+      .map(member => member.profiles!.email))]
+    if (walk && recipients.length > 0) {
+      await sendReportSubmittedEmail(recipients, {
+        date: walk.walk_date, time: walk.start_time, location: walk.location_name,
+      })
+    }
+  } catch (notifyError) {
+    console.error('Failed to send report submission notification:', notifyError)
   }
 
   revalidatePath('/report')

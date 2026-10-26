@@ -1074,7 +1074,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
                 {/* Media for this sighting */}
                 <div>
                   <MediaUploader
-                    label="Photos/Videos"
+                    label="Photos"
                     parentType="sighting"
                     parentId={sighting.id ?? null}
                     clientParentId={sighting.clientTempId}
@@ -1140,9 +1140,9 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
       {/* Step 5: Observation-level media (only when no sightings for NOT_SIGHTED) */}
       {!hasSightings && (
         <div id="step-photos" className="bg-white rounded-2xl p-5 shadow-sm space-y-3 scroll-mt-20">
-          <h2 className="text-sm font-semibold text-gray-900">5. Photos/Videos</h2>
+          <h2 className="text-sm font-semibold text-gray-900">5. Photos</h2>
           <MediaUploader
-            label="Photos/Videos"
+            label="Photos"
             parentType="observation"
             parentId={observationId ?? null}
             clientParentId={clientDraftId}

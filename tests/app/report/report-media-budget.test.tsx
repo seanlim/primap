@@ -30,7 +30,7 @@ function openReport(observationCount: number) {
 it('counts hidden observation media together with both sightings on reload', async () => {
   openReport(6)
   expect(await screen.findAllByText('10/10 in report')).toHaveLength(2)
-  expect(screen.queryByRole('button', { name: 'Add Photos/Videos' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Add Photos' })).not.toBeInTheDocument()
 })
 it('includes queued media for the hidden observation in the shared allowance', async () => {
   vi.mocked(getMediaByClientParent).mockImplementation(async id => id === 'obs-1' ? [
@@ -38,5 +38,5 @@ it('includes queued media for the hidden observation in the shared allowance', a
   ] : [])
   openReport(5)
   expect(await screen.findAllByText('10/10 in report')).toHaveLength(2)
-  expect(screen.queryByRole('button', { name: 'Add Photos/Videos' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Add Photos' })).not.toBeInTheDocument()
 })

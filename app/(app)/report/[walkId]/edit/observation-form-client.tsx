@@ -1067,7 +1067,7 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
                     onChange={(e) => updateSighting(index, 'notes', e.target.value)}
                     rows={2}
                     className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-500"
-                    placeholder="Additional notes for this sighting..."
+                    placeholder="Describe behaviors and counts by age group (e.g. 2 adults, 1 juvenile, 1 infant)..."
                   />
                 </div>
 

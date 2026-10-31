@@ -68,6 +68,10 @@ function setupUser(userId = 'user-1') {
   })
 }
 
+function mockProfilePhone(phone: string | null = '+6591234567') {
+  methods.single.mockResolvedValueOnce({ data: { phone_number: phone }, error: null })
+}
+
 function mockJoinableSlot(overrides?: Partial<{
   location_name: string
   reminder_sent_at: string | null
@@ -193,9 +197,36 @@ describe('walk-actions', () => {
       expect(result).toEqual({ error: 'Not authenticated' })
     })
 
+    it('requires a phone number before calling the join RPC', async () => {
+      setupUser()
+      mockProfilePhone(null)
+
+      const result = await joinWalk('slot-1')
+
+      expect(result).toEqual({
+        error: 'Add a phone number to your profile before joining a walk.',
+        code: 'PHONE_REQUIRED',
+      })
+      expect(mockSupabase.rpc).not.toHaveBeenCalled()
+    })
+
+    it('treats a blank stored phone number as missing', async () => {
+      setupUser()
+      mockProfilePhone('   ')
+
+      const result = await joinWalk('slot-1')
+
+      expect(result).toEqual({
+        error: 'Add a phone number to your profile before joining a walk.',
+        code: 'PHONE_REQUIRED',
+      })
+      expect(mockSupabase.rpc).not.toHaveBeenCalled()
+    })
+
     // TC-UNIT-WALK-01 (UC-03): Successful sign up for a walk slot
     it('calls RPC and returns success', async () => {
       setupUser()
+      mockProfilePhone()
       mockJoinableSlot()
       mockSupabase.rpc.mockResolvedValue({
         data: { success: true, membership_id: 'mem-1', observation_id: 'obs-1' },
@@ -220,6 +251,7 @@ describe('walk-actions', () => {
     // TC-UNIT-WALK-02 (UC-03 A1): Slot full prevents sign up
     it('returns "Slot is full" before calling RPC', async () => {
       setupUser()
+      mockProfilePhone()
       mockJoinableSlot({
         max_volunteers: 1,
         slot_memberships: [{ user_id: 'other-user', status: 'ACTIVE' }],
@@ -234,6 +266,7 @@ describe('walk-actions', () => {
     // TC-UNIT-WALK-03 (UC-03 A2): Duplicate sign up is blocked
     it('returns "already joined" before calling RPC', async () => {
       setupUser()
+      mockProfilePhone()
       mockJoinableSlot({
         slot_memberships: [{ user_id: 'user-1', status: 'ACTIVE' }],
       })
@@ -246,6 +279,7 @@ describe('walk-actions', () => {
 
     it('returns generic DB error from RPC', async () => {
       setupUser()
+      mockProfilePhone()
       mockJoinableSlot()
       mockSupabase.rpc.mockResolvedValue({
         data: null,
@@ -259,6 +293,7 @@ describe('walk-actions', () => {
 
     it('handles re-join after cancel (RPC reactivates membership)', async () => {
       setupUser()
+      mockProfilePhone()
       mockJoinableSlot({
         slot_memberships: [{ user_id: 'user-1', status: 'CANCELLED' }],
       })
@@ -278,6 +313,7 @@ describe('walk-actions', () => {
 
     it('sends a participant update email when joining a reminded walk', async () => {
       setupUser()
+      mockProfilePhone()
       mockJoinableSlot({
         reminder_sent_at: '2026-04-09T05:00:00.000Z',
       })

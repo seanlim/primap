@@ -30,6 +30,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 import { updateProfile } from '@/lib/actions/profile-actions'
+import { PHONE_INVALID_MESSAGE, PHONE_REQUIRED_MESSAGE } from '@/lib/utils/phone'
 
 function resetChain() {
   methods.select.mockReturnThis()
@@ -54,24 +55,70 @@ describe('profile-actions', () => {
     it('returns error when not authenticated', async () => {
       mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
 
-      const result = await updateProfile('Test User')
+      const result = await updateProfile({ fullName: 'Test User', phoneNumber: '91234567' })
 
       expect(result).toEqual({ error: 'Not authenticated' })
     })
 
-    it('returns success on valid update', async () => {
+    it('returns success on valid update and normalises the phone number', async () => {
       mockSupabase.auth.getUser.mockResolvedValue({
         data: { user: { id: 'user-1' } },
       })
 
-      const result = await updateProfile('Updated Name')
+      const result = await updateProfile({ fullName: ' Updated Name ', phoneNumber: '9123 4567' })
 
       expect(result).toEqual({ success: true })
       expect(mockSupabase.from).toHaveBeenCalledWith('profiles')
-      expect(methods.update).toHaveBeenCalledWith({ full_name: 'Updated Name' })
+      expect(methods.update).toHaveBeenCalledWith({
+        full_name: 'Updated Name',
+        phone_number: '+6591234567',
+      })
       expect(methods.eq).toHaveBeenCalledWith('id', 'user-1')
       expect(revalidatePath).toHaveBeenCalledWith('/profile')
       expect(revalidatePath).toHaveBeenCalledWith('/home')
+      expect(revalidatePath).toHaveBeenCalledWith('/walk')
+    })
+
+    it('stores an empty name as null', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: { id: 'user-1' } },
+      })
+
+      const result = await updateProfile({ fullName: '   ', phoneNumber: '+6591234567' })
+
+      expect(result).toEqual({ success: true })
+      expect(methods.update).toHaveBeenCalledWith({
+        full_name: null,
+        phone_number: '+6591234567',
+      })
+    })
+
+    it('rejects a missing phone number without touching the database', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: { id: 'user-1' } },
+      })
+
+      const result = await updateProfile({ fullName: 'Test User', phoneNumber: '  ' })
+
+      expect(result).toEqual({
+        error: PHONE_REQUIRED_MESSAGE,
+        fieldErrors: { phoneNumber: PHONE_REQUIRED_MESSAGE },
+      })
+      expect(methods.update).not.toHaveBeenCalled()
+    })
+
+    it('rejects an invalid phone number without touching the database', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: { id: 'user-1' } },
+      })
+
+      const result = await updateProfile({ fullName: 'Test User', phoneNumber: '12345' })
+
+      expect(result).toEqual({
+        error: PHONE_INVALID_MESSAGE,
+        fieldErrors: { phoneNumber: PHONE_INVALID_MESSAGE },
+      })
+      expect(methods.update).not.toHaveBeenCalled()
     })
 
     it('returns error when DB update fails', async () => {
@@ -80,7 +127,7 @@ describe('profile-actions', () => {
       })
       methods.eq.mockReturnValueOnce({ error: { message: 'Database error' } })
 
-      const result = await updateProfile('Bad Name')
+      const result = await updateProfile({ fullName: 'Bad Name', phoneNumber: '91234567' })
 
       expect(result).toEqual({ error: 'Database error' })
       expect(revalidatePath).not.toHaveBeenCalled()

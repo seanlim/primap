@@ -27,3 +27,24 @@ export function resolveStatusRedirect(status: UserStatus): '/pending' | '/blocke
   if (status === 'REJECTED' || status === 'DISABLED') return '/blocked'
   return null
 }
+
+/**
+ * Active volunteers must add a phone number before using the rest of the app.
+ * Admins are exempt, as are API routes (so background sync can still finish).
+ */
+export function needsPhoneCompletion({
+  role,
+  status,
+  phoneNumber,
+  pathname,
+}: {
+  role: string | null | undefined
+  status: UserStatus | null | undefined
+  phoneNumber: string | null | undefined
+  pathname: string
+}): boolean {
+  if (status !== 'ACTIVE' || role !== 'VOLUNTEER') return false
+  if (phoneNumber?.trim()) return false
+  if (pathname.startsWith('/api/')) return false
+  return !matchesPath(pathname, '/profile')
+}

@@ -17,6 +17,7 @@ describe('UsersClient admin indicators', () => {
         id: 'user-1',
         email: 'active@example.com',
         fullName: 'Active Reporter',
+        phoneNumber: '+6591230001',
         role: 'VOLUNTEER' as const,
         status: 'ACTIVE' as const,
         createdAt: '2026-04-01T00:00:00.000Z',
@@ -25,6 +26,7 @@ describe('UsersClient admin indicators', () => {
         id: 'user-2',
         email: 'late@example.com',
         fullName: 'Late Canceller',
+        phoneNumber: null,
         role: 'VOLUNTEER' as const,
         status: 'ACTIVE' as const,
         createdAt: '2026-04-02T00:00:00.000Z',
@@ -64,6 +66,16 @@ describe('UsersClient admin indicators', () => {
 
     expect(screen.getByText('High')).toBeInTheDocument()
     expect(screen.getByText('Late (2)')).toBeInTheDocument()
+  })
+
+  it('shows phone numbers and flags volunteers without one', () => {
+    render(
+      <UsersClient {...defaultProps} />
+    )
+
+    expect(screen.getByText('+65 9123 0001')).toBeInTheDocument()
+    expect(screen.getByText('No phone number')).toBeInTheDocument()
+    expect(screen.getByText('Missing phone')).toBeInTheDocument()
   })
 
   it('renders a history link for each user', () => {

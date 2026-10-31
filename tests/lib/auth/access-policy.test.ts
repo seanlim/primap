@@ -3,6 +3,7 @@ import {
   PUBLIC_PATHS,
   matchesPath,
   isPublicPath,
+  needsPhoneCompletion,
   needsProfileCheck,
   resolveStatusRedirect,
 } from '@/lib/auth/access-policy'
@@ -113,6 +114,43 @@ describe('access-policy', () => {
 
     it('returns null for ACTIVE status', () => {
       expect(resolveStatusRedirect('ACTIVE')).toBeNull()
+    })
+  })
+
+  describe('needsPhoneCompletion', () => {
+    const base = {
+      role: 'VOLUNTEER',
+      status: 'ACTIVE' as const,
+      phoneNumber: null,
+      pathname: '/home',
+    }
+
+    it('redirects an active volunteer without a phone', () => {
+      expect(needsPhoneCompletion(base)).toBe(true)
+    })
+
+    it('treats a whitespace-only phone as missing', () => {
+      expect(needsPhoneCompletion({ ...base, phoneNumber: '   ' })).toBe(true)
+    })
+
+    it('allows an active volunteer with a phone', () => {
+      expect(needsPhoneCompletion({ ...base, phoneNumber: '+6591234567' })).toBe(false)
+    })
+
+    it('allows the profile page itself to avoid a redirect loop', () => {
+      expect(needsPhoneCompletion({ ...base, pathname: '/profile' })).toBe(false)
+    })
+
+    it('exempts admins', () => {
+      expect(needsPhoneCompletion({ ...base, role: 'ADMIN' })).toBe(false)
+    })
+
+    it('exempts non-active users', () => {
+      expect(needsPhoneCompletion({ ...base, status: 'PENDING' })).toBe(false)
+    })
+
+    it('exempts API routes so background sync can finish', () => {
+      expect(needsPhoneCompletion({ ...base, pathname: '/api/offline-sync' })).toBe(false)
     })
   })
 })

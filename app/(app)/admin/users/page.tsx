@@ -61,6 +61,7 @@ export default async function AdminUsersPage({
     id: u.id,
     email: u.email,
     fullName: u.full_name,
+    phoneNumber: u.phone_number,
     role: u.role,
     status: u.status,
     createdAt: u.created_at,

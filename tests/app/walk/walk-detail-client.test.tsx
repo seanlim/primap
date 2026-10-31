@@ -274,4 +274,15 @@ describe('WalkDetailClient', () => {
     expect(screen.getByRole('button', { name: 'Round Closed' })).toBeDisabled()
     expect(screen.getByText('This survey round is no longer open for volunteer signup.')).toBeInTheDocument()
   })
+
+  it('shows a profile CTA instead of the join button when a phone is missing', () => {
+    renderWalkDetail({ missingPhone: true })
+
+    expect(screen.getByRole('link', { name: 'Add phone number to join' })).toHaveAttribute(
+      'href',
+      '/profile?phone=required'
+    )
+    expect(screen.queryByRole('button', { name: 'Join Walk' })).not.toBeInTheDocument()
+    expect(screen.getByText('A phone number is required so organisers can reach you in an emergency.')).toBeInTheDocument()
+  })
 })

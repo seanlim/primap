@@ -22,7 +22,7 @@ export default async function WalkDetailPage({
     .eq('slot_id', walkId)
     .limit(1)
 
-  const [{ data: walk }, { data: ownObservations }] = await Promise.all([
+  const [{ data: walk }, { data: ownObservations }, { data: profile }] = await Promise.all([
     supabase
       .from('walk_slots')
       .select(`
@@ -39,6 +39,11 @@ export default async function WalkDetailPage({
       .eq('id', walkId)
       .single(),
     ownObservationQuery,
+    supabase
+      .from('profiles')
+      .select('phone_number')
+      .eq('id', user.id)
+      .single(),
   ])
 
   if (!walk) notFound()
@@ -84,6 +89,7 @@ export default async function WalkDetailPage({
       isFull={isFull}
       currentUserId={user.id}
       hasSubmittedReport={hasSubmittedReport}
+      missingPhone={!profile?.phone_number?.trim()}
     />
   )
 }

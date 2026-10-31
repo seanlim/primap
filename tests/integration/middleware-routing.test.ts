@@ -91,7 +91,7 @@ describe('middleware-routing (integration)', () => {
   it('authenticated ACTIVE VOLUNTEER → /admin → role check → redirect /home', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockSingle.mockResolvedValue({
-      data: { status: 'ACTIVE', role: 'VOLUNTEER' },
+      data: { status: 'ACTIVE', role: 'VOLUNTEER', phone_number: '+6591234567' },
       error: null,
     })
 
@@ -99,6 +99,45 @@ describe('middleware-routing (integration)', () => {
 
     expect(response.status).toBe(307)
     expect(response.headers.get('location')).toContain('/home')
+  })
+
+  it('authenticated ACTIVE VOLUNTEER without a phone → /home → redirect /profile?phone=required', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockSingle.mockResolvedValue({
+      data: { status: 'ACTIVE', role: 'VOLUNTEER', phone_number: null },
+      error: null,
+    })
+
+    const response = await middleware(makeRequest('/home'))
+
+    expect(response.status).toBe(307)
+    const location = response.headers.get('location')!
+    expect(location).toContain('/profile')
+    expect(location).toContain('phone=required')
+  })
+
+  it('authenticated ACTIVE VOLUNTEER without a phone → /profile → pass through', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockSingle.mockResolvedValue({
+      data: { status: 'ACTIVE', role: 'VOLUNTEER', phone_number: null },
+      error: null,
+    })
+
+    const response = await middleware(makeRequest('/profile'))
+
+    expect(response.status).toBe(200)
+  })
+
+  it('authenticated ACTIVE ADMIN without a phone → /admin → pass through', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockSingle.mockResolvedValue({
+      data: { status: 'ACTIVE', role: 'ADMIN', phone_number: null },
+      error: null,
+    })
+
+    const response = await middleware(makeRequest('/admin'))
+
+    expect(response.status).toBe(200)
   })
 
   it('authenticated ACTIVE ADMIN → /admin → pass through', async () => {

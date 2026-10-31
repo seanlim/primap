@@ -116,7 +116,66 @@ You can make changes to your local Supabase instance directly using the table ed
 npx supabase db diff -f <migration_name>
 ```
 
-### 5. Configuring Google sign-in provider for local Supabase instance
+### 5. Deploying migrations to production
+
+We use the Supabase CLI migration workflow. Migrations are the SQL files in `supabase/migrations` and must be committed with the code change that depends on them.
+
+#### One-time setup
+
+Authenticate the CLI and link this repository to the production project:
+
+```bash
+npx supabase login
+npx supabase link --project-ref <production-project-ref>
+```
+
+The project ref is the subdomain in the Supabase dashboard URL (`https://supabase.com/dashboard/project/<project-ref>`). Linking prompts for the database password. Do not commit credentials.
+
+#### Before deploying
+
+Confirm the local migration history and see what is still pending on production:
+
+```bash
+npx supabase migration list
+```
+
+`Local` shows committed migrations; `Remote` shows migrations already applied. Review the pending SQL, then do a dry run:
+
+```bash
+npx supabase db push --dry-run
+```
+
+#### Deploy
+
+```bash
+npx supabase db push
+```
+
+`db push` applies every migration whose timestamp is newer than the last applied remote migration. It runs in timestamp order and stops on the first failure.
+
+If a migration was committed out of order (for example a hotfix with an earlier timestamp landed after production was already ahead), use `--include-all` only after reviewing exactly which migrations will run:
+
+```bash
+npx supabase db push --include-all --dry-run
+```
+
+#### After deploying
+
+```bash
+npx supabase migration list
+```
+
+The `Local` and `Remote` columns should match. Then smoke-test the affected flow against production and watch the app logs.
+
+For destructive or data-backfill migrations:
+
+1. Take a database backup (Supabase dashboard → Database → Backups) before pushing.
+2. Apply the backfill first, verify it, then deploy the constraint/enforcement migration in a separate push.
+3. Never edit a migration that has already been applied to production — add a new corrective migration instead.
+
+> Production deploys use the `seanlim` Supabase account. Confirm access before linking.
+
+### 6. Configuring Google sign-in provider for local Supabase instance
 
 Go to [Google Auth Platform console](https://console.cloud.google.com/auth/overview). 
 

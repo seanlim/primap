@@ -191,6 +191,38 @@ export async function saveDraft(input: SaveDraftInput) {
   return { success: true, observationId, sightingIds, serverUpdatedAt: new Date().toISOString() }
 }
 
+async function ensureAttendanceDefaults(
+  supabase: SupabaseClient<Database>,
+  slotId: string,
+  markedBy: string
+) {
+  const { data: memberships, error: membershipError } = await supabase
+    .from('slot_memberships')
+    .select('user_id')
+    .eq('slot_id', slotId)
+    .eq('status', 'ACTIVE')
+
+  if (membershipError) throw new Error(membershipError.message)
+  if (!memberships || memberships.length === 0) return
+
+  // Only fill in volunteers who have no attendance row yet, so explicit
+  // corrections (e.g. an unchecked absentee) are never overwritten.
+  const { error } = await supabase
+    .from('slot_attendance')
+    .upsert(
+      memberships.map(member => ({
+        slot_id: slotId,
+        user_id: member.user_id,
+        status: 'PRESENT' as const,
+        marked_by: markedBy,
+        marked_at: new Date().toISOString(),
+      })),
+      { onConflict: 'slot_id,user_id', ignoreDuplicates: true }
+    )
+
+  if (error) throw new Error(error.message)
+}
+
 export async function submitObservation(observationId: string, walkId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -285,11 +317,21 @@ export async function submitObservation(observationId: string, walkId: string) {
     }
   }
 
+  let attendanceWarning: string | undefined
+  try {
+    await ensureAttendanceDefaults(supabase, walkId, user.id)
+  } catch (attendanceError) {
+    // Submission is irreversible; never roll it back because attendance could
+    // not be filled in. The report page lets the group retry the marking.
+    console.error('Report submitted, but default attendance could not be recorded:', attendanceError)
+    attendanceWarning = 'Report submitted, but attendance could not be recorded. You can mark it on the report page.'
+  }
+
   revalidatePath('/report')
   revalidatePath(`/report/${walkId}`)
   revalidatePath('/home')
   revalidatePath('/profile')
-  return { success: true }
+  return { success: true, attendanceWarning }
 }
 
 // NOTE: Media uploads in production go through the `/api/media` route

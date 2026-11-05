@@ -16,10 +16,25 @@ export interface WalkViewRow {
   maxVolunteers: number | ''
   joinedVolunteers: number
   cancelledVolunteers: number
+  attendancePresent: number
+  attendanceAbsent: number
+  attendanceUnrecorded: number
   observationCount: number
   sightingCount: number
   incidentCount: number
   mediaCount: number
+}
+
+export interface AttendanceViewRow {
+  roundName: string
+  walkDate: string
+  location: string
+  volunteerName: string
+  volunteerEmail: string
+  attendance: string
+  markedByName: string
+  markedByEmail: string
+  markedAt: string
 }
 
 export interface ObservationViewRow {
@@ -111,6 +126,7 @@ export interface ViewExportData {
   observationRows: ObservationViewRow[]
   sightingRows: SightingViewRow[]
   incidentRows: IncidentViewRow[]
+  attendanceRows: AttendanceViewRow[]
   mediaRows: MediaViewRow[]
   mediaManifest: ViewExportMediaManifestItem[]
 }
@@ -125,6 +141,7 @@ type SightingRow = Record<string, unknown>
 type MediaRow = Record<string, unknown>
 type IncidentRow = Record<string, unknown>
 type MembershipRow = Record<string, unknown>
+type AttendanceRow = Record<string, unknown>
 
 function asString(value: unknown): string {
   return value === null || value === undefined ? '' : String(value)
@@ -195,6 +212,7 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
   const incidentsById = indexBy(tableData.incidents as IncidentRow[], 'id')
 
   const membershipsBySlotId = groupBy(tableData.slot_memberships as MembershipRow[], 'slot_id')
+  const attendanceBySlotId = groupBy(tableData.slot_attendance as AttendanceRow[], 'slot_id')
   const observationsBySlotId = groupBy(tableData.observations as ObservationRow[], 'slot_id')
   const sightingsByObservationId = groupBy(tableData.sightings as SightingRow[], 'observation_id')
   const incidentsBySlotId = groupBy(tableData.incidents as IncidentRow[], 'slot_id')
@@ -281,6 +299,10 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
     const memberships = membershipsBySlotId.get(walkId) ?? []
     const observations = observationsBySlotId.get(walkId) ?? []
     const incidents = incidentsBySlotId.get(walkId) ?? []
+    const attendance = attendanceBySlotId.get(walkId) ?? []
+    const joinedVolunteers = memberships.filter(row => asString(row.status) === 'ACTIVE').length
+    const attendancePresent = attendance.filter(row => asString(row.status) === 'PRESENT').length
+    const attendanceAbsent = attendance.filter(row => asString(row.status) === 'ABSENT').length
     const sightingCount = observations.reduce(
       (total, observation) => total + (sightingsByObservationId.get(asString(observation.id))?.length ?? 0),
       0
@@ -292,8 +314,11 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
 
     return {
       ...walkContext,
-      joinedVolunteers: memberships.filter(row => asString(row.status) === 'ACTIVE').length,
+      joinedVolunteers,
       cancelledVolunteers: memberships.filter(row => asString(row.status) === 'CANCELLED').length,
+      attendancePresent,
+      attendanceAbsent,
+      attendanceUnrecorded: Math.max(0, joinedVolunteers - attendancePresent - attendanceAbsent),
       observationCount: observations.length,
       sightingCount,
       incidentCount: incidents.length,
@@ -377,6 +402,23 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
     }
   })
 
+  const attendanceRows: AttendanceViewRow[] = (tableData.slot_attendance as AttendanceRow[]).map(row => {
+    const walk = walksById.get(asString(row.slot_id))
+    const walkContext = getWalkContext(walk, roundsById)
+    const volunteer = getProfileDisplay(profilesById.get(asString(row.user_id)))
+    const marker = getProfileDisplay(profilesById.get(asString(row.marked_by)))
+
+    return {
+      ...walkContext,
+      volunteerName: volunteer.name,
+      volunteerEmail: volunteer.email,
+      attendance: asString(row.status),
+      markedByName: marker.name,
+      markedByEmail: marker.email,
+      markedAt: asString(row.marked_at),
+    }
+  })
+
   const summaryRows: SummaryRow[] = [
     { metric: 'Survey Rounds', value: tableData.survey_rounds.length },
     { metric: 'Walks', value: tableData.walk_slots.length },
@@ -384,6 +426,7 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
     { metric: 'Observations', value: tableData.observations.length },
     { metric: 'Sightings', value: tableData.sightings.length },
     { metric: 'Incidents', value: tableData.incidents.length },
+    { metric: 'Attendance Records', value: tableData.slot_attendance.length },
     { metric: 'Media Files', value: tableData.media.length },
   ]
 
@@ -393,6 +436,7 @@ export function buildViewExportData(tableData: RawTableData): ViewExportData {
     observationRows,
     sightingRows,
     incidentRows,
+    attendanceRows,
     mediaRows,
     mediaManifest,
   }

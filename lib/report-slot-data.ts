@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
+import { hasWalkStarted } from '@/lib/utils/walk-participation'
 
 interface SightingData {
   id: string
@@ -55,10 +56,23 @@ interface IncidentData {
   media: IncidentMediaItem[]
 }
 
-interface MemberData {
+export interface MemberData {
   userId: string
   fullName: string | null
   email: string
+  attendance: 'PRESENT' | 'ABSENT' | null
+  attendanceMarkedAt: string | null
+}
+
+interface MemberRow {
+  user_id: string
+  profiles: { full_name: string | null; email: string } | null
+}
+
+interface AttendanceRow {
+  user_id: string
+  status: 'PRESENT' | 'ABSENT'
+  marked_at: string | null
 }
 
 export interface SlotReportViewData {
@@ -67,7 +81,75 @@ export interface SlotReportViewData {
   members: MemberData[]
   incidents: IncidentData[]
   isParticipant: boolean
+  isAdmin: boolean
+  canMarkAttendance: boolean
   hasSubmittedOwnObservation: boolean
+}
+
+export interface SlotMembersWithAttendance {
+  members: MemberData[]
+  isParticipant: boolean
+  isAdmin: boolean
+}
+
+function mergeMembers(
+  members: MemberRow[],
+  attendance: AttendanceRow[] | null
+): MemberData[] {
+  const attendanceByUserId = new Map(
+    (attendance ?? []).map(row => [row.user_id, row])
+  )
+
+  return members.map(member => {
+    const recorded = attendanceByUserId.get(member.user_id)
+    return {
+      userId: member.user_id,
+      fullName: member.profiles?.full_name ?? null,
+      email: member.profiles?.email ?? '',
+      attendance: recorded?.status ?? null,
+      attendanceMarkedAt: recorded?.marked_at ?? null,
+    }
+  })
+}
+
+/**
+ * Load the active volunteers in a slot together with their recorded attendance.
+ * Shared by the report view and the draft editor so both render the same list.
+ */
+export async function getSlotMembersWithAttendance(
+  supabase: SupabaseClient<Database>,
+  slotId: string,
+  currentUserId: string
+): Promise<SlotMembersWithAttendance> {
+  const [membersResult, attendanceResult, profileResult] = await Promise.all([
+    supabase
+      .from('slot_memberships')
+      .select('user_id, profiles:user_id(full_name, email)')
+      .eq('slot_id', slotId)
+      .eq('status', 'ACTIVE'),
+    supabase
+      .from('slot_attendance')
+      .select('user_id, status, marked_at')
+      .eq('slot_id', slotId),
+    supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', currentUserId)
+      .single(),
+  ])
+
+  const members = mergeMembers(
+    (membersResult.data ?? []) as unknown as MemberRow[],
+    attendanceResult.data as AttendanceRow[] | null
+  )
+  const isParticipant = members.some(member => member.userId === currentUserId)
+  const isAdmin = profileResult.data?.role === 'ADMIN'
+
+  return {
+    members,
+    isParticipant,
+    isAdmin,
+  }
 }
 
 export async function getSlotReportViewData(
@@ -75,7 +157,7 @@ export async function getSlotReportViewData(
   slotId: string,
   currentUserId: string
 ): Promise<SlotReportViewData | null> {
-  const [slotResult, observationsResult, membersResult, incidentsResult] = await Promise.all([
+  const [slotResult, observationsResult, membersResult, attendanceResult, profileResult, incidentsResult] = await Promise.all([
     supabase
       .from('walk_slots')
       .select('*, survey_rounds(name)')
@@ -95,6 +177,15 @@ export async function getSlotReportViewData(
       .select('user_id, profiles:user_id(full_name, email)')
       .eq('slot_id', slotId)
       .eq('status', 'ACTIVE'),
+    supabase
+      .from('slot_attendance')
+      .select('user_id, status, marked_at')
+      .eq('slot_id', slotId),
+    supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', currentUserId)
+      .single(),
     supabase
       .from('incidents')
       // Narrow to exactly the columns the volunteer/admin views need.
@@ -117,11 +208,13 @@ export async function getSlotReportViewData(
   if (!slot) return null
 
   const observations = observationsResult.data
-  const members = membersResult.data
+  const members = (membersResult.data ?? []) as unknown as MemberRow[]
+  const attendance = attendanceResult.data as AttendanceRow[] | null
   const incidents = incidentsResult.data
   const round = slot.survey_rounds as unknown as { name: string }
-  const activeMemberIds = new Set((members || []).map((member) => member.user_id))
+  const activeMemberIds = new Set(members.map((member) => member.user_id))
   const isParticipant = activeMemberIds.has(currentUserId)
+  const isAdmin = profileResult.data?.role === 'ADMIN'
   const visibleObservations = (observations || []).filter(
     (observation) => observation.status === 'SUBMITTED' || isParticipant
   )
@@ -139,7 +232,7 @@ export async function getSlotReportViewData(
       roundName: round.name,
     },
     observations: visibleObservations.map(obs => { // TODO: Currently, we select a random primary member, to fix in issue #105
-      const primaryMember = (members || [])[0]
+      const primaryMember = members[0]
       return {
       id: obs.id,
       userId: primaryMember?.user_id || '',
@@ -166,11 +259,7 @@ export async function getSlotReportViewData(
       media: obs.media,
     }
     })[0],
-    members: (members || []).map(m => ({
-      userId: m.user_id,
-      fullName: m.profiles.full_name,
-      email: m.profiles.email,
-    })),
+    members: mergeMembers(members, attendance),
     incidents: (incidents || []).map(inc => ({
       id: inc.id,
       type: inc.incident_type,
@@ -186,6 +275,8 @@ export async function getSlotReportViewData(
       })),
     })),
     isParticipant,
+    isAdmin,
+    canMarkAttendance: isAdmin || (isParticipant && hasWalkStarted(slot.walk_date, slot.start_time)),
     hasSubmittedOwnObservation,
   }
 }

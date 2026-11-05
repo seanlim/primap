@@ -21,6 +21,9 @@ function makeViewExportData(): ViewExportData {
       maxVolunteers: 8,
       joinedVolunteers: 5,
       cancelledVolunteers: 1,
+      attendancePresent: 4,
+      attendanceAbsent: 1,
+      attendanceUnrecorded: 0,
       observationCount: 4,
       sightingCount: 2,
       incidentCount: 1,
@@ -99,6 +102,17 @@ function makeViewExportData(): ViewExportData {
       exifDatetime: '',
       createdAt: '2026-03-14T08:10:00Z',
     }],
+    attendanceRows: [{
+      roundName: 'Round 1',
+      walkDate: '2026-03-14',
+      location: 'Pasir Ris Park',
+      volunteerName: 'Tan Wei Ming',
+      volunteerEmail: 'volunteer@example.com',
+      attendance: 'PRESENT',
+      markedByName: 'Tan Wei Ming',
+      markedByEmail: 'volunteer@example.com',
+      markedAt: '2026-03-14T09:20:00Z',
+    }],
     mediaManifest: [],
   }
 }
@@ -112,6 +126,7 @@ describe('buildViewExportWorkbook', () => {
       'Observations',
       'Sightings',
       'Incidents',
+      'Attendance',
     ])
   })
 

@@ -18,8 +18,8 @@ import {
 
 describe('constants', () => {
   describe('TABLE_ORDER', () => {
-    it('contains all 9 tables', () => {
-      expect(TABLE_ORDER).toHaveLength(9)
+    it('contains all 10 tables', () => {
+      expect(TABLE_ORDER).toHaveLength(10)
     })
 
     it('lists tables in FK-dependency order (parents before children)', () => {
@@ -49,7 +49,7 @@ describe('constants', () => {
 
     it('includes all expected table names', () => {
       const expected = [
-        'profiles', 'survey_rounds', 'walk_slots', 'slot_memberships',
+        'profiles', 'survey_rounds', 'walk_slots', 'slot_memberships', 'slot_attendance',
         'observations', 'sightings', 'media', 'incidents', 'app_settings',
       ]
       expect([...TABLE_ORDER]).toEqual(expect.arrayContaining(expected))

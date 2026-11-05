@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowLeft, CheckCircle, Gauge, Footprints, Users } from 'lucide-react'
+import { ArrowLeft, CheckCircle, Gauge, Footprints, Users, UserCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getAdminRoundsAnalyticsPageSnapshot, type SupabaseClientLike } from '@/lib/admin-volunteer-analytics'
 import DonutMetricCard from '../../../../../components/ui/DonutMetricCard'
@@ -125,6 +125,20 @@ export default async function AdminRoundsAnalyticsPage({
                   trackColor="#fed7aa"
                   iconBgColor="#fff7ed"
                   iconColor="#c2410c"
+                />
+                <DonutMetricCard
+                  title="Attendance Rate"
+                  value={formatPercent(analytics.overview.attendanceRate)}
+                  numerator={analytics.overview.attendancePresent}
+                  denominator={analytics.overview.attendancePresent + analytics.overview.attendanceAbsent}
+                  numeratorLabel="present"
+                  denominatorLabel="recorded attendance"
+                  progress={analytics.overview.attendanceRate}
+                  icon={UserCheck}
+                  ringColor="#7e22ce"
+                  trackColor="#e9d5ff"
+                  iconBgColor="#faf5ff"
+                  iconColor="#9333ea"
                 />
               </div>
 

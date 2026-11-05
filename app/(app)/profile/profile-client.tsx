@@ -27,6 +27,7 @@ interface Props {
   }
   stats: {
     walksJoined: number
+    walksAttended?: number
     reportsSubmitted: number
     draftsPending: number
     requiredWalks: number
@@ -48,6 +49,7 @@ interface Props {
     startTime: string
     roundName: string
     reportStatus: string
+    attendance: 'PRESENT' | 'ABSENT' | null
     sightingCount: number
   }[]
 }
@@ -352,6 +354,14 @@ export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: 
                 <p className="text-[11px] text-gray-400">This round</p>
               </div>
             </div>
+            <div className="flex items-center gap-3 bg-purple-50 rounded-xl p-3">
+              <Check className="w-4 h-4 text-purple-600 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-purple-700">{stats.walksAttended ?? 0}</p>
+                <p className="text-xs text-gray-500">Walks Attended</p>
+                <p className="text-[11px] text-gray-400">This round</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -439,6 +449,19 @@ export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: 
                             <Calendar className="w-3 h-3 text-gray-400" />
                             <p className="text-xs text-gray-500">{formatDate(walk.walkDate, 'compact')}</p>
                           </div>
+                          <p className={`text-[11px] mt-0.5 ${
+                            walk.attendance === 'PRESENT'
+                              ? 'text-green-600'
+                              : walk.attendance === 'ABSENT'
+                                ? 'text-red-500'
+                                : 'text-gray-400'
+                          }`}>
+                            {walk.attendance === 'PRESENT'
+                              ? 'Attended'
+                              : walk.attendance === 'ABSENT'
+                                ? 'Absent'
+                                : 'Attendance not recorded'}
+                          </p>
                         </div>
                         <div className="text-right shrink-0 ml-2">
                           <span className={`text-xs font-medium ${

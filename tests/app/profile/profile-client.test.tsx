@@ -54,7 +54,7 @@ describe('ProfileClient', () => {
     expect(screen.getByText('My Sighting Map')).toBeInTheDocument()
     expect(screen.getByText('2 report coordinates plotted from your submitted reports.')).toBeInTheDocument()
     expect(screen.getByText('Walks Joined')).toBeInTheDocument()
-    expect(screen.getAllByText('This round')).toHaveLength(3)
+    expect(screen.getAllByText('This round')).toHaveLength(4)
     expect(mockMapView).toHaveBeenCalledWith(
       expect.objectContaining({
         markers: [

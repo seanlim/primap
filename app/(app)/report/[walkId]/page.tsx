@@ -29,6 +29,7 @@ export default async function WalkReportPage({
       incidents={viewData.incidents}
       currentUserId={user.id}
       canReportIncident={viewData.isParticipant}
+      canMarkAttendance={viewData.canMarkAttendance}
     />
   )
 }

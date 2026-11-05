@@ -102,6 +102,14 @@ describe('getSlotReportViewData', () => {
           return createOrderedQueryResult([])
         }
 
+        if (table === 'slot_attendance') {
+          return createMembershipQueryResult([])
+        }
+
+        if (table === 'profiles') {
+          return createSingleQueryResult({ role: 'VOLUNTEER' })
+        }
+
         throw new Error(`Unexpected table: ${table}`)
       },
     })
@@ -169,6 +177,20 @@ describe('getSlotReportViewData', () => {
           ])
         }
 
+        if (table === 'slot_attendance') {
+          return createMembershipQueryResult([
+            {
+              user_id: 'user-self',
+              status: 'PRESENT',
+              marked_at: '2026-04-12T05:00:00Z',
+            },
+          ])
+        }
+
+        if (table === 'profiles') {
+          return createSingleQueryResult({ role: 'VOLUNTEER' })
+        }
+
         if (table === 'incidents') {
           return createOrderedQueryResult([
             {
@@ -214,8 +236,12 @@ describe('getSlotReportViewData', () => {
         userId: 'user-self',
         fullName: null,
         email: 'self@example.com',
+        attendance: 'PRESENT',
+        attendanceMarkedAt: '2026-04-12T05:00:00Z',
       },
     ])
+    expect(result?.isAdmin).toBe(false)
+    expect(result?.canMarkAttendance).toBe(true)
     expect(result?.incidents).toEqual([
       {
         id: 'incident-1',
@@ -256,6 +282,14 @@ describe('getSlotReportViewData', () => {
 
         if (table === 'slot_memberships') {
           return createMembershipQueryResult([])
+        }
+
+        if (table === 'slot_attendance') {
+          return createMembershipQueryResult([])
+        }
+
+        if (table === 'profiles') {
+          return createSingleQueryResult(null)
         }
 
         if (table === 'incidents') {

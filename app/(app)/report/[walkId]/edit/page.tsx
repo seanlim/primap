@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import { ObservationFormClient } from './observation-form-client'
+import { getSlotMembersWithAttendance } from '@/lib/report-slot-data'
+import { hasWalkStarted } from '@/lib/utils/walk-participation'
 import { DEFAULT_MAX_MEDIA_PER_REPORT } from '@/lib/constants/settings'
 
 export const dynamic = 'force-dynamic'
@@ -55,8 +57,14 @@ export default async function EditReportPage({
     redirect(`/report/${walkId}`)
   }
 
+  const attendanceData = await getSlotMembersWithAttendance(supabase, walkId, user.id)
+  const canMarkAttendance = attendanceData.isAdmin
+    || (attendanceData.isParticipant && hasWalkStarted(walk.walk_date, walk.start_time))
+
   return (
     <ObservationFormClient
+      members={attendanceData.members}
+      canMarkAttendance={canMarkAttendance}
       slot={{
         id: walk.id,
         locationName: walk.location_name,

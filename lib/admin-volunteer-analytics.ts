@@ -61,6 +61,12 @@ export interface AnalyticsObservation {
   lng?: number | null
 }
 
+export interface AnalyticsAttendance {
+  slot_id: string
+  user_id: string
+  status: 'PRESENT' | 'ABSENT'
+}
+
 export interface AnalyticsReportMapPoint {
   lat: number
   lng: number
@@ -93,6 +99,10 @@ export interface AnalyticsOverviewMetrics {
   completedWalks: number
   upcomingWalks: number
   missingReportWalks: number
+  attendancePresent: number
+  attendanceAbsent: number
+  attendanceUnrecorded: number
+  attendanceRate: number
 }
 
 export interface VolunteerAnalyticsLandingSnapshot {
@@ -129,6 +139,10 @@ export interface AdminWalksAnalyticsPageSnapshot {
     walkSignUps: number
     totalVolunteerCapacity: number
     cancellations: number
+    attendancePresent: number
+    attendanceAbsent: number
+    attendanceUnrecorded: number
+    attendanceRate: number
   } | null
   reportMapPoints: AnalyticsReportMapPoint[]
 }
@@ -171,11 +185,24 @@ function buildMetrics(input: {
   slots: AnalyticsWalkSlot[]
   memberships: AnalyticsMembership[]
   observations: AnalyticsObservation[]
+  attendance?: AnalyticsAttendance[]
   now: Date
 }): AnalyticsOverviewMetrics {
   const activeMemberships = input.memberships.filter((membership) => membership.status === 'ACTIVE')
   const cancelledMemberships = input.memberships.filter((membership) => membership.status === 'CANCELLED')
   const submittedObservations = input.observations.filter((observation) => observation.status === 'SUBMITTED')
+
+  // Only count attendance for people who are actually in the slot, so stale
+  // rows for a volunteer removed by an admin do not skew the rate.
+  const activeMembershipKeys = new Set(
+    activeMemberships.map((membership) => `${membership.slot_id}:${membership.user_id}`)
+  )
+  const attendance = (input.attendance ?? []).filter((row) =>
+    activeMembershipKeys.has(`${row.slot_id}:${row.user_id}`)
+  )
+  const attendancePresent = attendance.filter((row) => row.status === 'PRESENT').length
+  const attendanceAbsent = attendance.filter((row) => row.status === 'ABSENT').length
+  const recordedAttendance = attendancePresent + attendanceAbsent
 
   const endedSlotIds = new Set(
     input.slots
@@ -225,6 +252,10 @@ function buildMetrics(input: {
     completedWalks: endedSlotIds.size,
     upcomingWalks: input.slots.length - endedSlotIds.size,
     missingReportWalks,
+    attendancePresent,
+    attendanceAbsent,
+    attendanceUnrecorded: Math.max(0, activeMemberships.length - recordedAttendance),
+    attendanceRate: recordedAttendance === 0 ? 0 : attendancePresent / recordedAttendance,
   }
 }
 
@@ -234,6 +265,7 @@ export function buildVolunteerAnalyticsSnapshot(input: {
   slots: AnalyticsWalkSlot[]
   memberships: AnalyticsMembership[]
   observations: AnalyticsObservation[]
+  attendance?: AnalyticsAttendance[]
   allTime: AnalyticsAllTimeTotals
   now?: Date
 }): VolunteerRoundAnalyticsSnapshot {
@@ -241,6 +273,7 @@ export function buildVolunteerAnalyticsSnapshot(input: {
     slots: input.slots,
     memberships: input.memberships,
     observations: input.observations,
+    attendance: input.attendance,
     now: input.now ?? new Date(),
   })
 
@@ -267,7 +300,7 @@ export function buildVolunteerAnalyticsSnapshot(input: {
 }
 
 async function getAnalyticsBaseData(supabase: SupabaseClientLike) {
-  const [roundsResult, slotsResult, membershipsResult, observationsResult, activeVolunteersCountResult] = await Promise.all([
+  const [roundsResult, slotsResult, membershipsResult, observationsResult, attendanceResult, activeVolunteersCountResult] = await Promise.all([
     supabase
       .from('survey_rounds')
       .select('id, name, start_date, end_date, status')
@@ -283,6 +316,9 @@ async function getAnalyticsBaseData(supabase: SupabaseClientLike) {
       .from('observations')
       .select('id, slot_id, status, outcome, lat, lng') as SupabaseQueryLike<AnalyticsObservation[]>,
     supabase
+      .from('slot_attendance')
+      .select('slot_id, user_id, status') as SupabaseQueryLike<AnalyticsAttendance[]>,
+    supabase
       .from('profiles')
       .select('id', { count: 'exact', head: true })
       .eq('role', 'VOLUNTEER')
@@ -294,6 +330,7 @@ async function getAnalyticsBaseData(supabase: SupabaseClientLike) {
     slots: slotsResult.data ?? [],
     memberships: membershipsResult.data ?? [],
     observations: observationsResult.data ?? [],
+    attendance: attendanceResult.data ?? [],
     activeRegisteredVolunteers: activeVolunteersCountResult.count ?? 0,
   }
 }
@@ -348,6 +385,7 @@ export async function getAdminWalksAnalyticsPageSnapshotByRound(
     slots: [targetWalk],
     memberships: targetMemberships,
     observations: targetObservations,
+    attendance: base.attendance.filter((row) => row.slot_id === targetWalk.id),
     now: options?.now ?? new Date(),
   })
 
@@ -386,6 +424,10 @@ export async function getAdminWalksAnalyticsPageSnapshotByRound(
       walkSignUps: metrics.walkSignUps,
       totalVolunteerCapacity: metrics.totalVolunteerCapacity,
       cancellations: metrics.walkCancellations,
+      attendancePresent: metrics.attendancePresent,
+      attendanceAbsent: metrics.attendanceAbsent,
+      attendanceUnrecorded: metrics.attendanceUnrecorded,
+      attendanceRate: metrics.attendanceRate,
     },
     reportMapPoints,
   }
@@ -567,6 +609,7 @@ export async function getAdminVolunteerAnalyticsLanding(
   const roundSlotIds = new Set(roundSlots.map((slot) => slot.id))
   const roundMemberships = base.memberships.filter((membership) => roundSlotIds.has(membership.slot_id))
   const roundObservations = base.observations.filter((observation) => roundSlotIds.has(observation.slot_id))
+  const roundAttendance = base.attendance.filter((row) => roundSlotIds.has(row.slot_id))
   const slotsById = new Map(roundSlots.map((slot) => [slot.id, slot]))
 
   return {
@@ -575,6 +618,7 @@ export async function getAdminVolunteerAnalyticsLanding(
       slots: roundSlots,
       memberships: roundMemberships,
       observations: roundObservations,
+      attendance: roundAttendance,
       now,
     }),
     reportMapPoints: await getReportMapPoints(supabase, roundObservations, slotsById, roundNameById),
@@ -607,6 +651,7 @@ export async function getAdminRoundsAnalyticsPageSnapshot(
   const roundSlotIds = new Set(roundSlots.map((slot) => slot.id))
   const roundMemberships = base.memberships.filter((membership) => roundSlotIds.has(membership.slot_id))
   const roundObservations = base.observations.filter((observation) => roundSlotIds.has(observation.slot_id))
+  const roundAttendance = base.attendance.filter((row) => roundSlotIds.has(row.slot_id))
 
   return {
     availableRounds: base.rounds,
@@ -615,6 +660,7 @@ export async function getAdminRoundsAnalyticsPageSnapshot(
       slots: roundSlots,
       memberships: roundMemberships,
       observations: roundObservations,
+      attendance: roundAttendance,
       now: options?.now ?? new Date(),
     }),
     reportMapPoints: await getReportMapPoints(supabase, roundObservations, roundSlotsById, roundNameById),

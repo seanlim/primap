@@ -29,6 +29,7 @@ export default async function AdminWalkReportPage({
       backHref="/admin/reports"
       backLabel="Back to Admin Reports"
       canReportIncident={viewData.isParticipant}
+      canMarkAttendance={viewData.canMarkAttendance}
     />
   )
 }

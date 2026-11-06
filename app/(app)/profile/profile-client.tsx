@@ -21,6 +21,7 @@ interface Props {
     avatarUrl: string | null
     phoneNumber: string | null
     phoneVerifiedAt: string | null
+    birthMonth: string | null
     role: string
     status: string
     createdAt: string
@@ -95,18 +96,23 @@ export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: 
   const [editingContact, setEditingContact] = useState(false)
   const [name, setName] = useState(profile.fullName || '')
   const [phone, setPhone] = useState(profile.phoneNumber || '')
+  const [birthMonth, setBirthMonth] = useState(profile.birthMonth?.slice(0, 7) || '')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [phoneError, setPhoneError] = useState('')
+  const [birthMonthError, setBirthMonthError] = useState('')
   const router = useRouter()
 
   const phoneMissing = !profile.phoneNumber?.trim()
+  const birthMonthMissing = profile.role === 'VOLUNTEER' && !profile.birthMonth
 
   const startEditingContact = () => {
     setName(profile.fullName || '')
     setPhone(profile.phoneNumber || '')
+    setBirthMonth(profile.birthMonth?.slice(0, 7) || '')
     setSaveError('')
     setPhoneError('')
+    setBirthMonthError('')
     setEditingContact(true)
   }
 
@@ -114,17 +120,20 @@ export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: 
     setEditingContact(false)
     setSaveError('')
     setPhoneError('')
+    setBirthMonthError('')
   }
 
   const handleSaveContact = async () => {
     setSaving(true)
     setSaveError('')
     setPhoneError('')
-    const result = await updateProfile({ fullName: name, phoneNumber: phone })
+    setBirthMonthError('')
+    const result = await updateProfile({ fullName: name, phoneNumber: phone, birthMonth })
     setSaving(false)
     if (result.error) {
       setSaveError(result.error)
       setPhoneError(result.fieldErrors?.phoneNumber || '')
+      setBirthMonthError(result.fieldErrors?.birthMonth || '')
       return
     }
     setEditingContact(false)
@@ -207,6 +216,26 @@ export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: 
         </div>
       )}
 
+      {birthMonthMissing && (
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-amber-800">Add your birth month and year to join walks</p>
+            <p className="text-sm text-amber-700">
+              Only month and year are collected to determine whether a survey round needs guardian details.
+            </p>
+            {!editingContact && (
+              <button
+                onClick={startEditingContact}
+                className="text-sm font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900"
+              >
+                Add birth month and year
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Contact Details */}
       <div className="bg-white rounded-2xl p-5 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
@@ -272,7 +301,38 @@ export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: 
               )}
             </div>
 
-            {saveError && !phoneError && (
+            {profile.role === 'VOLUNTEER' && <div>
+              <label htmlFor="profile-birth-month" className="mb-1 block text-sm font-medium text-gray-700">
+                Birth month and year
+              </label>
+              <input
+                id="profile-birth-month"
+                type="month"
+                value={birthMonth}
+                onChange={(e) => {
+                  setBirthMonth(e.target.value)
+                  setBirthMonthError('')
+                  setSaveError('')
+                }}
+                max={new Date().toISOString().slice(0, 7)}
+                className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 ${
+                  birthMonthError
+                    ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
+                    : 'border-gray-300 focus:border-green-500 focus:ring-green-100'
+                }`}
+                aria-invalid={Boolean(birthMonthError)}
+                aria-describedby={birthMonthError ? 'profile-birth-month-error' : 'profile-birth-month-help'}
+              />
+              {birthMonthError ? (
+                <p id="profile-birth-month-error" className="mt-1 text-xs text-red-600">{birthMonthError}</p>
+              ) : (
+                <p id="profile-birth-month-help" className="mt-1 text-xs text-gray-400">
+                  We use month and year only to determine round participation requirements.
+                </p>
+              )}
+            </div>}
+
+            {saveError && !phoneError && !birthMonthError && (
               <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{saveError}</p>
             )}
 
@@ -310,6 +370,14 @@ export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: 
                 )}
               </dd>
             </div>
+            {profile.role === 'VOLUNTEER' && <div>
+              <dt className="text-xs text-gray-400">Birth month and year</dt>
+              <dd className={`mt-0.5 font-medium ${profile.birthMonth ? 'text-gray-900' : 'text-amber-600'}`}>
+                {profile.birthMonth
+                  ? new Date(`${profile.birthMonth.slice(0, 7)}-01T00:00:00`).toLocaleDateString('en-SG', { month: 'long', year: 'numeric' })
+                  : 'Not set'}
+              </dd>
+            </div>}
           </dl>
         )}
       </div>

@@ -17,6 +17,7 @@ import {
   sendRoleDemotedEmail,
   sendWalkCancellationEmail,
   sendWalkReminderEmail,
+  sendGuardianWalkReminderEmail,
   sendWalkParticipantUpdateEmail,
   sendIncidentReportedEmail,
 } from '@/lib/email'
@@ -517,6 +518,39 @@ describe('email utilities', () => {
       const call = mockSend.mock.calls[0][0]
       expect(call.html).toContain('Current participant roster')
       expect(call.html).toContain('charlie@example.com')
+    })
+  })
+
+  describe('sendGuardianWalkReminderEmail', () => {
+    it('reminds the guardian without including the volunteer roster', async () => {
+      await sendGuardianWalkReminderEmail(
+        'guardian@example.com',
+        'Pat Guardian',
+        ['Charlie'],
+        { date: '2025-07-02', time: '08:00', location: 'MacRitchie' }
+      )
+
+      const call = mockSend.mock.calls[0][0]
+      expect(call.to).toBe('guardian@example.com')
+      expect(call.subject).toBe('Reminder: Upcoming Survey Walk')
+      expect(call.html).toContain('Hi Pat Guardian')
+      expect(call.html).toContain('Charlie is scheduled')
+      expect(call.html).toContain('Please accompany the volunteer')
+      expect(call.html).not.toContain('Current participant roster')
+      expect(call.html).not.toContain('charlie@example.com')
+    })
+
+    it('escapes guardian and volunteer names', async () => {
+      await sendGuardianWalkReminderEmail(
+        'guardian@example.com',
+        '<Pat>',
+        ['<Charlie & Alex>'],
+        { date: '2025-07-02', time: '08:00', location: 'MacRitchie' }
+      )
+
+      const call = mockSend.mock.calls[0][0]
+      expect(call.html).toContain('&lt;Pat&gt;')
+      expect(call.html).toContain('&lt;Charlie &amp; Alex&gt;')
     })
   })
 

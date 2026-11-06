@@ -31,6 +31,7 @@ function renderWalkDetail(overrides: Partial<ComponentProps<typeof WalkDetailCli
     <WalkDetailClient
       walk={{
         id: 'slot-1',
+        roundId: 'round-1',
         locationName: 'Bukit Timah',
         walkDate: '2099-04-15',
         startTime: '08:00',
@@ -38,6 +39,7 @@ function renderWalkDetail(overrides: Partial<ComponentProps<typeof WalkDetailCli
         maxVolunteers: 3,
         notes: null,
         roundName: 'Round A',
+        minorWorkshopRequired: false,
         joinBlockedInfo: null,
       }}
       members={[]}
@@ -257,6 +259,7 @@ describe('WalkDetailClient', () => {
     renderWalkDetail({
       walk: {
         id: 'slot-1',
+        roundId: 'round-1',
         locationName: 'Bukit Timah',
         walkDate: '2099-04-15',
         startTime: '08:00',
@@ -264,6 +267,7 @@ describe('WalkDetailClient', () => {
         maxVolunteers: 3,
         notes: null,
         roundName: 'Round A',
+        minorWorkshopRequired: false,
         joinBlockedInfo: {
           label: 'Round Closed',
           description: 'This survey round is no longer open for volunteer signup.',

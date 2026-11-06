@@ -234,6 +234,31 @@ export async function sendWalkReminderEmail(
   `));
 }
 
+export async function sendGuardianWalkReminderEmail(
+  email: string,
+  guardianName: string | null,
+  volunteerNames: string[],
+  slotInfo: WalkEmailSlotInfo
+) {
+  const guardianDisplayName = escapeHtml(guardianName || 'Guardian')
+  const volunteerList = volunteerNames.map(name => `<li>${escapeHtml(name)}</li>`).join('')
+  const volunteers = volunteerNames.length === 1
+    ? `<p>This is a reminder that ${escapeHtml(volunteerNames[0])} is scheduled for a survey walk.</p>`
+    : `<p>This is a reminder that these volunteers are scheduled for a survey walk:</p><ul>${volunteerList}</ul>`
+
+  await sendEmail(email, 'Reminder: Upcoming Survey Walk', wrapHtml(`
+    <p>Hi ${guardianDisplayName},</p>
+    ${volunteers}
+    <div style="background-color: #f0fdf4; padding: 15px; border-radius: 5px; margin: 15px 0; border: 1px solid #bbf7d0;">
+      <p><strong>Date:</strong> ${escapeHtml(slotInfo.date)}</p>
+      <p><strong>Time:</strong> ${escapeHtml(slotInfo.time)}</p>
+      <p><strong>Location:</strong> ${escapeHtml(slotInfo.location)}</p>
+    </div>
+    <p>Please accompany the volunteer(s) for this walk. If plans change, contact the survey organiser.</p>
+    <a href="${APP_URL()}/walk" class="button">View Walk Details</a>
+  `))
+}
+
 export async function sendWalkParticipantUpdateEmail(
   recipients: string[],
   slotInfo: WalkEmailSlotInfo,

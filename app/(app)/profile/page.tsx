@@ -238,6 +238,7 @@ export default async function ProfilePage() {
         avatarUrl: profile.avatar_url,
         phoneNumber: profile.phone_number,
         phoneVerifiedAt: profile.phone_verified_at,
+        birthMonth: profile.birth_month,
         role: profile.role,
         status: profile.status,
         createdAt: profile.created_at,

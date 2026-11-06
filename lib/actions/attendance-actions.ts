@@ -3,10 +3,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import type { AttendanceStatus } from '@/lib/types/supabase-helpers'
+import { isMinorAtRoundStart } from '@/lib/utils/minor-status'
 
 export interface AttendanceEntry {
   userId: string
-  status: AttendanceStatus
+  status?: AttendanceStatus
+  guardianPresent?: boolean | null
 }
 
 const MAX_ATTENDANCE_ENTRIES = 100
@@ -31,12 +33,22 @@ export async function saveSlotAttendance(slotId: string, entries: AttendanceEntr
     return { error: 'Too many attendance entries.' }
   }
 
-  const normalized = new Map<string, AttendanceStatus>()
+  const normalized = new Map<string, AttendanceEntry>()
   for (const entry of entries) {
-    if (!entry?.userId || (entry.status !== 'PRESENT' && entry.status !== 'ABSENT')) {
+    const hasStatus = entry?.status === 'PRESENT' || entry?.status === 'ABSENT'
+    const hasGuardianPresence = Object.prototype.hasOwnProperty.call(entry ?? {}, 'guardianPresent')
+    if (!entry?.userId
+      || (entry.status !== undefined && !hasStatus)
+      || (hasGuardianPresence && entry.guardianPresent !== null && typeof entry.guardianPresent !== 'boolean')
+      || (!hasStatus && !hasGuardianPresence)
+    ) {
       return { error: 'Invalid attendance entry.' }
     }
-    normalized.set(entry.userId, entry.status)
+    normalized.set(entry.userId, {
+      userId: entry.userId,
+      ...(hasStatus ? { status: entry.status as AttendanceStatus } : {}),
+      ...(hasGuardianPresence ? { guardianPresent: entry.guardianPresent } : {}),
+    })
   }
 
   // Permission check up front so volunteers get a readable error instead of a
@@ -75,17 +87,57 @@ export async function saveSlotAttendance(slotId: string, entries: AttendanceEntr
     return { error: 'Some volunteers are no longer part of this walk. Refresh and try again.' }
   }
 
+  const entriesWithGuardianPresence = [...normalized.values()].filter(entry =>
+    Object.prototype.hasOwnProperty.call(entry, 'guardianPresent') && entry.guardianPresent !== null
+  )
+  if (entriesWithGuardianPresence.length > 0) {
+    const [{ data: slot }, { data: targetProfiles, error: profileError }] = await Promise.all([
+      supabase
+        .from('walk_slots')
+        .select('survey_rounds(start_date)')
+        .eq('id', slotId)
+        .single(),
+      supabase
+        .from('profiles')
+        .select('id, birth_month')
+        .in('id', entriesWithGuardianPresence.map(entry => entry.userId)),
+    ])
+    if (profileError) return { error: profileError.message }
+    const round = slot?.survey_rounds as unknown as { start_date: string } | null
+    const birthMonths = new Map((targetProfiles ?? []).map(profile => [profile.id, profile.birth_month]))
+    if (!round || entriesWithGuardianPresence.some(entry =>
+      !isMinorAtRoundStart(birthMonths.get(entry.userId), round.start_date)
+    )) {
+      return { error: 'Guardian attendance can only be recorded for minor volunteers.' }
+    }
+  }
+
+  const { data: existingAttendance, error: existingAttendanceError } = await supabase
+    .from('slot_attendance')
+    .select('user_id, status, guardian_present')
+    .eq('slot_id', slotId)
+    .in('user_id', targetUserIds)
+  if (existingAttendanceError) return { error: existingAttendanceError.message }
+  const existingByUserId = new Map((existingAttendance ?? []).map(row => [row.user_id, row]))
+
   const markedAt = new Date().toISOString()
   const { error } = await supabase
     .from('slot_attendance')
     .upsert(
-      targetUserIds.map(userId => ({
-        slot_id: slotId,
-        user_id: userId,
-        status: normalized.get(userId) as AttendanceStatus,
-        marked_by: user.id,
-        marked_at: markedAt,
-      })),
+      targetUserIds.map(userId => {
+        const entry = normalized.get(userId)!
+        const existing = existingByUserId.get(userId)
+        return {
+          slot_id: slotId,
+          user_id: userId,
+          status: entry.status ?? existing?.status ?? 'PRESENT',
+          guardian_present: Object.prototype.hasOwnProperty.call(entry, 'guardianPresent')
+            ? entry.guardianPresent
+            : existing?.guardian_present ?? null,
+          marked_by: user.id,
+          marked_at: markedAt,
+        }
+      }),
       { onConflict: 'slot_id,user_id' }
     )
 

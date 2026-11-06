@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import {
   sendWalkCancellationEmail,
@@ -11,6 +12,7 @@ import { getJoinBlockInfo, hasWalkStarted } from '@/lib/utils/walk-participation
 import { hasPhone } from '@/lib/utils/phone'
 import { OBSERVATION_MEDIA_BUCKET } from '@/lib/utils/storage'
 import { isLateCancellationActive } from '@/lib/utils/reminder-schedule'
+import { isMinorAtRoundStart } from '@/lib/utils/minor-status'
 
 interface ActiveParticipantRow {
   user_id: string
@@ -47,7 +49,7 @@ export async function joinWalk(walkId: string) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('phone_number')
+    .select('phone_number, birth_month, role')
     .eq('id', user.id)
     .single()
 
@@ -58,13 +60,26 @@ export async function joinWalk(walkId: string) {
     }
   }
 
+  if (profile?.role === 'VOLUNTEER' && !profile.birth_month) {
+    return {
+      error: 'Add your birth month and year to your profile before joining a walk.',
+      code: 'BIRTH_MONTH_REQUIRED' as const,
+    }
+  }
+
   interface JoinSlotQueryRow {
     location_name: string
     reminder_sent_at: string | null
     walk_date: string
     start_time: string
     max_volunteers: number
-    survey_rounds: { status?: string } | null
+    round_id: string
+    survey_rounds: {
+      id: string
+      status?: string
+      start_date: string
+      minor_workshop_required: boolean
+    } | null
     slot_memberships: Array<{ user_id: string; status: string }>
   }
 
@@ -76,7 +91,8 @@ export async function joinWalk(walkId: string) {
       walk_date,
       start_time,
       max_volunteers,
-      survey_rounds (status),
+      round_id,
+      survey_rounds (id, status, start_date, minor_workshop_required),
       slot_memberships (user_id, status)
     `)
     .eq('id', walkId)
@@ -101,6 +117,32 @@ export async function joinWalk(walkId: string) {
   if (alreadyJoined) return { error: 'You have already joined this walk.' }
   if (joinBlock?.label === 'Walk Full') return { error: joinBlock.description }
 
+  if (profile?.role === 'VOLUNTEER' && isMinorAtRoundStart(profile.birth_month, round?.start_date)) {
+    const admin = createAdminClient()
+    const { data: requirements } = await admin
+      .from('round_participation_requirements')
+      .select('guardian_name, guardian_email, guardian_accompaniment_acknowledged_at, guardian_workshop_attended_at')
+      .eq('user_id', user.id)
+      .eq('round_id', slot.round_id)
+      .maybeSingle()
+
+    if (!requirements?.guardian_name?.trim()
+      || !requirements.guardian_email?.trim()
+      || !requirements.guardian_accompaniment_acknowledged_at
+    ) {
+      return {
+        error: 'Add your guardian details for this survey round before joining a walk.',
+        code: 'GUARDIAN_DETAILS_REQUIRED' as const,
+      }
+    }
+    if (round?.minor_workshop_required && !requirements.guardian_workshop_attended_at) {
+      return {
+        error: 'Your admin must confirm guardian workshop attendance before you can join a walk.',
+        code: 'GUARDIAN_WORKSHOP_REQUIRED' as const,
+      }
+    }
+  }
+
   // The RPC remains the atomic source of truth for membership + draft-observation
   // creation/reactivation. These prechecks only keep the volunteer UX and server
   // action aligned before we hand off to the database boundary.
@@ -112,7 +154,10 @@ export async function joinWalk(walkId: string) {
   if (error) return { error: error.message }
 
   const result = data as { success?: boolean; error?: string }
-  if (result.error) return { error: result.error }
+  if (result.error) {
+    const code = (data as { code?: string }).code
+    return { error: result.error, ...(code ? { code } : {}) }
+  }
 
   const warnings: string[] = []
 

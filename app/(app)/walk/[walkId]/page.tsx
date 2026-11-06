@@ -3,6 +3,8 @@ import { redirect, notFound } from 'next/navigation'
 import { WalkDetailClient } from './walk-detail-client'
 import type { MembershipWithProfile } from '@/lib/types/supabase-helpers'
 import { getJoinBlockInfo, getWalkStartDateTime } from '@/lib/utils/walk-participation'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { isMinorAtRoundStart } from '@/lib/utils/minor-status'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,7 +29,7 @@ export default async function WalkDetailPage({
       .from('walk_slots')
       .select(`
         *,
-        survey_rounds (name, status),
+        survey_rounds (id, name, status, start_date, minor_workshop_required),
         slot_memberships (
           id,
           user_id,
@@ -41,14 +43,30 @@ export default async function WalkDetailPage({
     ownObservationQuery,
     supabase
       .from('profiles')
-      .select('phone_number')
+      .select('phone_number, birth_month, role')
       .eq('id', user.id)
       .single(),
   ])
 
   if (!walk) notFound()
 
-  const round = walk.survey_rounds as unknown as { name: string; status: string }
+  const round = walk.survey_rounds as unknown as {
+    id: string
+    name: string
+    status: string
+    start_date: string
+    minor_workshop_required: boolean
+  }
+  const isMinor = profile?.role === 'VOLUNTEER'
+    && isMinorAtRoundStart(profile.birth_month, round?.start_date)
+  const guardianRequirement = isMinor
+    ? await createAdminClient()
+        .from('round_participation_requirements')
+        .select('guardian_name, guardian_email, guardian_phone_number, guardian_accompaniment_acknowledged_at, guardian_workshop_attended_at')
+        .eq('user_id', user.id)
+        .eq('round_id', round.id)
+        .maybeSingle()
+    : { data: null, error: null }
   const memberships = (walk.slot_memberships as unknown as MembershipWithProfile[])
     .filter(m => m.status === 'ACTIVE')
 
@@ -70,6 +88,7 @@ export default async function WalkDetailPage({
     <WalkDetailClient
       walk={{
         id: walk.id,
+        roundId: round.id,
         locationName: walk.location_name,
         walkDate: walk.walk_date,
         startTime: walk.start_time,
@@ -77,6 +96,7 @@ export default async function WalkDetailPage({
         maxVolunteers: walk.max_volunteers,
         notes: null,
         roundName: round?.name || '',
+        minorWorkshopRequired: round?.minor_workshop_required ?? false,
         joinBlockedInfo,
       }}
       members={memberships.map(m => ({
@@ -90,6 +110,15 @@ export default async function WalkDetailPage({
       currentUserId={user.id}
       hasSubmittedReport={hasSubmittedReport}
       missingPhone={!profile?.phone_number?.trim()}
+      missingBirthMonth={profile?.role === 'VOLUNTEER' && !profile.birth_month}
+      isMinor={isMinor}
+      guardianDetails={guardianRequirement.data ? {
+        guardianName: guardianRequirement.data.guardian_name || '',
+        guardianEmail: guardianRequirement.data.guardian_email || '',
+        guardianPhone: guardianRequirement.data.guardian_phone_number || '',
+        accompanimentAcknowledged: Boolean(guardianRequirement.data.guardian_accompaniment_acknowledged_at),
+        workshopAttended: Boolean(guardianRequirement.data.guardian_workshop_attended_at),
+      } : null}
     />
   )
 }

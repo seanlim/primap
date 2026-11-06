@@ -1,6 +1,6 @@
 import { revalidatePath } from 'next/cache'
 
-const { mockSupabase, methods } = vi.hoisted(() => {
+const { mockSupabase, mockAdminSupabase, methods } = vi.hoisted(() => {
   const methods = {
     select: vi.fn(),
     insert: vi.fn(),
@@ -28,11 +28,16 @@ const { mockSupabase, methods } = vi.hoisted(() => {
     from: vi.fn().mockReturnValue(methods),
     rpc: vi.fn(),
   }
-  return { mockSupabase, methods }
+  const mockAdminSupabase = { from: vi.fn().mockReturnValue(methods) }
+  return { mockSupabase, mockAdminSupabase, methods }
 })
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => mockSupabase),
+}))
+
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: vi.fn(() => mockAdminSupabase),
 }))
 
 vi.mock('@/lib/email', () => ({
@@ -57,6 +62,7 @@ function resetChain() {
   methods.single.mockResolvedValue({ data: null, error: null })
   mockSupabase.rpc.mockResolvedValue({ data: null, error: null })
   mockSupabase.from.mockReturnValue(methods)
+  mockAdminSupabase.from.mockReturnValue(methods)
   mockSupabase.storage.from.mockReturnValue({
     remove: vi.fn().mockResolvedValue({ error: null }),
   })
@@ -68,8 +74,14 @@ function setupUser(userId = 'user-1') {
   })
 }
 
-function mockProfilePhone(phone: string | null = '+6591234567') {
-  methods.single.mockResolvedValueOnce({ data: { phone_number: phone }, error: null })
+function mockProfilePhone(
+  phone: string | null = '+6591234567',
+  overrides: { birth_month?: string | null; role?: string } = {}
+) {
+  methods.single.mockResolvedValueOnce({
+    data: { phone_number: phone, birth_month: '2000-01-01', role: 'VOLUNTEER', ...overrides },
+    error: null,
+  })
 }
 
 function mockJoinableSlot(overrides?: Partial<{
@@ -78,7 +90,8 @@ function mockJoinableSlot(overrides?: Partial<{
   walk_date: string
   start_time: string
   max_volunteers: number
-  survey_rounds: { status: string }
+  round_id: string
+  survey_rounds: { id: string; status: string; start_date: string; minor_workshop_required: boolean }
   slot_memberships: Array<{ user_id: string; status: string }>
 }>) {
   methods.single.mockResolvedValueOnce({
@@ -88,7 +101,13 @@ function mockJoinableSlot(overrides?: Partial<{
       walk_date: '2099-04-15',
       start_time: '08:00',
       max_volunteers: 3,
-      survey_rounds: { status: 'OPEN' },
+      round_id: 'round-1',
+      survey_rounds: {
+        id: 'round-1',
+        status: 'OPEN',
+        start_date: '2026-04-01',
+        minor_workshop_required: false,
+      },
       slot_memberships: [],
       ...overrides,
     },
@@ -219,6 +238,64 @@ describe('walk-actions', () => {
       expect(result).toEqual({
         error: 'Add a phone number to your profile before joining a walk.',
         code: 'PHONE_REQUIRED',
+      })
+      expect(mockSupabase.rpc).not.toHaveBeenCalled()
+    })
+
+    it('requires birth month for a volunteer before calling the join RPC', async () => {
+      setupUser()
+      mockProfilePhone('+6591234567', { birth_month: null })
+
+      const result = await joinWalk('slot-1')
+
+      expect(result).toEqual({
+        error: 'Add your birth month and year to your profile before joining a walk.',
+        code: 'BIRTH_MONTH_REQUIRED',
+      })
+      expect(mockSupabase.rpc).not.toHaveBeenCalled()
+    })
+
+    it('requires guardian details for minor volunteers', async () => {
+      setupUser()
+      mockProfilePhone('+6591234567', { birth_month: '2010-05-01' })
+      mockJoinableSlot()
+      methods.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
+
+      const result = await joinWalk('slot-1')
+
+      expect(result).toEqual({
+        error: 'Add your guardian details for this survey round before joining a walk.',
+        code: 'GUARDIAN_DETAILS_REQUIRED',
+      })
+      expect(mockSupabase.rpc).not.toHaveBeenCalled()
+    })
+
+    it('requires admin workshop confirmation when the round requires it', async () => {
+      setupUser()
+      mockProfilePhone('+6591234567', { birth_month: '2010-05-01' })
+      mockJoinableSlot({
+        survey_rounds: {
+          id: 'round-1',
+          status: 'OPEN',
+          start_date: '2026-04-01',
+          minor_workshop_required: true,
+        },
+      })
+      methods.maybeSingle.mockResolvedValueOnce({
+        data: {
+          guardian_name: 'Guardian One',
+          guardian_email: 'guardian@example.com',
+          guardian_accompaniment_acknowledged_at: '2026-01-01T00:00:00Z',
+          guardian_workshop_attended_at: null,
+        },
+        error: null,
+      })
+
+      const result = await joinWalk('slot-1')
+
+      expect(result).toEqual({
+        error: 'Your admin must confirm guardian workshop attendance before you can join a walk.',
+        code: 'GUARDIAN_WORKSHOP_REQUIRED',
       })
       expect(mockSupabase.rpc).not.toHaveBeenCalled()
     })

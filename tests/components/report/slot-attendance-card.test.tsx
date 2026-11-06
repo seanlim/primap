@@ -66,6 +66,23 @@ describe('SlotAttendanceCard', () => {
     expect(screen.getByText('Not recorded')).toBeInTheDocument()
   })
 
+  it('records guardian accompaniment only for members marked as minors', async () => {
+    const user = userEvent.setup()
+    render(
+      <SlotAttendanceCard
+        slotId="slot-1"
+        members={[{ ...members[1], requiresGuardian: true }]}
+        canEdit
+      />
+    )
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Bob guardian attendance' }), 'ABSENT')
+
+    expect(mockSaveSlotAttendance).toHaveBeenCalledWith('slot-1', [
+      { userId: 'bob', guardianPresent: false },
+    ])
+  })
+
   it('does not render when there are no active members', () => {
     const { container } = render(<SlotAttendanceCard slotId="slot-1" members={[]} canEdit />)
     expect(container).toBeEmptyDOMElement()

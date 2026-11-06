@@ -12,6 +12,8 @@ export interface AttendanceMember {
   email: string
   attendance?: AttendanceStatus | null
   attendanceMarkedAt?: string | null
+  requiresGuardian?: boolean
+  guardianPresent?: boolean | null
 }
 
 interface Props {
@@ -72,6 +74,9 @@ export function SlotAttendanceCard({ slotId, members, canEdit, disabled = false 
   const [values, setValues] = useState<Record<string, AttendanceStatus>>(() =>
     Object.fromEntries(members.map(member => [member.userId, member.attendance ?? 'PRESENT']))
   )
+  const [guardianValues, setGuardianValues] = useState<Record<string, boolean | null>>(() =>
+    Object.fromEntries(members.map(member => [member.userId, member.guardianPresent ?? null]))
+  )
   const [savingUserId, setSavingUserId] = useState<string | null>(null)
   const { showToast } = useToast()
 
@@ -96,6 +101,24 @@ export function SlotAttendanceCard({ slotId, members, canEdit, disabled = false 
 
     if (result.error) {
       setValues(current => ({ ...current, [userId]: previous }))
+      showToast(result.error, 'error')
+    }
+  }
+
+  const handleGuardianPresenceChange = async (userId: string, next: boolean | null) => {
+    if (!canEdit || disabled || savingUserId) return
+    const previous = guardianValues[userId]
+    if (previous === next) return
+
+    const member = members.find(item => item.userId === userId)
+    if (!member?.requiresGuardian) return
+
+    setGuardianValues(current => ({ ...current, [userId]: next }))
+    setSavingUserId(userId)
+    const result = await saveSlotAttendance(slotId, [{ userId, guardianPresent: next }])
+    setSavingUserId(null)
+    if (result.error) {
+      setGuardianValues(current => ({ ...current, [userId]: previous }))
       showToast(result.error, 'error')
     }
   }
@@ -126,14 +149,16 @@ export function SlotAttendanceCard({ slotId, members, canEdit, disabled = false 
       </div>
 
       <ul className="divide-y divide-gray-100">
-        {members.map(member => {
-          const savedStatus = member.attendance
-          const value = values[member.userId] ?? savedStatus ?? 'PRESENT'
+      {members.map(member => {
+        const savedStatus = member.attendance
+        const value = values[member.userId] ?? savedStatus ?? 'PRESENT'
+        const guardianValue = guardianValues[member.userId]
           const isSaving = savingUserId === member.userId
           const markedAt = formatMarkedAt(member.attendanceMarkedAt)
 
           return (
-            <li key={member.userId} className="flex items-center gap-3 py-2.5">
+            <li key={member.userId} className="py-2.5">
+              <div className="flex items-center gap-3">
               {canEdit ? (
                 <button
                   type="button"
@@ -179,6 +204,48 @@ export function SlotAttendanceCard({ slotId, members, canEdit, disabled = false 
               ) : (
                 <StatusBadge status={canEdit ? value : savedStatus} />
               )}
+              {member.requiresGuardian && !canEdit && (
+                <span className={`text-xs font-medium ${
+                  guardianValue === true
+                    ? 'text-green-700'
+                    : guardianValue === false
+                      ? 'text-red-700'
+                      : 'text-gray-500'
+                }`}>
+                  {guardianValue === true
+                    ? 'Guardian present'
+                    : guardianValue === false
+                      ? 'Guardian absent'
+                      : 'Guardian not recorded'}
+                </span>
+              )}
+              </div>
+            {member.requiresGuardian && canEdit && (
+              <div className="mt-2 flex items-center justify-between gap-3 pl-8">
+                <label htmlFor={`guardian-presence-${member.userId}`} className="text-xs text-gray-600">
+                  Guardian accompaniment
+                </label>
+                <select
+                  id={`guardian-presence-${member.userId}`}
+                  aria-label={`${memberName(member)} guardian attendance`}
+                  value={guardianValue === true
+                    ? 'PRESENT'
+                    : guardianValue === false
+                      ? 'ABSENT'
+                      : ''}
+                  onChange={event => handleGuardianPresenceChange(
+                    member.userId,
+                    event.target.value === '' ? null : event.target.value === 'PRESENT'
+                  )}
+                  disabled={disabled || savingUserId !== null}
+                  className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 disabled:opacity-50"
+                >
+                  <option value="">Not recorded</option>
+                  <option value="PRESENT">Present</option>
+                  <option value="ABSENT">Absent</option>
+                </select>
+              </div>
+            )}
             </li>
           )
         })}

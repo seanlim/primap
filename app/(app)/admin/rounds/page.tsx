@@ -24,6 +24,7 @@ export default async function AdminRoundsPage() {
         endDate: r.end_date,
         status: r.status,
         walkCount: r.walk_slots[0]?.count,
+        minorWorkshopRequired: r.minor_workshop_required,
       }))}
     />
   )

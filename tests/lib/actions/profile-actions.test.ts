@@ -55,7 +55,7 @@ describe('profile-actions', () => {
     it('returns error when not authenticated', async () => {
       mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
 
-      const result = await updateProfile({ fullName: 'Test User', phoneNumber: '91234567' })
+      const result = await updateProfile({ fullName: 'Test User', phoneNumber: '91234567', birthMonth: '2000-01' })
 
       expect(result).toEqual({ error: 'Not authenticated' })
     })
@@ -65,13 +65,14 @@ describe('profile-actions', () => {
         data: { user: { id: 'user-1' } },
       })
 
-      const result = await updateProfile({ fullName: ' Updated Name ', phoneNumber: '9123 4567' })
+      const result = await updateProfile({ fullName: ' Updated Name ', phoneNumber: '9123 4567', birthMonth: '2000-01' })
 
       expect(result).toEqual({ success: true })
       expect(mockSupabase.from).toHaveBeenCalledWith('profiles')
       expect(methods.update).toHaveBeenCalledWith({
         full_name: 'Updated Name',
         phone_number: '+6591234567',
+        birth_month: '2000-01-01',
       })
       expect(methods.eq).toHaveBeenCalledWith('id', 'user-1')
       expect(revalidatePath).toHaveBeenCalledWith('/profile')
@@ -84,12 +85,13 @@ describe('profile-actions', () => {
         data: { user: { id: 'user-1' } },
       })
 
-      const result = await updateProfile({ fullName: '   ', phoneNumber: '+6591234567' })
+      const result = await updateProfile({ fullName: '   ', phoneNumber: '+6591234567', birthMonth: '2000-01' })
 
       expect(result).toEqual({ success: true })
       expect(methods.update).toHaveBeenCalledWith({
         full_name: null,
         phone_number: '+6591234567',
+        birth_month: '2000-01-01',
       })
     })
 
@@ -98,7 +100,7 @@ describe('profile-actions', () => {
         data: { user: { id: 'user-1' } },
       })
 
-      const result = await updateProfile({ fullName: 'Test User', phoneNumber: '  ' })
+      const result = await updateProfile({ fullName: 'Test User', phoneNumber: '  ', birthMonth: '2000-01' })
 
       expect(result).toEqual({
         error: PHONE_REQUIRED_MESSAGE,
@@ -112,7 +114,7 @@ describe('profile-actions', () => {
         data: { user: { id: 'user-1' } },
       })
 
-      const result = await updateProfile({ fullName: 'Test User', phoneNumber: '12345' })
+      const result = await updateProfile({ fullName: 'Test User', phoneNumber: '12345', birthMonth: '2000-01' })
 
       expect(result).toEqual({
         error: PHONE_INVALID_MESSAGE,
@@ -127,7 +129,7 @@ describe('profile-actions', () => {
       })
       methods.eq.mockReturnValueOnce({ error: { message: 'Database error' } })
 
-      const result = await updateProfile({ fullName: 'Bad Name', phoneNumber: '91234567' })
+      const result = await updateProfile({ fullName: 'Bad Name', phoneNumber: '91234567', birthMonth: '2000-01' })
 
       expect(result).toEqual({ error: 'Database error' })
       expect(revalidatePath).not.toHaveBeenCalled()

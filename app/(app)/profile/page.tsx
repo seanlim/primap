@@ -105,6 +105,18 @@ export default async function ProfilePage() {
     (historyObservations || []).map(o => [o.slot_id, o as HistoryObservation & { id: string }])
   )
 
+  const { data: attendanceHistory } = walkSlotIds.length > 0
+    ? await supabase
+        .from('slot_attendance')
+        .select('slot_id, status')
+        .eq('user_id', user.id)
+        .in('slot_id', walkSlotIds)
+    : { data: [] }
+
+  const attendanceBySlotId = new Map(
+    (attendanceHistory || []).map(row => [row.slot_id, row.status])
+  )
+
   const submittedObservationIds = (submittedObservationHistory || []).map((observation) => observation.id)
   const submittedObservationById = new Map(
     (submittedObservationHistory || []).map((observation) => [observation.id, observation])
@@ -194,7 +206,7 @@ export default async function ProfilePage() {
 
   const currentRoundUserSlotIds = (currentRoundUserSlotIdsData || []).map((slot) => slot.id)
 
-  const [{ count: draftsPending }, { count: reportsSubmitted }] = currentRoundUserSlotIds.length > 0
+  const [{ count: draftsPending }, { count: reportsSubmitted }, { count: walksAttended }] = currentRoundUserSlotIds.length > 0
     ? await Promise.all([
         supabase
           .from('observations')
@@ -206,8 +218,14 @@ export default async function ProfilePage() {
           .select('id', { count: 'exact', head: true })
           .eq('status', 'SUBMITTED')
           .in('slot_id', currentRoundUserSlotIds),
+        supabase
+          .from('slot_attendance')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('status', 'PRESENT')
+          .in('slot_id', currentRoundUserSlotIds),
       ])
-    : [{ count: 0 }, { count: 0 }]
+    : [{ count: 0 }, { count: 0 }, { count: 0 }]
   
   const walksJoined = (draftsPending || 0) + (reportsSubmitted || 0)
 
@@ -226,6 +244,7 @@ export default async function ProfilePage() {
       }}
       stats={{
         walksJoined: walksJoined,
+        walksAttended: walksAttended || 0,
         reportsSubmitted: reportsSubmitted || 0,
         draftsPending: draftsPending || 0,
         requiredWalks: settings?.required_walks_per_round || 4,
@@ -242,6 +261,7 @@ export default async function ProfilePage() {
           startTime: slot?.start_time || '',
           roundName: slot?.survey_rounds?.name || '',
           reportStatus: !obs ? 'none' : obs.status as string,
+          attendance: attendanceBySlotId.get(slot?.id || '') ?? null,
           sightingCount: obs?.outcome === 'SIGHTED' && obs.id ? (sightingCountByObservationId.get(obs.id) || 0) : 0,
         }
       })}

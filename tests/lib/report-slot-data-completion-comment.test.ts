@@ -65,6 +65,8 @@ function buildSupabase(observations: typeof baseObservation[], members: typeof b
       if (table === 'walk_slots') return createSingleQueryResult(baseSlot)
       if (table === 'observations') return createOrderedQueryResult(observations)
       if (table === 'slot_memberships') return createMembershipQueryResult(members)
+      if (table === 'slot_attendance') return createMembershipQueryResult([])
+      if (table === 'profiles') return createSingleQueryResult({ role: 'ADMIN' })
       if (table === 'incidents') return createOrderedQueryResult([])
       throw new Error(`Unexpected table: ${table}`)
     },
@@ -138,6 +140,8 @@ describe('completion_comment in getSlotReportViewData', () => {
         if (table === 'walk_slots') return createSingleQueryResult(null)
         if (table === 'observations') return createOrderedQueryResult([])
         if (table === 'slot_memberships') return createMembershipQueryResult([])
+        if (table === 'slot_attendance') return createMembershipQueryResult([])
+        if (table === 'profiles') return createSingleQueryResult(null)
         if (table === 'incidents') return createOrderedQueryResult([])
         throw new Error(`Unexpected table: ${table}`)
       },

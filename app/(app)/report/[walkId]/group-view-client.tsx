@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/toast'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { Breadcrumb } from '@/components/ui/breadcrumb'
 import { MediaGallery } from '@/components/report/media-gallery'
+import { SlotAttendanceCard, type AttendanceMember } from '@/components/report/slot-attendance-card'
 import { INCIDENT_TYPE_LABELS, type IncidentType } from '@/lib/constants/incident-types'
 import { IncidentModal } from './incident-modal'
 
@@ -51,7 +52,7 @@ interface Props {
     roundName: string
   }
   observation: ObservationData
-  members: { userId: string; fullName: string | null; email: string }[]
+  members: AttendanceMember[]
   incidents: {
     id: string
     type: string
@@ -65,6 +66,7 @@ interface Props {
   backHref?: string
   backLabel?: string
   canReportIncident?: boolean
+  canMarkAttendance?: boolean
 }
 
 const SPECIES_LABELS: Record<string, string> = {
@@ -78,6 +80,7 @@ const SPECIES_LABELS: Record<string, string> = {
 export function GroupViewClient({
   slot,
   observation,
+  members,
   incidents,
   backHref = '/report',
   backLabel = 'Back to Reports',
@@ -85,6 +88,7 @@ export function GroupViewClient({
   // current call sites pass `viewData.isParticipant`; this default protects
   // against future call sites that might forget.
   canReportIncident = false,
+  canMarkAttendance = false,
 }: Props) {
   const [showIncidentModal, setShowIncidentModal] = useState(false)
   const [showSubmitDialog, setShowSubmitDialog] = useState(false)
@@ -106,6 +110,9 @@ export function GroupViewClient({
     if (result.error) {
       showToast(result.error, 'error')
     } else {
+      if (result.attendanceWarning) {
+        showToast(result.attendanceWarning, 'info')
+      }
       router.refresh()
     }
     setShowSubmitDialog(false)
@@ -188,6 +195,13 @@ export function GroupViewClient({
           <ObservationDetails observation={observation} />
         </div>
       )}
+
+      {/* Attendance */}
+      <SlotAttendanceCard
+        slotId={slot.id}
+        members={members}
+        canEdit={canMarkAttendance}
+      />
 
       {/* Incidents */}
       {incidents.length > 0 && (

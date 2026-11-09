@@ -161,6 +161,7 @@ describe('getAdminUsersAnalytics indicators', () => {
           if (table === 'profiles') {
             return createQuery({ data: [{ id: 'user-1' }, { id: 'user-2' }] })
           }
+          if (table === 'slot_attendance') return createQuery({ data: [] })
           if (table === 'slot_memberships') {
             return createQuery({
               data: [
@@ -204,6 +205,7 @@ describe('getAdminUsersAnalytics indicators', () => {
       from: (table: string) => ({
         select: () => {
           if (table === 'profiles') return createQuery({ data: [{ id: 'user-1' }] })
+          if (table === 'slot_attendance') return createQuery({ data: [] })
           if (table === 'slot_memberships') {
             return createQuery({
               data: [
@@ -280,6 +282,7 @@ describe('getAdminWalksAnalyticsPageSnapshotByRound', () => {
               ],
             })
           }
+          if (table === 'slot_attendance') return createQuery({ data: [] })
           if (table === 'slot_memberships') return createQuery({ data: [] })
           if (table === 'observations') return createQuery({ data: [] })
           if (table === 'sightings') return createQuery({ data: [] })
@@ -332,6 +335,7 @@ describe('getAdminWalksAnalyticsPageSnapshotByRound', () => {
               ],
             })
           }
+          if (table === 'slot_attendance') return createQuery({ data: [] })
           if (table === 'slot_memberships') {
             return createQuery({
               data: [
@@ -426,6 +430,7 @@ describe('getAdminWalksAnalyticsPageSnapshotByRound', () => {
               ],
             })
           }
+          if (table === 'slot_attendance') return createQuery({ data: [] })
           if (table === 'slot_memberships') return createQuery({ data: [] })
           if (table === 'observations') {
             return createQuery({
@@ -533,6 +538,7 @@ describe('admin analytics report maps', () => {
               ],
             })
           }
+          if (table === 'slot_attendance') return createQuery({ data: [] })
           if (table === 'slot_memberships') return createQuery({ data: [] })
           if (table === 'observations') {
             return createQuery({

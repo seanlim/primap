@@ -9,6 +9,7 @@ import { LocationPicker } from '@/components/map/location-picker'
 import { ReportMediaBudgetProvider } from '@/components/report/report-media-budget'
 import { MediaUploader, type MediaItem } from '@/components/report/media-uploader'
 import { StepIndicator } from '@/components/report/step-indicator'
+import { SlotAttendanceCard, type AttendanceMember } from '@/components/report/slot-attendance-card'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { Breadcrumb } from '@/components/ui/breadcrumb'
 import { getDraft, putDraft, deleteDraft, clearSyncStateForWalk, getMediaByClientParent, updateMediaResolvedParentId } from '@/lib/offline/db'
@@ -26,6 +27,8 @@ interface Props {
     roundName: string
   }
   maxMediaPerReport?: number
+  members?: AttendanceMember[]
+  canMarkAttendance?: boolean
   existingObservation: {
     id: string
     walkCompletion: 'COMPLETED' | 'PARTIAL' | 'ABORTED'
@@ -63,7 +66,7 @@ const SPECIES_OPTIONS = [
   { value: 'OTHER', label: 'Other (specify)' },
 ]
 
-export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_MEDIA_PER_REPORT, existingObservation }: Props) {
+export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_MEDIA_PER_REPORT, members = [], canMarkAttendance = false, existingObservation }: Props) {
   const [walkCompletion, setWalkCompletion] = useState(existingObservation?.walkCompletion ?? 'PARTIAL')
   const [completionComment, setCompletionComment] = useState(existingObservation?.completionComment ?? '')
   const [notes, setNotes] = useState(existingObservation?.notes ?? '')
@@ -1177,6 +1180,13 @@ export function ObservationFormClient({ slot, maxMediaPerReport = DEFAULT_MAX_ME
           You are offline. Changes will be saved locally and synced when you reconnect.
         </p>
       )}
+
+      <SlotAttendanceCard
+        slotId={slot.id}
+        members={members}
+        canEdit={canMarkAttendance}
+        disabled={!isOnline}
+      />
 
       {/* Actions */}
       <div className="flex gap-3">

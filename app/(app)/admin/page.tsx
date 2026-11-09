@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { Users, Calendar, AlertTriangle, Settings, ClipboardList, CheckCircle, Gauge, ArrowRight, Database } from 'lucide-react'
+import { Users, Calendar, AlertTriangle, Settings, ClipboardList, CheckCircle, Gauge, ArrowRight, Database, UserCheck } from 'lucide-react'
 import { getAdminVolunteerAnalyticsLanding, type SupabaseClientLike } from '@/lib/admin-volunteer-analytics'
 import { formatDate } from '@/lib/utils/format-date'
 import DonutMetricCard from '../../../components/ui/DonutMetricCard'
@@ -184,6 +184,20 @@ export default async function AdminDashboard() {
             trackColor="#fed7aa"
             iconBgColor="#fff7ed"
             iconColor="#c2410c"
+          />
+          <DonutMetricCard
+            title="Attendance Rate"
+            value={formatPercent(currentRound.attendanceRate)}
+            numerator={currentRound.attendancePresent}
+            denominator={currentRound.attendancePresent + currentRound.attendanceAbsent}
+            numeratorLabel="present"
+            denominatorLabel="recorded attendance"
+            progress={currentRound.attendanceRate}
+            icon={UserCheck}
+            ringColor="#7e22ce"
+            trackColor="#e9d5ff"
+            iconBgColor="#faf5ff"
+            iconColor="#9333ea"
           />
         </div>
       ) : (

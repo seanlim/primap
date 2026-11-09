@@ -3,6 +3,8 @@ import type { Tables } from './database'
 export type Profile = Tables<'profiles'>
 export type WalkSlot = Tables<'walk_slots'>
 export type SlotMembership = Tables<'slot_memberships'>
+export type SlotAttendance = Tables<'slot_attendance'>
+export type AttendanceStatus = SlotAttendance['status']
 export type Observation = Tables<'observations'>
 export type Incident = Tables<'incidents'>
 export type SurveyRound = Tables<'survey_rounds'>

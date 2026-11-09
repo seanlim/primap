@@ -6,6 +6,7 @@ const { mockSupabase, state } = vi.hoisted(() => {
     role: 'VOLUNTEER' as 'VOLUNTEER' | 'ADMIN',
     membership: { id: 'membership-1' } as { id: string } | null,
     activeMembers: [{ user_id: 'alice' }, { user_id: 'bob' }] as Array<{ user_id: string }>,
+    existingAttendance: [] as Array<{ user_id: string; status: 'PRESENT' | 'ABSENT'; guardian_present: boolean | null }>,
     upsertCalls: [] as Array<{ rows: unknown[]; options: unknown }>,
     upsertError: null as { message: string } | null,
   }
@@ -52,6 +53,11 @@ const { mockSupabase, state } = vi.hoisted(() => {
 
       if (table === 'slot_attendance') {
         return {
+          select: () => ({
+            eq: () => ({
+              in: async () => ({ data: state.existingAttendance, error: null }),
+            }),
+          }),
           upsert: async (rows: unknown[], options: unknown) => {
             state.upsertCalls.push({ rows, options })
             return { error: state.upsertError }
@@ -77,6 +83,7 @@ function resetState() {
   state.role = 'VOLUNTEER'
   state.membership = { id: 'membership-1' }
   state.activeMembers = [{ user_id: 'alice' }, { user_id: 'bob' }]
+  state.existingAttendance = []
   state.upsertCalls = []
   state.upsertError = null
   vi.clearAllMocks()
@@ -125,8 +132,8 @@ describe('saveSlotAttendance', () => {
     expect(state.upsertCalls).toHaveLength(1)
     expect(state.upsertCalls[0].options).toEqual({ onConflict: 'slot_id,user_id' })
     expect(state.upsertCalls[0].rows).toEqual([
-      { slot_id: 'slot-1', user_id: 'alice', status: 'PRESENT', marked_by: 'alice', marked_at: expect.any(String) },
-      { slot_id: 'slot-1', user_id: 'bob', status: 'PRESENT', marked_by: 'alice', marked_at: expect.any(String) },
+      { slot_id: 'slot-1', user_id: 'alice', status: 'PRESENT', guardian_present: null, marked_by: 'alice', marked_at: expect.any(String) },
+      { slot_id: 'slot-1', user_id: 'bob', status: 'PRESENT', guardian_present: null, marked_by: 'alice', marked_at: expect.any(String) },
     ])
     for (const path of ['/report', '/report/slot-1', '/profile', '/admin', '/admin/reports', '/admin/reports/slot-1']) {
       expect(revalidatePath).toHaveBeenCalledWith(path)
@@ -141,7 +148,7 @@ describe('saveSlotAttendance', () => {
 
     expect(result).toMatchObject({ success: true })
     expect(state.upsertCalls[0].rows).toEqual([
-      { slot_id: 'slot-1', user_id: 'bob', status: 'ABSENT', marked_by: 'alice', marked_at: expect.any(String) },
+      { slot_id: 'slot-1', user_id: 'bob', status: 'ABSENT', guardian_present: null, marked_by: 'alice', marked_at: expect.any(String) },
     ])
   })
 

@@ -367,11 +367,13 @@ export type Database = {
       round_participation_requirements: {
         Row: {
           created_at: string
+          guardian_accompaniment_acknowledged_at: string | null
           guardian_email: string | null
           guardian_email_verified_at: string | null
           guardian_name: string | null
           guardian_phone_number: string | null
           guardian_phone_verified_at: string | null
+          guardian_workshop_attended_at: string | null
           id: string
           indemnity_acknowledged_at: string | null
           round_id: string
@@ -380,11 +382,13 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          guardian_accompaniment_acknowledged_at?: string | null
           guardian_email?: string | null
           guardian_email_verified_at?: string | null
           guardian_name?: string | null
           guardian_phone_number?: string | null
           guardian_phone_verified_at?: string | null
+          guardian_workshop_attended_at?: string | null
           id?: string
           indemnity_acknowledged_at?: string | null
           round_id: string
@@ -393,11 +397,13 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          guardian_accompaniment_acknowledged_at?: string | null
           guardian_email?: string | null
           guardian_email_verified_at?: string | null
           guardian_name?: string | null
           guardian_phone_number?: string | null
           guardian_phone_verified_at?: string | null
+          guardian_workshop_attended_at?: string | null
           id?: string
           indemnity_acknowledged_at?: string | null
           round_id?: string
@@ -471,6 +477,7 @@ export type Database = {
       slot_attendance: {
         Row: {
           created_at: string
+          guardian_present: boolean | null
           id: string
           marked_at: string
           marked_by: string | null
@@ -481,6 +488,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          guardian_present?: boolean | null
           id?: string
           marked_at?: string
           marked_by?: string | null
@@ -491,6 +499,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          guardian_present?: boolean | null
           id?: string
           marked_at?: string
           marked_by?: string | null
@@ -573,6 +582,7 @@ export type Database = {
           end_date: string
           id: string
           indemnity_form_url: string | null
+          minor_workshop_required: boolean
           name: string
           start_date: string
           status: Database["public"]["Enums"]["round_status"]
@@ -585,6 +595,7 @@ export type Database = {
           end_date: string
           id?: string
           indemnity_form_url?: string | null
+          minor_workshop_required?: boolean
           name: string
           start_date: string
           status?: Database["public"]["Enums"]["round_status"]
@@ -597,6 +608,7 @@ export type Database = {
           end_date?: string
           id?: string
           indemnity_form_url?: string | null
+          minor_workshop_required?: boolean
           name?: string
           start_date?: string
           status?: Database["public"]["Enums"]["round_status"]
@@ -915,4 +927,3 @@ export const Constants = {
     },
   },
 } as const
-

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/types/database'
 import { hasWalkStarted } from '@/lib/utils/walk-participation'
+import { isMinorAtRoundStart } from '@/lib/utils/minor-status'
 
 interface SightingData {
   id: string
@@ -62,17 +63,20 @@ export interface MemberData {
   email: string
   attendance: 'PRESENT' | 'ABSENT' | null
   attendanceMarkedAt: string | null
+  requiresGuardian: boolean
+  guardianPresent: boolean | null
 }
 
 interface MemberRow {
   user_id: string
-  profiles: { full_name: string | null; email: string } | null
+  profiles: { full_name: string | null; email: string; birth_month: string | null } | null
 }
 
 interface AttendanceRow {
   user_id: string
   status: 'PRESENT' | 'ABSENT'
   marked_at: string | null
+  guardian_present: boolean | null
 }
 
 export interface SlotReportViewData {
@@ -94,7 +98,8 @@ export interface SlotMembersWithAttendance {
 
 function mergeMembers(
   members: MemberRow[],
-  attendance: AttendanceRow[] | null
+  attendance: AttendanceRow[] | null,
+  roundStartDate: string
 ): MemberData[] {
   const attendanceByUserId = new Map(
     (attendance ?? []).map(row => [row.user_id, row])
@@ -108,6 +113,8 @@ function mergeMembers(
       email: member.profiles?.email ?? '',
       attendance: recorded?.status ?? null,
       attendanceMarkedAt: recorded?.marked_at ?? null,
+      requiresGuardian: isMinorAtRoundStart(member.profiles?.birth_month, roundStartDate),
+      guardianPresent: recorded?.guardian_present ?? null,
     }
   })
 }
@@ -121,26 +128,34 @@ export async function getSlotMembersWithAttendance(
   slotId: string,
   currentUserId: string
 ): Promise<SlotMembersWithAttendance> {
-  const [membersResult, attendanceResult, profileResult] = await Promise.all([
+  const [membersResult, attendanceResult, profileResult, slotResult] = await Promise.all([
     supabase
       .from('slot_memberships')
-      .select('user_id, profiles:user_id(full_name, email)')
+      .select('user_id, profiles:user_id(full_name, email, birth_month)')
       .eq('slot_id', slotId)
       .eq('status', 'ACTIVE'),
     supabase
       .from('slot_attendance')
-      .select('user_id, status, marked_at')
+      .select('user_id, status, marked_at, guardian_present')
       .eq('slot_id', slotId),
     supabase
       .from('profiles')
       .select('role')
       .eq('id', currentUserId)
       .single(),
+    supabase
+      .from('walk_slots')
+      .select('survey_rounds(start_date)')
+      .eq('id', slotId)
+      .single(),
   ])
+
+  const round = slotResult.data?.survey_rounds as unknown as { start_date: string } | null
 
   const members = mergeMembers(
     (membersResult.data ?? []) as unknown as MemberRow[],
-    attendanceResult.data as AttendanceRow[] | null
+    attendanceResult.data as AttendanceRow[] | null,
+    round?.start_date ?? ''
   )
   const isParticipant = members.some(member => member.userId === currentUserId)
   const isAdmin = profileResult.data?.role === 'ADMIN'
@@ -160,7 +175,7 @@ export async function getSlotReportViewData(
   const [slotResult, observationsResult, membersResult, attendanceResult, profileResult, incidentsResult] = await Promise.all([
     supabase
       .from('walk_slots')
-      .select('*, survey_rounds(name)')
+    .select('*, survey_rounds(name, start_date)')
       .eq('id', slotId)
       .single(),
     supabase
@@ -174,12 +189,12 @@ export async function getSlotReportViewData(
       .order('created_at', { ascending: true }),
     supabase
       .from('slot_memberships')
-      .select('user_id, profiles:user_id(full_name, email)')
+      .select('user_id, profiles:user_id(full_name, email, birth_month)')
       .eq('slot_id', slotId)
       .eq('status', 'ACTIVE'),
     supabase
       .from('slot_attendance')
-      .select('user_id, status, marked_at')
+      .select('user_id, status, marked_at, guardian_present')
       .eq('slot_id', slotId),
     supabase
       .from('profiles')
@@ -211,7 +226,7 @@ export async function getSlotReportViewData(
   const members = (membersResult.data ?? []) as unknown as MemberRow[]
   const attendance = attendanceResult.data as AttendanceRow[] | null
   const incidents = incidentsResult.data
-  const round = slot.survey_rounds as unknown as { name: string }
+  const round = slot.survey_rounds as unknown as { name: string; start_date: string }
   const activeMemberIds = new Set(members.map((member) => member.user_id))
   const isParticipant = activeMemberIds.has(currentUserId)
   const isAdmin = profileResult.data?.role === 'ADMIN'
@@ -259,7 +274,7 @@ export async function getSlotReportViewData(
       media: obs.media,
     }
     })[0],
-    members: mergeMembers(members, attendance),
+    members: mergeMembers(members, attendance, round.start_date),
     incidents: (incidents || []).map(inc => ({
       id: inc.id,
       type: inc.incident_type,

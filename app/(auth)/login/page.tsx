@@ -7,6 +7,7 @@ import { withTimeout } from '@/lib/utils/with-timeout'
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [birthMonth, setBirthMonth] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
@@ -58,11 +59,18 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
+    if (!birthMonth) {
+      setError('Enter your birth month and year to create an account.')
+      setLoading(false)
+      return
+    }
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/auth/callback`,
+        data: { birth_month: `${birthMonth}-01` },
       },
     })
     if (error) {
@@ -117,6 +125,23 @@ export default function LoginPage() {
               required
             />
           </div>
+          {mode === 'signup' && (
+            <div>
+              <label htmlFor="signup-birth-month" className="mb-1 block text-sm font-medium text-gray-700">
+                Birth month and year
+              </label>
+              <input
+                id="signup-birth-month"
+                type="month"
+                value={birthMonth}
+                onChange={(e) => setBirthMonth(e.target.value)}
+                max={new Date().toISOString().slice(0, 7)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                required
+              />
+              <p className="mt-1 text-xs text-gray-400">Only month and year are collected.</p>
+            </div>
+          )}
           <div>
             <input
               type="password"

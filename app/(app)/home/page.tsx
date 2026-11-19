@@ -1,5 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+import { requireSession } from '@/lib/supabase/session'
 import Link from 'next/link'
 import { formatDate, getRelativeDay } from '@/lib/utils/format-date'
 import { Calendar, PenLine, CheckCircle, MapPin, ArrowRight, Footprints, ClipboardList, ChevronRight, Compass } from 'lucide-react'
@@ -8,44 +7,47 @@ import type { WalkRef } from '@/lib/types/supabase-helpers'
 export const dynamic = 'force-dynamic'
 
 export default async function HomePage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  const { supabase, userId } = await requireSession()
 
   const now = new Date()
   const today = now.toISOString().split('T')[0]
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
-
-  const { data: upcomingWalks } = await supabase
-    .from('slot_memberships')
-    .select(`
-      id,
-      status,
-      walk_slots!inner (
+  // These three reads are independent; one round trip instead of three.
+  const [
+    { data: profile },
+    { data: upcomingWalks },
+    { data: allUserMemberships },
+  ] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', userId)
+      .single(),
+    supabase
+      .from('slot_memberships')
+      .select(`
         id,
-        location_name,
-        walk_date,
-        start_time,
-        end_time,
-        survey_rounds (name)
-      )
-    `)
-    .eq('user_id', user.id)
-    .eq('status', 'ACTIVE')
-    .gte('walk_slots.walk_date', today)
+        status,
+        walk_slots!inner (
+          id,
+          location_name,
+          walk_date,
+          start_time,
+          end_time,
+          survey_rounds (name)
+        )
+      `)
+      .eq('user_id', userId)
+      .eq('status', 'ACTIVE')
+      .gte('walk_slots.walk_date', today),
+    supabase
+      .from('slot_memberships')
+      .select('slot_id')
+      .eq('user_id', userId)
+      .eq('status', 'ACTIVE'),
+  ])
 
   const upcomingMemberships = upcomingWalks || []
-
-  const { data: allUserMemberships } = await supabase
-    .from('slot_memberships')
-    .select('slot_id')
-    .eq('user_id', user.id)
-    .eq('status', 'ACTIVE')
 
   const allUserSlotIds = (allUserMemberships || []).map(m => m.slot_id)
 

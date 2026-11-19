@@ -1,5 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect, notFound } from 'next/navigation'
+import { notFound } from 'next/navigation'
+import { requireSession } from '@/lib/supabase/session'
 import { WalkDetailClient } from './walk-detail-client'
 import type { MembershipWithProfile } from '@/lib/types/supabase-helpers'
 import { getJoinBlockInfo, getWalkStartDateTime } from '@/lib/utils/walk-participation'
@@ -14,9 +14,7 @@ export default async function WalkDetailPage({
   params: Promise<{ walkId: string }>
 }) {
   const { walkId } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  const { supabase, userId } = await requireSession()
 
   const ownObservationQuery = supabase
     .from('observations')
@@ -44,7 +42,7 @@ export default async function WalkDetailPage({
     supabase
       .from('profiles')
       .select('phone_number, birth_month, role')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single(),
   ])
 
@@ -63,14 +61,14 @@ export default async function WalkDetailPage({
     ? await createAdminClient()
         .from('round_participation_requirements')
         .select('guardian_name, guardian_email, guardian_phone_number, guardian_accompaniment_acknowledged_at, guardian_workshop_attended_at')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .eq('round_id', round.id)
         .maybeSingle()
     : { data: null, error: null }
   const memberships = (walk.slot_memberships as unknown as MembershipWithProfile[])
     .filter(m => m.status === 'ACTIVE')
 
-  const userMembership = memberships.find(m => m.user_id === user.id)
+  const userMembership = memberships.find(m => m.user_id === userId)
   const hasSubmittedReport = (ownObservations || []).some((observation) => observation.status === 'SUBMITTED')
   const slotStart = getWalkStartDateTime(walk.walk_date, walk.start_time)
   const isPastOrStarted = slotStart <= new Date()
@@ -107,7 +105,7 @@ export default async function WalkDetailPage({
       }))}
       isJoined={!!userMembership}
       isFull={isFull}
-      currentUserId={user.id}
+      currentUserId={userId}
       hasSubmittedReport={hasSubmittedReport}
       missingPhone={!profile?.phone_number?.trim()}
       missingBirthMonth={profile?.role === 'VOLUNTEER' && !profile.birth_month}

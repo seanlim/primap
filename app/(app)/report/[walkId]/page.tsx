@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { requireSession } from '@/lib/supabase/session'
 import { redirect, notFound } from 'next/navigation'
 import { GroupViewClient } from './group-view-client'
 import { getSlotReportViewData } from '@/lib/report-slot-data'
@@ -11,11 +11,9 @@ export default async function WalkReportPage({
   params: Promise<{ walkId: string }>
 }) {
   const { walkId } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  const { supabase, userId } = await requireSession()
 
-  const viewData = await getSlotReportViewData(supabase, walkId, user.id)
+  const viewData = await getSlotReportViewData(supabase, walkId, userId)
   if (!viewData) notFound()
   if (!viewData.isParticipant && !viewData.hasSubmittedOwnObservation) {
     redirect('/report')
@@ -27,7 +25,7 @@ export default async function WalkReportPage({
       observation={viewData.observations}
       members={viewData.members}
       incidents={viewData.incidents}
-      currentUserId={user.id}
+      currentUserId={userId}
       canReportIncident={viewData.isParticipant}
       canMarkAttendance={viewData.canMarkAttendance}
     />

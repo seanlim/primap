@@ -1,135 +1,85 @@
-import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { ProfileClient } from './profile-client'
-import type { WalkRef, HistoryObservation } from '@/lib/types/supabase-helpers'
-import { getWalkStartDateTime, hasWalkEnded } from '@/lib/utils/walk-participation'
+import { requireSession } from '@/lib/supabase/session'
+import type { Tables } from '@/lib/types/database'
+import type { AttendanceStatus, HistoryObservation, WalkRef } from '@/lib/types/supabase-helpers'
 import { buildSlotPopupMeta } from '@/lib/utils/report-map'
-import { findCurrentRound } from '@/lib/utils/rounds'
 
 export const dynamic = 'force-dynamic'
 
+type ProfileRow = Tables<'profiles'>
+
+type SubmittedObservation = {
+  id: string
+  slot_id: string
+  status: string
+  outcome: string
+  lat: number | null
+  lng: number | null
+  walk_slots: WalkRef | null
+}
+
+type WalkHistoryEntry = {
+  membership_id: string
+  slot_id: string
+  history_type: 'active' | 'submitted'
+  walk_slots: WalkRef | null
+}
+
+type ProfilePagePayload = {
+  profile: ProfileRow | null
+  submitted_observations: SubmittedObservation[]
+  walk_history: WalkHistoryEntry[]
+  history_observations: HistoryObservation[]
+  attendance: Array<{ slot_id: string; status: AttendanceStatus }>
+  sightings: Array<{
+    observation_id: string
+    lat: number | null
+    lng: number | null
+    species: string
+    species_other: string | null
+  }>
+  settings: { required_walks_per_round: number } | null
+  stats: {
+    drafts_pending: number
+    reports_submitted: number
+    walks_attended: number
+  }
+}
+
 export default async function ProfilePage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  const { supabase } = await requireSession()
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+  // One query instead of ten sequential PostgREST round trips (see
+  // supabase/migrations/20261119120000_add_profile_page_rpc.sql).
+  const { data, error } = await supabase.rpc('get_profile_page')
 
+  if (error) {
+    console.error('Failed to load profile page data:', error.message)
+    redirect('/login?error=profile_fetch_failed')
+  }
+
+  const payload = data as unknown as ProfilePagePayload
+  const profile = payload.profile
   if (!profile) redirect('/login')
 
-  const { data: activeMemberships } = await supabase
-    .from('slot_memberships')
-    .select(`
-      id,
-      slot_id,
-      walk_slots (
-        id,
-        location_name,
-        walk_date,
-        start_time,
-        end_time,
-        survey_rounds (name)
-      )
-    `)
-    .eq('user_id', user.id)
-    .eq('status', 'ACTIVE')
-    .order('joined_at', { ascending: false })
-    .limit(20)
-  
-  const activeWalkHistory = activeMemberships || []
-  const userSlotIds = activeWalkHistory.map((m) => m.slot_id)
+  const submittedObservations = payload.submitted_observations || []
+  const walkHistoryItems = payload.walk_history || []
 
-  const { data: submittedObservationHistory } = await supabase
-    .from('observations')
-    .select(`
-      id,
-      slot_id,
-      status,
-      outcome,
-      lat,
-      lng,
-      walk_slots (
-        id,
-        location_name,
-        walk_date,
-        start_time,
-        end_time,
-        survey_rounds (name)
-      )
-    `)
-    .eq('status', 'SUBMITTED')
-    .in('slot_id', userSlotIds)
-
-  const activeSlotIds = activeWalkHistory
-    .map((membership) => (membership.walk_slots as WalkRef | undefined)?.id)
-    .filter(Boolean)
-
-  const walkHistoryItems = [
-    ...activeWalkHistory.map((membership) => ({
-      membershipId: membership.id,
-      slot: membership.walk_slots as WalkRef,
-      historyType: 'active' as const,
-    })),
-    ...(submittedObservationHistory || [])
-      .filter((observation) => !activeSlotIds.includes(observation.slot_id))
-      .map((observation) => ({
-        membershipId: observation.id,
-        slot: observation.walk_slots as WalkRef,
-        historyType: 'submitted' as const,
-      })),
-  ]
-    .filter((item) => item.slot && (item.historyType === 'active' || hasWalkEnded(item.slot.walk_date, item.slot.end_time)))
-    .sort((a, b) => {
-      const aTime = getWalkStartDateTime(a.slot.walk_date, a.slot.start_time).getTime()
-      const bTime = getWalkStartDateTime(b.slot.walk_date, b.slot.start_time).getTime()
-      return bTime - aTime
-    })
-    .slice(0, 20)
-
-  const walkSlotIds = walkHistoryItems
-    .map(w => w.slot?.id)
-    .filter(Boolean)
-
-  const { data: historyObservations } = walkSlotIds.length > 0
-    ? await supabase
-        .from('observations')
-        .select('id, slot_id, status, outcome, lat, lng')
-        .in('slot_id', walkSlotIds)
-    : { data: [] }
-
-  const obsMap = new Map(
-    (historyObservations || []).map(o => [o.slot_id, o as HistoryObservation & { id: string }])
+  const obsMap = new Map<string, HistoryObservation>(
+    (payload.history_observations || []).map((observation) => [observation.slot_id, observation])
   )
-
-  const { data: attendanceHistory } = walkSlotIds.length > 0
-    ? await supabase
-        .from('slot_attendance')
-        .select('slot_id, status')
-        .eq('user_id', user.id)
-        .in('slot_id', walkSlotIds)
-    : { data: [] }
 
   const attendanceBySlotId = new Map(
-    (attendanceHistory || []).map(row => [row.slot_id, row.status])
+    (payload.attendance || []).map((row) => [row.slot_id, row.status])
   )
 
-  const submittedObservationIds = (submittedObservationHistory || []).map((observation) => observation.id)
   const submittedObservationById = new Map(
-    (submittedObservationHistory || []).map((observation) => [observation.id, observation])
+    submittedObservations.map((observation) => [observation.id, observation])
   )
-  const { data: submittedSightings } = submittedObservationIds.length > 0
-    ? await supabase
-        .from('sightings')
-        .select('observation_id, lat, lng, species, species_other')
-        .in('observation_id', submittedObservationIds)
-    : { data: [] }
 
   const sightingCountByObservationId = new Map<string, number>()
-  const reportMapPoints = (submittedSightings || []).flatMap((sighting) => {
+  const reportMapPoints = (payload.sightings || []).flatMap((sighting) => {
     if (!sighting.observation_id) return []
     sightingCountByObservationId.set(
       sighting.observation_id,
@@ -139,7 +89,7 @@ export default async function ProfilePage() {
     if (sighting.lat === null || sighting.lng === null) return []
 
     const observation = submittedObservationById.get(sighting.observation_id)
-    const slot = observation?.walk_slots as WalkRef | undefined
+    const slot = observation?.walk_slots ?? undefined
 
     return [{
       lat: sighting.lat,
@@ -161,10 +111,10 @@ export default async function ProfilePage() {
     }]
   })
 
-  const notSightedPoints = (submittedObservationHistory || [])
+  const notSightedPoints = submittedObservations
     .filter((observation) => observation.outcome === 'NOT_SIGHTED' && observation.lat !== null && observation.lng !== null)
     .map((observation) => {
-      const slot = observation.walk_slots as WalkRef | undefined
+      const slot = observation.walk_slots ?? undefined
       return {
         lat: observation.lat as number,
         lng: observation.lng as number,
@@ -181,53 +131,9 @@ export default async function ProfilePage() {
       }
     })
 
-  const [{ data: settings }, { data: rounds }] = await Promise.all([
-    supabase
-      .from('app_settings')
-      .select('required_walks_per_round')
-      .limit(1)
-      .single(),
-    supabase
-      .from('survey_rounds')
-      .select('id, name, start_date, end_date')
-      .eq('status', 'OPEN')
-      .order('start_date', { ascending: false }),
-  ])
-
-  const currentRound = findCurrentRound(rounds || [])
-
-  const { data: currentRoundUserSlotIdsData } = currentRound
-    ? await supabase
-        .from('walk_slots')
-        .select('id')
-        .eq('round_id', currentRound.id)
-        .in('id', userSlotIds)
-    : { data: [] }
-
-  const currentRoundUserSlotIds = (currentRoundUserSlotIdsData || []).map((slot) => slot.id)
-
-  const [{ count: draftsPending }, { count: reportsSubmitted }, { count: walksAttended }] = currentRoundUserSlotIds.length > 0
-    ? await Promise.all([
-        supabase
-          .from('observations')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'DRAFT')
-          .in('slot_id', currentRoundUserSlotIds),
-        supabase
-          .from('observations')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'SUBMITTED')
-          .in('slot_id', currentRoundUserSlotIds),
-        supabase
-          .from('slot_attendance')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .eq('status', 'PRESENT')
-          .in('slot_id', currentRoundUserSlotIds),
-      ])
-    : [{ count: 0 }, { count: 0 }, { count: 0 }]
-  
-  const walksJoined = (draftsPending || 0) + (reportsSubmitted || 0)
+  const stats = payload.stats || { drafts_pending: 0, reports_submitted: 0, walks_attended: 0 }
+  const draftsPending = stats.drafts_pending || 0
+  const reportsSubmitted = stats.reports_submitted || 0
 
   return (
     <ProfileClient
@@ -244,25 +150,25 @@ export default async function ProfilePage() {
         createdAt: profile.created_at,
       }}
       stats={{
-        walksJoined: walksJoined,
-        walksAttended: walksAttended || 0,
-        reportsSubmitted: reportsSubmitted || 0,
-        draftsPending: draftsPending || 0,
-        requiredWalks: settings?.required_walks_per_round || 4,
+        walksJoined: draftsPending + reportsSubmitted,
+        walksAttended: stats.walks_attended || 0,
+        reportsSubmitted,
+        draftsPending,
+        requiredWalks: payload.settings?.required_walks_per_round || 4,
       }}
       reportMapPoints={[...reportMapPoints, ...notSightedPoints]}
-      walkHistory={walkHistoryItems.map(w => {
-        const slot = w.slot
-        const obs = obsMap.get(slot?.id)
+      walkHistory={walkHistoryItems.map((entry) => {
+        const slot = entry.walk_slots
+        const obs = slot?.id ? obsMap.get(slot.id) : undefined
         return {
-          membershipId: w.membershipId,
+          membershipId: entry.membership_id,
           slotId: slot?.id || '',
           locationName: slot?.location_name || '',
           walkDate: slot?.walk_date || '',
           startTime: slot?.start_time || '',
           roundName: slot?.survey_rounds?.name || '',
           reportStatus: !obs ? 'none' : obs.status as string,
-          attendance: attendanceBySlotId.get(slot?.id || '') ?? null,
+          attendance: (slot?.id ? attendanceBySlotId.get(slot.id) : undefined) ?? null,
           sightingCount: obs?.outcome === 'SIGHTED' && obs.id ? (sightingCountByObservationId.get(obs.id) || 0) : 0,
         }
       })}

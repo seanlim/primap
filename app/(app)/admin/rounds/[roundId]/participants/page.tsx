@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient } from '@/lib/supabase/server'
+import { requireSession, getCurrentProfile } from '@/lib/supabase/session'
 import { isMinorAtRoundStart } from '@/lib/utils/minor-status'
 import { RoundParticipantsClient } from './participants-client'
 
@@ -13,16 +13,11 @@ export default async function RoundParticipantsPage({
   params: Promise<{ roundId: string }>
 }) {
   const { roundId } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  await requireSession()
 
-  const { data: actor } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-  if (actor?.role !== 'ADMIN') redirect('/home')
+  // Cached per render: app/(app)/layout.tsx already read this profile.
+  const { profile } = await getCurrentProfile()
+  if (profile?.role !== 'ADMIN') redirect('/home')
 
   const admin = createAdminClient()
   const { data: round } = await admin

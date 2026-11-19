@@ -1,9 +1,11 @@
+import { stubClaimsFromUser } from '@/tests/mocks/session'
 import { render, screen } from '@testing-library/react'
 
 const { mockSupabase, mockRedirect } = vi.hoisted(() => {
   const mockSupabase = {
     auth: {
       getUser: vi.fn(),
+      getClaims: vi.fn(),
     },
     from: vi.fn(),
   }
@@ -45,6 +47,7 @@ function createQuery(result: { data?: unknown; count?: number | null; error?: { 
 describe('ReportListPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    stubClaimsFromUser(mockSupabase.auth)
   })
 
   it('organizes report items by workflow state', async () => {

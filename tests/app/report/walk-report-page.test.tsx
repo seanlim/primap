@@ -1,9 +1,11 @@
+import { stubClaimsFromUser } from '@/tests/mocks/session'
 import { render, screen } from '@testing-library/react'
 
 const { mockSupabase, mockRedirect, mockNotFound, mockGroupViewClient, mockGetSlotReportViewData } = vi.hoisted(() => {
   const mockSupabase = {
     auth: {
       getUser: vi.fn(),
+      getClaims: vi.fn(),
     },
   }
   const mockRedirect = vi.fn()
@@ -35,6 +37,7 @@ import WalkReportPage from '@/app/(app)/report/[walkId]/page'
 describe('WalkReportPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    stubClaimsFromUser(mockSupabase.auth)
     mockSupabase.auth.getUser.mockResolvedValue({
       data: { user: { id: 'user-1' } },
     })

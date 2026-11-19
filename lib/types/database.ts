@@ -744,6 +744,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_profile_page: { Args: never; Returns: Json }
       get_report_media_count: {
         Args: { p_parent_type: string; p_parent_id: string }
         Returns: number

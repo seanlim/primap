@@ -1,3 +1,4 @@
+import { stubClaimsFromUser } from '@/tests/mocks/session'
 import { render, screen } from '@testing-library/react'
 import type { AnchorHTMLAttributes, ReactNode } from 'react'
 
@@ -10,6 +11,7 @@ const { mockSupabase, mockRedirect } = vi.hoisted(() => {
   const mockSupabase = {
     auth: {
       getUser: vi.fn(),
+      getClaims: vi.fn(),
     },
   }
   const mockRedirect = vi.fn()
@@ -41,6 +43,7 @@ import GuidancePage from '@/app/(app)/guidance/page'
 describe('GuidancePage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    stubClaimsFromUser(mockSupabase.auth)
   })
 
   it('renders compact beginner guidance with volunteer terminology', async () => {

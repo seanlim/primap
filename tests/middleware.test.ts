@@ -1,18 +1,13 @@
 import { NextRequest } from 'next/server'
 
-const mockGetUser = vi.fn()
-const mockSingle = vi.fn()
+const { mockGetClaims, mockGetUser } = vi.hoisted(() => ({
+  mockGetClaims: vi.fn(),
+  mockGetUser: vi.fn(),
+}))
 
 vi.mock('@supabase/ssr', () => ({
   createServerClient: vi.fn(() => ({
-    auth: { getUser: mockGetUser },
-    from: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          single: mockSingle,
-        }),
-      }),
-    }),
+    auth: { getClaims: mockGetClaims, getUser: mockGetUser },
   })),
 }))
 
@@ -22,19 +17,33 @@ function makeRequest(path: string): NextRequest {
   return new NextRequest(`http://localhost:3000${path}`)
 }
 
+function claimsFor(userId: string) {
+  return {
+    data: { claims: { sub: userId }, header: {}, signature: new Uint8Array() },
+    error: null,
+  }
+}
+
 describe('middleware', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-key'
+    mockGetClaims.mockResolvedValue({ data: null, error: null })
     mockGetUser.mockResolvedValue({ data: { user: null } })
-    mockSingle.mockResolvedValue({ data: null, error: null })
   })
 
   // --- Unauthenticated ---
 
   it('redirects unauthenticated user from /home to /login', async () => {
     const response = await middleware(makeRequest('/home'))
+
+    expect(response.status).toBe(307)
+    expect(response.headers.get('location')).toContain('/login')
+  })
+
+  it('redirects unauthenticated user from an RSC prefetch to /login', async () => {
+    const response = await middleware(makeRequest('/profile?_rsc=abc123'))
 
     expect(response.status).toBe(307)
     expect(response.headers.get('location')).toContain('/login')
@@ -58,10 +67,16 @@ describe('middleware', () => {
     expect(response.status).toBe(200)
   })
 
+  it('does not hit the Auth server for anonymous requests', async () => {
+    await middleware(makeRequest('/home'))
+
+    expect(mockGetUser).not.toHaveBeenCalled()
+  })
+
   // --- Authenticated on /login ---
 
   it('redirects authenticated user from /login to /home', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockGetClaims.mockResolvedValue(claimsFor('user-1'))
 
     const response = await middleware(makeRequest('/login'))
 
@@ -70,141 +85,65 @@ describe('middleware', () => {
   })
 
   it('allows authenticated user to stay on /login with profile_fetch_failed error', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockGetClaims.mockResolvedValue(claimsFor('user-1'))
 
     const response = await middleware(makeRequest('/login?error=profile_fetch_failed'))
 
     expect(response.status).toBe(200)
   })
 
-  // --- Authenticated with profile statuses ---
+  // --- Authenticated app routes ---
 
-  it('allows ACTIVE VOLUNTEER to access /home', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
-    mockSingle.mockResolvedValue({
-      data: { status: 'ACTIVE', role: 'VOLUNTEER', phone_number: '+6591234567' },
-      error: null,
-    })
+  it('allows an authenticated user through without querying profiles', async () => {
+    mockGetClaims.mockResolvedValue(claimsFor('user-1'))
 
     const response = await middleware(makeRequest('/home'))
 
     expect(response.status).toBe(200)
+    expect(mockGetUser).not.toHaveBeenCalled()
   })
 
-  it('redirects PENDING user from /home to /pending', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
-    mockSingle.mockResolvedValue({
-      data: { status: 'PENDING', role: 'VOLUNTEER' },
-      error: null,
-    })
-
-    const response = await middleware(makeRequest('/home'))
-
-    expect(response.status).toBe(307)
-    expect(response.headers.get('location')).toContain('/pending')
-  })
-
-  it('redirects REJECTED user from /home to /blocked', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
-    mockSingle.mockResolvedValue({
-      data: { status: 'REJECTED', role: 'VOLUNTEER' },
-      error: null,
-    })
-
-    const response = await middleware(makeRequest('/home'))
-
-    expect(response.status).toBe(307)
-    expect(response.headers.get('location')).toContain('/blocked')
-  })
-
-  it('redirects DISABLED user from /home to /blocked', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
-    mockSingle.mockResolvedValue({
-      data: { status: 'DISABLED', role: 'VOLUNTEER' },
-      error: null,
-    })
-
-    const response = await middleware(makeRequest('/home'))
-
-    expect(response.status).toBe(307)
-    expect(response.headers.get('location')).toContain('/blocked')
-  })
-
-  it('allows PENDING user to stay on /pending (no redirect)', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
-    mockSingle.mockResolvedValue({
-      data: { status: 'PENDING', role: 'VOLUNTEER' },
-      error: null,
-    })
-
-    const response = await middleware(makeRequest('/pending'))
-
-    expect(response.status).toBe(200)
-  })
-
-  // --- Profile fetch errors ---
-
-  it('redirects to /login with error on profile fetch failure', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
-    mockSingle.mockResolvedValue({
-      data: null,
-      error: { message: 'DB error' },
-    })
-
-    const response = await middleware(makeRequest('/home'))
-
-    expect(response.status).toBe(307)
-    const location = response.headers.get('location')!
-    expect(location).toContain('/login')
-    expect(location).toContain('error=profile_fetch_failed')
-  })
-
-  it('redirects to /pending when profile is null', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
-    mockSingle.mockResolvedValue({ data: null, error: null })
-
-    const response = await middleware(makeRequest('/home'))
-
-    expect(response.status).toBe(307)
-    expect(response.headers.get('location')).toContain('/pending')
-  })
-
-  // --- Admin access control ---
-
-  it('redirects non-ADMIN from /admin to /home', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
-    mockSingle.mockResolvedValue({
-      data: { status: 'ACTIVE', role: 'VOLUNTEER', phone_number: '+6591234567' },
-      error: null,
-    })
-
-    const response = await middleware(makeRequest('/admin'))
-
-    expect(response.status).toBe(307)
-    expect(response.headers.get('location')).toContain('/home')
-  })
-
-  it('allows ADMIN to access /admin', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
-    mockSingle.mockResolvedValue({
-      data: { status: 'ACTIVE', role: 'ADMIN' },
-      error: null,
-    })
-
-    const response = await middleware(makeRequest('/admin'))
-
-    expect(response.status).toBe(200)
-  })
-
-  it('allows ADMIN to access /admin/users', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
-    mockSingle.mockResolvedValue({
-      data: { status: 'ACTIVE', role: 'ADMIN' },
-      error: null,
-    })
+  it('forwards the pathname so layouts can gate on the current route', async () => {
+    mockGetClaims.mockResolvedValue(claimsFor('user-1'))
 
     const response = await middleware(makeRequest('/admin/users'))
 
     expect(response.status).toBe(200)
+    expect(response.headers.get('x-middleware-request-x-pathname')).toBe('/admin/users')
+  })
+
+  it('refreshes an expired token through getUser as a fallback', async () => {
+    mockGetClaims.mockResolvedValue({
+      data: null,
+      error: { message: 'JWT expired', name: 'AuthInvalidJwtError' },
+    })
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+
+    const response = await middleware(makeRequest('/home'))
+
+    expect(mockGetUser).toHaveBeenCalledTimes(1)
+    expect(response.status).toBe(200)
+  })
+
+  it('redirects when the token cannot be refreshed', async () => {
+    mockGetClaims.mockResolvedValue({
+      data: null,
+      error: { message: 'JWT expired', name: 'AuthInvalidJwtError' },
+    })
+    mockGetUser.mockResolvedValue({ data: { user: null } })
+
+    const response = await middleware(makeRequest('/home'))
+
+    expect(response.status).toBe(307)
+    expect(response.headers.get('location')).toContain('/login')
+  })
+
+  // --- Cron route ---
+
+  it('bypasses auth for the cron endpoint', async () => {
+    const response = await middleware(makeRequest('/api/cron/reminders'))
+
+    expect(response.status).toBe(200)
+    expect(mockGetClaims).not.toHaveBeenCalled()
   })
 })

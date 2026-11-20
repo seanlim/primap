@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -15,7 +14,7 @@ import {
   Droplets,
   WifiOff,
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/server'
+import { requireSession } from '@/lib/supabase/session'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,12 +47,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 export default async function GuidancePage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) redirect('/login')
+  await requireSession()
 
   return (
     <div className="space-y-6 animate-fade-in">

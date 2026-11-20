@@ -2,22 +2,22 @@ import { render, screen } from '@testing-library/react'
 
 const { mockSupabase, mockProfileClient, mockRedirect } = vi.hoisted(() => {
   const mockSupabase = {
-    auth: {
-      getUser: vi.fn(),
-    },
-    from: vi.fn(),
+    rpc: vi.fn(),
   }
   const mockProfileClient = vi.fn<(props: unknown) => import('react').ReactElement>(() => <div data-testid="profile-client" />)
-  const mockRedirect = vi.fn()
+  // Next's redirect() throws to unwind the render; mirror that so the page stops.
+  const mockRedirect = vi.fn((url: string) => {
+    throw new Error(`NEXT_REDIRECT:${url}`)
+  })
   return { mockSupabase, mockProfileClient, mockRedirect }
 })
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => mockSupabase),
+vi.mock('@/lib/supabase/session', () => ({
+  requireSession: vi.fn(async () => ({ supabase: mockSupabase, userId: 'user-1' })),
 }))
 
 vi.mock('next/navigation', () => ({
-  redirect: (...args: unknown[]) => mockRedirect(...args),
+  redirect: (url: string) => mockRedirect(url),
 }))
 
 vi.mock('@/app/(app)/profile/profile-client', () => ({
@@ -26,119 +26,124 @@ vi.mock('@/app/(app)/profile/profile-client', () => ({
 
 import ProfilePage from '@/app/(app)/profile/page'
 
-function createQuery(result: { data?: unknown; count?: number | null; error?: { message: string } | null }) {
-  const query = {
-    eq: vi.fn(() => query),
-    order: vi.fn(() => query),
-    limit: vi.fn(() => query),
-    in: vi.fn(() => query),
-    single: vi.fn().mockResolvedValue({
-      data: result.data ?? null,
-      error: result.error ?? null,
-      count: result.count ?? null,
-    }),
-    then: vi.fn((resolve: (value: unknown) => unknown) =>
-      Promise.resolve(resolve({
-        data: result.data ?? null,
-        error: result.error ?? null,
-        count: result.count ?? null,
-      }))
-    ),
-  }
+const profile = {
+  id: 'user-1',
+  email: 'volunteer@example.com',
+  full_name: 'Volunteer One',
+  avatar_url: null,
+  phone_number: '+6591234567',
+  phone_verified_at: null,
+  birth_month: null,
+  role: 'VOLUNTEER',
+  status: 'ACTIVE',
+  created_at: '2026-01-01T00:00:00.000Z',
+}
 
-  return query
+const walkSlot = {
+  id: 'slot-1',
+  location_name: 'Bukit Timah',
+  walk_date: '2026-04-05',
+  start_time: '07:00:00',
+  end_time: '09:00:00',
+  survey_rounds: { name: 'Round 2' },
 }
 
 describe('ProfilePage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-04-11T12:00:00+08:00'))
   })
 
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  it('scopes progress stats to the current round while leaving history separate', async () => {
-    mockSupabase.auth.getUser.mockResolvedValue({
-      data: { user: { id: 'user-1' } },
-    })
-
-    const tableResults: Record<string, Array<{ data?: unknown; count?: number | null }>> = {
-      profiles: [
-        {
-          data: {
-            id: 'user-1',
-            email: 'volunteer@example.com',
-            full_name: 'Volunteer One',
-            avatar_url: null,
-            phone_number: '+6591234567',
-            phone_verified_at: null,
-            role: 'VOLUNTEER',
-            status: 'ACTIVE',
-            created_at: '2026-01-01T00:00:00.000Z',
+  it('renders the whole page from a single RPC payload', async () => {
+    mockSupabase.rpc.mockResolvedValue({
+      data: {
+        profile,
+        submitted_observations: [
+          {
+            id: 'obs-1',
+            slot_id: 'slot-1',
+            status: 'SUBMITTED',
+            outcome: 'SIGHTED',
+            lat: 1.35,
+            lng: 103.78,
+            walk_slots: walkSlot,
           },
-        },
-      ],
-      slot_memberships: [
-        { data: [] },
-        { count: 2 },
-      ],
-      observations: [
-        { data: [] },
-        { count: 1 },
-        { count: 1 },
-      ],
-      slot_attendance: [
-        { count: 2 },
-      ],
-      app_settings: [
-        { data: { required_walks_per_round: 4 } },
-      ],
-      survey_rounds: [
-        {
-          data: [
-            { id: 'round-1', name: 'Round 1', start_date: '2026-03-01', end_date: '2026-03-31' },
-            { id: 'round-2', name: 'Round 2', start_date: '2026-04-01', end_date: '2026-04-30' },
-          ],
-        },
-      ],
-      walk_slots: [
-        {
-          data: [
-            { id: 'slot-current-1' },
-            { id: 'slot-current-2' },
-          ],
-        },
-      ],
-    }
-
-    const callCounts = new Map<string, number>()
-
-    mockSupabase.from.mockImplementation((table: string) => ({
-      select: () => {
-        const index = callCounts.get(table) ?? 0
-        callCounts.set(table, index + 1)
-        const result = tableResults[table]?.[index]
-        if (!result) throw new Error(`Unexpected query for table ${table} at call ${index + 1}`)
-        return createQuery(result)
+        ],
+        walk_history: [
+          {
+            membership_id: 'membership-1',
+            slot_id: 'slot-1',
+            history_type: 'active',
+            walk_slots: walkSlot,
+          },
+        ],
+        history_observations: [
+          { id: 'obs-1', slot_id: 'slot-1', status: 'SUBMITTED', outcome: 'SIGHTED' },
+        ],
+        attendance: [{ slot_id: 'slot-1', status: 'PRESENT' }],
+        sightings: [
+          { observation_id: 'obs-1', lat: 1.35, lng: 103.78, species: 'RBL', species_other: null },
+        ],
+        settings: { required_walks_per_round: 4 },
+        stats: { drafts_pending: 1, reports_submitted: 2, walks_attended: 3 },
       },
-    }))
+      error: null,
+    })
 
     render(await ProfilePage())
 
     expect(screen.getByTestId('profile-client')).toBeInTheDocument()
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('get_profile_page')
     expect(mockProfileClient).toHaveBeenCalledWith(
       expect.objectContaining({
-        stats: expect.objectContaining({
-          walksJoined: 2,
-          walksAttended: 2,
+        stats: {
+          walksJoined: 3,
+          walksAttended: 3,
           draftsPending: 1,
-          reportsSubmitted: 1,
+          reportsSubmitted: 2,
           requiredWalks: 4,
-        }),
+        },
+        walkHistory: [
+          expect.objectContaining({
+            membershipId: 'membership-1',
+            slotId: 'slot-1',
+            roundName: 'Round 2',
+            reportStatus: 'SUBMITTED',
+            attendance: 'PRESENT',
+            sightingCount: 1,
+          }),
+        ],
+        reportMapPoints: [
+          expect.objectContaining({ lat: 1.35, lng: 103.78, outcome: 'SIGHTED' }),
+        ],
       })
     )
+  })
+
+  it('redirects to login when the payload cannot be loaded', async () => {
+    mockSupabase.rpc.mockResolvedValue({ data: null, error: { message: 'boom' } })
+
+    await expect(ProfilePage()).rejects.toThrow('NEXT_REDIRECT:/login?error=profile_fetch_failed')
+
+    expect(mockRedirect).toHaveBeenCalledWith('/login?error=profile_fetch_failed')
+  })
+
+  it('redirects to login when the profile row is missing', async () => {
+    mockSupabase.rpc.mockResolvedValue({
+      data: {
+        profile: null,
+        submitted_observations: [],
+        walk_history: [],
+        history_observations: [],
+        attendance: [],
+        sightings: [],
+        settings: null,
+        stats: { drafts_pending: 0, reports_submitted: 0, walks_attended: 0 },
+      },
+      error: null,
+    })
+
+    await expect(ProfilePage()).rejects.toThrow('NEXT_REDIRECT:/login')
+
+    expect(mockRedirect).toHaveBeenCalledWith('/login')
   })
 })

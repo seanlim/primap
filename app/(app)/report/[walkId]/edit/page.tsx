@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { requireSession } from '@/lib/supabase/session'
 import { redirect, notFound } from 'next/navigation'
 import { ObservationFormClient } from './observation-form-client'
 import { getSlotMembersWithAttendance } from '@/lib/report-slot-data'
@@ -13,9 +13,7 @@ export default async function EditReportPage({
   params: Promise<{ walkId: string }>
 }) {
   const { walkId } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  const { supabase, userId } = await requireSession()
 
   // Run all queries in parallel
   const [walkResult, membershipResult, obsResult, settingsResult] = await Promise.all([
@@ -28,7 +26,7 @@ export default async function EditReportPage({
       .from('slot_memberships')
       .select('id')
       .eq('slot_id', walkId)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('status', 'ACTIVE')
       .single(),
     supabase
@@ -57,7 +55,7 @@ export default async function EditReportPage({
     redirect(`/report/${walkId}`)
   }
 
-  const attendanceData = await getSlotMembersWithAttendance(supabase, walkId, user.id)
+  const attendanceData = await getSlotMembersWithAttendance(supabase, walkId, userId)
   const canMarkAttendance = attendanceData.isAdmin
     || (attendanceData.isParticipant && hasWalkStarted(walk.walk_date, walk.start_time))
 

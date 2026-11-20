@@ -1,5 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+import { requireSession } from '@/lib/supabase/session'
 import Link from 'next/link'
 import { formatDate, getRelativeDay } from '@/lib/utils/format-date'
 import { WalkFilters } from './walk-filters-client'
@@ -168,16 +167,21 @@ export default async function WalkPage({
   const locationFilter = params.location || ''
   const availabilityFilter = params.availability || ''
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  const { supabase, userId } = await requireSession()
 
-  // Get all open rounds with their slots
-  const { data: rounds } = await supabase
-    .from('survey_rounds')
-    .select('*')
-    .eq('status', 'OPEN')
-    .order('start_date', { ascending: false })
+  // Open rounds and the volunteer's own memberships are independent reads.
+  const [{ data: rounds }, { data: myMemberships }] = await Promise.all([
+    supabase
+      .from('survey_rounds')
+      .select('*')
+      .eq('status', 'OPEN')
+      .order('start_date', { ascending: false }),
+    supabase
+      .from('slot_memberships')
+      .select('slot_id')
+      .eq('user_id', userId)
+      .eq('status', 'ACTIVE'),
+  ])
 
   // Get all slots for open rounds with filters
   const roundIds = (rounds || []).map(r => r.id)
@@ -231,13 +235,6 @@ export default async function WalkPage({
         roundEndDate: round.end_date,
       }
     })
-
-  // Get user's active memberships
-  const { data: myMemberships } = await supabase
-    .from('slot_memberships')
-    .select('slot_id')
-    .eq('user_id', user.id)
-    .eq('status', 'ACTIVE')
 
   const mySlotIds = new Set((myMemberships || []).map(m => m.slot_id))
 

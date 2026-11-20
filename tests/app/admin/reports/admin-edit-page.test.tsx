@@ -1,3 +1,4 @@
+import { stubClaimsFromUser } from '@/tests/mocks/session'
 import { render, screen } from '@testing-library/react'
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────
@@ -12,6 +13,7 @@ const {
   const mockSupabase = {
     auth: {
       getUser: vi.fn(),
+      getClaims: vi.fn(),
     },
     from: vi.fn(),
   }
@@ -117,6 +119,7 @@ const defaultParams = Promise.resolve({
 describe('AdminEditObservationPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    stubClaimsFromUser(mockSupabase.auth)
     mockSupabase.auth.getUser.mockResolvedValue({
       data: { user: { id: 'admin-1' } },
     })

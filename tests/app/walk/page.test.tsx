@@ -1,9 +1,11 @@
+import { stubClaimsFromUser } from '@/tests/mocks/session'
 import { render, screen } from '@testing-library/react'
 
 const { mockSupabase, mockRedirect } = vi.hoisted(() => {
   const mockSupabase = {
     auth: {
       getUser: vi.fn(),
+      getClaims: vi.fn(),
     },
     from: vi.fn(),
   }
@@ -51,6 +53,7 @@ function createQuery(result: { data?: unknown; count?: number | null; error?: { 
 describe('WalkPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    stubClaimsFromUser(mockSupabase.auth)
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-04-11T12:00:00+08:00'))
   })

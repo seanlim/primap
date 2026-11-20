@@ -1,14 +1,23 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { isPublicPath, needsPhoneCompletion, needsProfileCheck, resolveStatusRedirect } from '@/lib/auth/access-policy'
+import { isPublicPath } from '@/lib/auth/access-policy'
 
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request })
   const pathname = request.nextUrl.pathname
 
   if (pathname === '/api/cron/reminders') {
-    return supabaseResponse
+    return NextResponse.next({ request })
   }
+
+  // App Router layouts don't receive the pathname, so forward it as a request
+  // header for the account-status checks in app/(app)/layout.tsx.
+  const forwardedHeaders = () => {
+    const headers = new Headers(request.headers)
+    headers.set('x-pathname', pathname)
+    return headers
+  }
+
+  let supabaseResponse = NextResponse.next({ request: { headers: forwardedHeaders() } })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,7 +31,7 @@ export async function middleware(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) => {
             request.cookies.set(name, value)
           })
-          supabaseResponse = NextResponse.next({ request })
+          supabaseResponse = NextResponse.next({ request: { headers: forwardedHeaders() } })
           cookiesToSet.forEach(({ name, value, options }) => {
             supabaseResponse.cookies.set(name, value, options)
           })
@@ -31,12 +40,21 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  // Verify the JWT locally against the cached JWKS instead of calling the Auth
+  // server on every request. Only an expired token needs the network, because
+  // refreshing it has to write new cookies back onto the response.
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims()
+  let userId: string | null = claimsData?.claims?.sub ?? null
+
+  if (!userId && claimsError) {
+    const { data: userData } = await supabase.auth.getUser()
+    userId = userData.user?.id ?? null
+  }
 
   const requestIsPublicPath = isPublicPath(pathname)
 
   // Unauthenticated users can only access public paths
-  if (!user && !requestIsPublicPath && pathname !== '/') {
+  if (!userId && !requestIsPublicPath && pathname !== '/') {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
@@ -45,67 +63,16 @@ export async function middleware(request: NextRequest) {
   // Authenticated users on login page should redirect to home,
   // unless they were redirected here due to profile fetch failure.
   const loginError = request.nextUrl.searchParams.get('error')
-  if (user && pathname === '/login' && loginError !== 'profile_fetch_failed') {
+  if (userId && pathname === '/login' && loginError !== 'profile_fetch_failed') {
     const url = request.nextUrl.clone()
     url.pathname = '/home'
     return NextResponse.redirect(url)
   }
 
-  // Check account status for authenticated users across protected pages
-  // and the status landing pages themselves.
-  const profileCheckRequired = needsProfileCheck({
-    hasUser: Boolean(user),
-    pathname,
-    isPublic: requestIsPublicPath,
-  })
-
-  if (profileCheckRequired) {
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('status, role, phone_number')
-      .eq('id', user!.id)
-      .single()
-
-    if (profileError) {
-      console.error('Failed to fetch profile in middleware:', profileError)
-      const url = request.nextUrl.clone()
-      url.pathname = '/login'
-      url.searchParams.set('error', 'profile_fetch_failed')
-      return NextResponse.redirect(url)
-    }
-
-    if (!profile) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/pending'
-      return NextResponse.redirect(url)
-    }
-
-    const statusRedirect = resolveStatusRedirect(profile.status)
-    if (statusRedirect && pathname !== statusRedirect) {
-      const url = request.nextUrl.clone()
-      url.pathname = statusRedirect
-      return NextResponse.redirect(url)
-    }
-
-    if (needsPhoneCompletion({
-      role: profile.role,
-      status: profile.status,
-      phoneNumber: profile.phone_number,
-      pathname,
-    })) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/profile'
-      url.searchParams.set('phone', 'required')
-      return NextResponse.redirect(url)
-    }
-
-    if (pathname.startsWith('/admin') && profile.role !== 'ADMIN') {
-      const url = request.nextUrl.clone()
-      url.pathname = '/home'
-      return NextResponse.redirect(url)
-    }
-  }
-
+  // Account status, phone completion and admin gating live in
+  // app/(app)/layout.tsx, which needs the profile row anyway. Doing the profile
+  // query here duplicated it in the layout and page and added two sequential
+  // database round trips to every request (including RSC prefetches).
   return supabaseResponse
 }
 

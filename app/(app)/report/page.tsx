@@ -1,5 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+import { requireSession } from '@/lib/supabase/session'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils/format-date'
 import { ClipboardList, Search } from 'lucide-react'
@@ -86,9 +85,7 @@ function ReportSection({
 }
 
 export default async function ReportListPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  const { supabase, userId } = await requireSession()
 
   const membershipResult = await supabase
   .from('slot_memberships')
@@ -104,7 +101,7 @@ export default async function ReportListPage() {
       survey_rounds (name)
     )
   `)
-  .eq('user_id', user.id)
+  .eq('user_id', userId)
   .eq('status', 'ACTIVE')
   .order('joined_at', { ascending: false })
 
@@ -117,32 +114,35 @@ export default async function ReportListPage() {
     })
     .filter((id): id is string => Boolean(id))
 
-  const submittedResult = await supabase
-  .from('observations')
-  .select(`
-    id,
-    slot_id,
-    status,
-    walk_slots (
-      id,
-      location_name,
-      walk_date,
-      start_time,
-      end_time,
-      survey_rounds (name)
-    )
-  `)
-  .in('slot_id', slotIds)
-  .eq('status', 'SUBMITTED')
-  
-  const submittedObservations = submittedResult.data || []
+  // Both reads only depend on the membership slot ids, so they share a round trip.
+  const [submittedResult, observationsResult] = await Promise.all([
+    supabase
+      .from('observations')
+      .select(`
+        id,
+        slot_id,
+        status,
+        walk_slots (
+          id,
+          location_name,
+          walk_date,
+          start_time,
+          end_time,
+          survey_rounds (name)
+        )
+      `)
+      .in('slot_id', slotIds)
+      .eq('status', 'SUBMITTED'),
+    slotIds.length > 0
+      ? supabase
+          .from('observations')
+          .select('id, slot_id, status')
+          .in('slot_id', slotIds)
+      : Promise.resolve({ data: [] }),
+  ])
 
-  const { data: observations } = slotIds.length > 0
-    ? await supabase
-        .from('observations')
-        .select('id, slot_id, status')
-        .in('slot_id', slotIds)
-    : { data: [] }
+  const submittedObservations = submittedResult.data || []
+  const observations = observationsResult.data || []
 
   const observationMap = new Map(
     (observations || []).map((observation) => [

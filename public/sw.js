@@ -1,29 +1,18 @@
-const CACHE_NAME = 'primap-v3'
+const CACHE_NAME = 'primap-static-v1'
 const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1'])
 const IS_LOCALHOST = LOCAL_HOSTNAMES.has(self.location.hostname)
-const STATIC_ASSETS = [
-  '/',
-  '/home',
-  '/walk',
-  '/report',
-  '/profile',
-  '/manifest.json',
-]
+const IMMUTABLE_ASSET = /\.(png|jpg|jpeg|svg|gif|webp|ico|woff2?|css|js|pdf)$/
 
-// Install: cache app shell
-self.addEventListener('install', (event) => {
-  if (IS_LOCALHOST) {
-    self.skipWaiting()
-    return
-  }
+// Nothing is precached. Every app route is per-user and server rendered, so
+// pre-caching them on install triggered several full dynamic renders and could
+// serve one volunteer's page to another. Only content-hashed build assets are
+// cached, and only after the browser requests them.
 
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
-  )
+self.addEventListener('install', () => {
   self.skipWaiting()
 })
 
-// Activate: clean old caches
+// Activate: drop caches from previous versions, including the old HTML cache.
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -37,59 +26,40 @@ self.addEventListener('activate', (event) => {
   self.clients.claim()
 })
 
-// Fetch: network-first for API, cache-first for assets
+function isImmutableAsset(url) {
+  return url.pathname.startsWith('/_next/static/') || IMMUTABLE_ASSET.test(url.pathname)
+}
+
+// Fetch: static build assets only. Documents, RSC payloads and API responses
+// always go to the network so per-user data is never cached.
 self.addEventListener('fetch', (event) => {
   if (IS_LOCALHOST) return
 
   const { request } = event
-  const url = new URL(request.url)
-
-  // Skip non-GET requests
   if (request.method !== 'GET') return
 
-  // Skip Supabase API calls (auth, realtime)
+  const url = new URL(request.url)
+
+  // Skip Supabase calls (auth, REST, realtime)
   if (url.hostname.includes('supabase')) return
+  if (url.origin !== self.location.origin) return
 
-  // API routes: network-first
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/_next/data/')) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const clone = response.clone()
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
-          return response
-        })
-        .catch(() => caches.match(request))
-    )
-    return
-  }
+  // Never intercept the worker script or RSC payload requests
+  if (url.pathname === '/sw.js' || url.searchParams.has('_rsc')) return
 
-  // Static assets: cache-first, but cache on first fetch
-  if (
-    url.pathname.startsWith('/_next/static/') ||
-    url.pathname.match(/\.(png|jpg|jpeg|svg|gif|webp|ico|woff2?|css|js)$/)
-  ) {
-    event.respondWith(
-      caches.match(request).then((cached) => {
-        if (cached) return cached
-        return fetch(request).then((response) => {
-          const clone = response.clone()
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
-          return response
-        })
-      })
-    )
-    return
-  }
+  if (!isImmutableAsset(url)) return
 
-  // HTML pages: network-first with cache fallback
   event.respondWith(
-    fetch(request)
-      .then((response) => {
-        const clone = response.clone()
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
+    caches.match(request).then((cached) => {
+      if (cached) return cached
+
+      return fetch(request).then((response) => {
+        if (response.ok && response.type === 'basic') {
+          const clone = response.clone()
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
+        }
         return response
       })
-      .catch(() => caches.match(request))
+    })
   )
 })

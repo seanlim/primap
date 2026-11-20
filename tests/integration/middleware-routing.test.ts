@@ -1,42 +1,85 @@
 /**
- * Integration test: full middleware with real access-policy functions, only mocking Supabase auth.
+ * Integration test: real access-policy functions wired through the layers that
+ * enforce them.
  *
- * Only external boundary mocked:
- *   1. @supabase/ssr (createServerClient) — Supabase auth + DB
+ * `middleware.ts` now only authenticates (no database access). Account status,
+ * phone completion and admin gating moved to `app/(app)/layout.tsx`, which reads
+ * the pathname from the `x-pathname` header the middleware sets. Both layers are
+ * exercised here with the real access-policy helpers.
  *
- * The real access-policy module (isPublicPath, needsProfileCheck, resolveStatusRedirect)
- * wires through naturally.
+ * Only external boundaries are mocked: @supabase/ssr (auth), next/headers,
+ * next/navigation and the layout's presentational shell.
  */
 
 import { NextRequest } from 'next/server'
 
-const mockGetUser = vi.fn()
-const mockSingle = vi.fn()
+const { mockGetClaims, mockGetUser, mockRequireSession, mockGetCurrentProfile, mockRedirect, mockHeaders, pathnameRef } =
+  vi.hoisted(() => {
+    const pathnameRef = { current: '/home' }
+    return {
+      mockGetClaims: vi.fn(),
+      mockGetUser: vi.fn(),
+      mockRequireSession: vi.fn(),
+      mockGetCurrentProfile: vi.fn(),
+      mockRedirect: vi.fn((url: string) => {
+        throw new Error(`NEXT_REDIRECT:${url}`)
+      }),
+      mockHeaders: vi.fn(async () => new Headers({ 'x-pathname': pathnameRef.current })),
+      pathnameRef,
+    }
+  })
 
 vi.mock('@supabase/ssr', () => ({
   createServerClient: vi.fn(() => ({
-    auth: { getUser: mockGetUser },
-    from: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({ single: mockSingle }),
-      }),
-    }),
+    auth: { getClaims: mockGetClaims, getUser: mockGetUser },
   })),
 }))
 
+vi.mock('@/lib/supabase/session', () => ({
+  requireSession: mockRequireSession,
+  getCurrentProfile: mockGetCurrentProfile,
+}))
+
+vi.mock('next/navigation', () => ({ redirect: mockRedirect }))
+vi.mock('next/headers', () => ({ headers: mockHeaders }))
+vi.mock('@/components/layout/app-shell', () => ({
+  AppShell: ({ children }: { children: unknown }) => children,
+}))
+vi.mock('@/components/ui/toast', () => ({
+  ToastProvider: ({ children }: { children: unknown }) => children,
+}))
+
 import { middleware } from '@/middleware'
+import AppLayout from '@/app/(app)/layout'
 
 function makeRequest(path: string): NextRequest {
   return new NextRequest(`http://localhost:3000${path}`)
 }
 
-describe('middleware-routing (integration)', () => {
+function claimsFor(userId: string) {
+  return {
+    data: { claims: { sub: userId }, header: {}, signature: new Uint8Array() },
+    error: null,
+  }
+}
+
+async function renderLayout(pathname: string) {
+  pathnameRef.current = pathname
+  try {
+    await AppLayout({ children: null })
+    return null
+  } catch (error) {
+    return (error as Error).message
+  }
+}
+
+describe('middleware authentication', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-key'
+    mockGetClaims.mockResolvedValue({ data: null, error: null })
     mockGetUser.mockResolvedValue({ data: { user: null } })
-    mockSingle.mockResolvedValue({ data: null, error: null })
   })
 
   it('unauthenticated → /home → real isPublicPath returns false → redirect /login', async () => {
@@ -53,7 +96,7 @@ describe('middleware-routing (integration)', () => {
   })
 
   it('authenticated → /login → redirect /home', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+    mockGetClaims.mockResolvedValue(claimsFor('user-1'))
 
     const response = await middleware(makeRequest('/login'))
 
@@ -61,109 +104,109 @@ describe('middleware-routing (integration)', () => {
     expect(response.headers.get('location')).toContain('/home')
   })
 
-  // TC-INT-AUTH-01 (UC-01): Pending accounts are blocked from normal app routes
-  it('authenticated PENDING → /home → real resolveStatusRedirect returns /pending → redirect /pending', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
-    mockSingle.mockResolvedValue({
-      data: { status: 'PENDING', role: 'VOLUNTEER' },
-      error: null,
-    })
+  it('authenticated → /home → pass through without touching the database', async () => {
+    mockGetClaims.mockResolvedValue(claimsFor('user-1'))
 
     const response = await middleware(makeRequest('/home'))
 
-    expect(response.status).toBe(307)
-    expect(response.headers.get('location')).toContain('/pending')
+    expect(response.status).toBe(200)
+    expect(mockGetUser).not.toHaveBeenCalled()
   })
 
-  it('authenticated REJECTED → /walk → real resolveStatusRedirect returns /blocked → redirect /blocked', async () => {
+  it('expired token → refresh through getUser → pass through', async () => {
+    mockGetClaims.mockResolvedValue({ data: null, error: { message: 'JWT expired' } })
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
-    mockSingle.mockResolvedValue({
-      data: { status: 'REJECTED', role: 'VOLUNTEER' },
-      error: null,
-    })
-
-    const response = await middleware(makeRequest('/walk'))
-
-    expect(response.status).toBe(307)
-    expect(response.headers.get('location')).toContain('/blocked')
-  })
-
-  it('authenticated ACTIVE VOLUNTEER → /admin → role check → redirect /home', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
-    mockSingle.mockResolvedValue({
-      data: { status: 'ACTIVE', role: 'VOLUNTEER', phone_number: '+6591234567' },
-      error: null,
-    })
-
-    const response = await middleware(makeRequest('/admin'))
-
-    expect(response.status).toBe(307)
-    expect(response.headers.get('location')).toContain('/home')
-  })
-
-  it('authenticated ACTIVE VOLUNTEER without a phone → /home → redirect /profile?phone=required', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
-    mockSingle.mockResolvedValue({
-      data: { status: 'ACTIVE', role: 'VOLUNTEER', phone_number: null },
-      error: null,
-    })
 
     const response = await middleware(makeRequest('/home'))
 
-    expect(response.status).toBe(307)
-    const location = response.headers.get('location')!
-    expect(location).toContain('/profile')
-    expect(location).toContain('phone=required')
+    expect(response.status).toBe(200)
+    expect(mockGetUser).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('app layout account gating', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockRequireSession.mockResolvedValue({ supabase: {}, userId: 'user-1' })
+    mockGetCurrentProfile.mockResolvedValue({
+      profile: { id: 'user-1', status: 'ACTIVE', role: 'VOLUNTEER', phone_number: '+6591234567' },
+      error: null,
+    })
   })
 
-  it('authenticated ACTIVE VOLUNTEER without a phone → /profile → pass through', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
-    mockSingle.mockResolvedValue({
-      data: { status: 'ACTIVE', role: 'VOLUNTEER', phone_number: null },
+  it('ACTIVE volunteer with a phone → /home → pass through', async () => {
+    expect(await renderLayout('/home')).toBeNull()
+  })
+
+  it('PENDING → /home → resolveStatusRedirect returns /pending', async () => {
+    mockGetCurrentProfile.mockResolvedValue({
+      profile: { id: 'user-1', status: 'PENDING', role: 'VOLUNTEER', phone_number: null },
       error: null,
     })
 
-    const response = await middleware(makeRequest('/profile'))
-
-    expect(response.status).toBe(200)
+    expect(await renderLayout('/home')).toBe('NEXT_REDIRECT:/pending')
   })
 
-  it('authenticated ACTIVE ADMIN without a phone → /admin → pass through', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
-    mockSingle.mockResolvedValue({
-      data: { status: 'ACTIVE', role: 'ADMIN', phone_number: null },
+  it('REJECTED → /walk → resolveStatusRedirect returns /blocked', async () => {
+    mockGetCurrentProfile.mockResolvedValue({
+      profile: { id: 'user-1', status: 'REJECTED', role: 'VOLUNTEER', phone_number: null },
       error: null,
     })
 
-    const response = await middleware(makeRequest('/admin'))
-
-    expect(response.status).toBe(200)
+    expect(await renderLayout('/walk')).toBe('NEXT_REDIRECT:/blocked')
   })
 
-  it('authenticated ACTIVE ADMIN → /admin → pass through', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
-    mockSingle.mockResolvedValue({
-      data: { status: 'ACTIVE', role: 'ADMIN' },
+  it('DISABLED → /walk → resolveStatusRedirect returns /blocked', async () => {
+    mockGetCurrentProfile.mockResolvedValue({
+      profile: { id: 'user-1', status: 'DISABLED', role: 'VOLUNTEER', phone_number: null },
       error: null,
     })
 
-    const response = await middleware(makeRequest('/admin'))
+    expect(await renderLayout('/walk')).toBe('NEXT_REDIRECT:/blocked')
+  })
 
-    expect(response.status).toBe(200)
+  it('ACTIVE volunteer without a phone → /home → needsPhoneCompletion sends them to /profile', async () => {
+    mockGetCurrentProfile.mockResolvedValue({
+      profile: { id: 'user-1', status: 'ACTIVE', role: 'VOLUNTEER', phone_number: null },
+      error: null,
+    })
+
+    expect(await renderLayout('/home')).toBe('NEXT_REDIRECT:/profile?phone=required')
+  })
+
+  it('ACTIVE volunteer without a phone → /profile → allowed', async () => {
+    mockGetCurrentProfile.mockResolvedValue({
+      profile: { id: 'user-1', status: 'ACTIVE', role: 'VOLUNTEER', phone_number: null },
+      error: null,
+    })
+
+    expect(await renderLayout('/profile')).toBeNull()
+  })
+
+  it('ACTIVE admin without a phone → /admin → allowed', async () => {
+    mockGetCurrentProfile.mockResolvedValue({
+      profile: { id: 'user-1', status: 'ACTIVE', role: 'ADMIN', phone_number: null },
+      error: null,
+    })
+
+    expect(await renderLayout('/admin')).toBeNull()
   })
 
   it('profile fetch error → redirect /login?error=profile_fetch_failed', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
-    mockSingle.mockResolvedValue({
-      data: null,
+    mockGetCurrentProfile.mockResolvedValue({
+      profile: null,
       error: { message: 'DB connection failed' },
     })
 
-    const response = await middleware(makeRequest('/home'))
+    expect(await renderLayout('/home')).toBe('NEXT_REDIRECT:/login?error=profile_fetch_failed')
+  })
 
-    expect(response.status).toBe(307)
-    const location = response.headers.get('location')!
-    expect(location).toContain('/login')
-    expect(location).toContain('error=profile_fetch_failed')
+  it('missing profile row → redirect /pending', async () => {
+    mockGetCurrentProfile.mockResolvedValue({
+      profile: null,
+      error: { code: 'PGRST116', message: 'No rows found' },
+    })
+
+    expect(await renderLayout('/home')).toBe('NEXT_REDIRECT:/pending')
   })
 })

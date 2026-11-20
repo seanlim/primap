@@ -1,5 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
-import { notFound, redirect } from 'next/navigation'
+import { requireSession } from '@/lib/supabase/session'
+import { notFound } from 'next/navigation'
 import { GroupViewClient } from '@/app/(app)/report/[walkId]/group-view-client'
 import { getSlotReportViewData } from '@/lib/report-slot-data'
 
@@ -11,12 +11,9 @@ export default async function AdminWalkReportPage({
   params: Promise<{ walkId: string }>
 }) {
   const { walkId } = await params
-  const supabase = await createClient()
+  const { supabase, userId } = await requireSession()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const viewData = await getSlotReportViewData(supabase, walkId, user.id)
+  const viewData = await getSlotReportViewData(supabase, walkId, userId)
   if (!viewData) notFound()
 
   return (
@@ -25,7 +22,7 @@ export default async function AdminWalkReportPage({
       observation={viewData.observations}
       members={viewData.members}
       incidents={viewData.incidents}
-      currentUserId={user.id}
+      currentUserId={userId}
       backHref="/admin/reports"
       backLabel="Back to Admin Reports"
       canReportIncident={viewData.isParticipant}

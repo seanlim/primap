@@ -1,5 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { requireSession, getCurrentProfile } from '@/lib/supabase/session'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,16 +8,11 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  await requireSession()
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
+  // Cached per render: app/(app)/layout.tsx already read this profile, so the
+  // admin guard adds no extra database round trip.
+  const { profile } = await getCurrentProfile()
   if (profile?.role !== 'ADMIN') redirect('/home')
 
   return <>{children}</>

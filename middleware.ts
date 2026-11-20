@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { isPublicPath, needsProfileCheck, resolveStatusRedirect } from '@/lib/auth/access-policy'
+import { isPublicPath, needsPhoneCompletion, needsProfileCheck, resolveStatusRedirect } from '@/lib/auth/access-policy'
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -62,7 +62,7 @@ export async function middleware(request: NextRequest) {
   if (profileCheckRequired) {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('status, role')
+      .select('status, role, phone_number')
       .eq('id', user!.id)
       .single()
 
@@ -84,6 +84,18 @@ export async function middleware(request: NextRequest) {
     if (statusRedirect && pathname !== statusRedirect) {
       const url = request.nextUrl.clone()
       url.pathname = statusRedirect
+      return NextResponse.redirect(url)
+    }
+
+    if (needsPhoneCompletion({
+      role: profile.role,
+      status: profile.status,
+      phoneNumber: profile.phone_number,
+      pathname,
+    })) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/profile'
+      url.searchParams.set('phone', 'required')
       return NextResponse.redirect(url)
     }
 

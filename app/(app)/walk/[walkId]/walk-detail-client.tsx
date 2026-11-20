@@ -2,6 +2,7 @@
 
 import { useRef, useState, useOptimistic, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { joinWalk, cancelWalk, getWalkLateCancellationStatus } from '@/lib/actions/walk-actions'
 import { MapPin, Calendar, Clock, Users } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
@@ -32,9 +33,10 @@ interface WalkDetailProps {
   isFull: boolean
   currentUserId: string
   hasSubmittedReport: boolean
+  missingPhone?: boolean
 }
 
-export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserId, hasSubmittedReport }: WalkDetailProps) {
+export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserId, hasSubmittedReport, missingPhone = false }: WalkDetailProps) {
   const [error, setError] = useState('')
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [lateCancellationActive, setLateCancellationActive] = useState(false)
@@ -184,13 +186,27 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
           </div>
         ) : (
           <div className="space-y-2">
-            <button
-              onClick={handleJoin}
-              disabled={joinDisabled}
-              className="w-full bg-green-600 text-white py-3 px-4 rounded-xl hover:bg-green-700 disabled:opacity-50 font-medium transition-colors"
-            >
-              {isJoining ? 'Joining...' : walk.joinBlockedInfo?.label || 'Join Walk'}
-            </button>
+            {missingPhone ? (
+              <>
+                <Link
+                  href="/profile?phone=required"
+                  className="block w-full bg-amber-500 text-white py-3 px-4 rounded-xl hover:bg-amber-600 font-medium transition-colors text-center"
+                >
+                  Add phone number to join
+                </Link>
+                <p className="text-xs text-amber-700 text-center">
+                  A phone number is required so organisers can reach you in an emergency.
+                </p>
+              </>
+            ) : (
+              <button
+                onClick={handleJoin}
+                disabled={joinDisabled}
+                className="w-full bg-green-600 text-white py-3 px-4 rounded-xl hover:bg-green-700 disabled:opacity-50 font-medium transition-colors"
+              >
+                {isJoining ? 'Joining...' : walk.joinBlockedInfo?.label || 'Join Walk'}
+              </button>
+            )}
             {walk.joinBlockedInfo && (
               <p className="text-xs text-gray-500 text-center">{walk.joinBlockedInfo.description}</p>
             )}

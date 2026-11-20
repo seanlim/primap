@@ -218,6 +218,8 @@ export default async function ProfilePage() {
         email: profile.email,
         fullName: profile.full_name,
         avatarUrl: profile.avatar_url,
+        phoneNumber: profile.phone_number,
+        phoneVerifiedAt: profile.phone_verified_at,
         role: profile.role,
         status: profile.status,
         createdAt: profile.created_at,

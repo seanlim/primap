@@ -8,6 +8,7 @@ import {
   type WalkEmailParticipant,
 } from '@/lib/email'
 import { getJoinBlockInfo, hasWalkStarted } from '@/lib/utils/walk-participation'
+import { hasPhone } from '@/lib/utils/phone'
 import { OBSERVATION_MEDIA_BUCKET } from '@/lib/utils/storage'
 import { isLateCancellationActive } from '@/lib/utils/reminder-schedule'
 
@@ -43,6 +44,19 @@ export async function joinWalk(walkId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('phone_number')
+    .eq('id', user.id)
+    .single()
+
+  if (!hasPhone(profile?.phone_number)) {
+    return {
+      error: 'Add a phone number to your profile before joining a walk.',
+      code: 'PHONE_REQUIRED' as const,
+    }
+  }
 
   interface JoinSlotQueryRow {
     location_name: string

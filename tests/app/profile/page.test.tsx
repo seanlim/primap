@@ -73,6 +73,8 @@ describe('ProfilePage', () => {
             email: 'volunteer@example.com',
             full_name: 'Volunteer One',
             avatar_url: null,
+            phone_number: '+6591234567',
+            phone_verified_at: null,
             role: 'VOLUNTEER',
             status: 'ACTIVE',
             created_at: '2026-01-01T00:00:00.000Z',

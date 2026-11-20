@@ -82,7 +82,7 @@ describe('middleware', () => {
   it('allows ACTIVE VOLUNTEER to access /home', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockSingle.mockResolvedValue({
-      data: { status: 'ACTIVE', role: 'VOLUNTEER' },
+      data: { status: 'ACTIVE', role: 'VOLUNTEER', phone_number: '+6591234567' },
       error: null,
     })
 
@@ -174,7 +174,7 @@ describe('middleware', () => {
   it('redirects non-ADMIN from /admin to /home', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
     mockSingle.mockResolvedValue({
-      data: { status: 'ACTIVE', role: 'VOLUNTEER' },
+      data: { status: 'ACTIVE', role: 'VOLUNTEER', phone_number: '+6591234567' },
       error: null,
     })
 

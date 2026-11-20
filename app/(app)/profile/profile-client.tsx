@@ -3,8 +3,9 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { LogOut, Check, Pencil, MapPin, Calendar, Footprints, ClipboardList, Eye } from 'lucide-react'
+import { LogOut, Check, Pencil, MapPin, Calendar, Footprints, ClipboardList, Eye, Phone, AlertTriangle, X } from 'lucide-react'
 import { formatDate } from '@/lib/utils/format-date'
+import { formatPhoneForDisplay } from '@/lib/utils/phone'
 import { updateProfile } from '@/lib/actions/profile-actions'
 import { signOut } from '@/lib/actions/auth-actions'
 import { SightingLegend } from '@/components/admin/analytics-shared'
@@ -18,6 +19,8 @@ interface Props {
     email: string
     fullName: string | null
     avatarUrl: string | null
+    phoneNumber: string | null
+    phoneVerifiedAt: string | null
     role: string
     status: string
     createdAt: string
@@ -87,16 +90,42 @@ function ProgressRing({ percent, size = 80, stroke = 6 }: { percent: number; siz
 }
 
 export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: Props) {
-  const [editingName, setEditingName] = useState(false)
+  const [editingContact, setEditingContact] = useState(false)
   const [name, setName] = useState(profile.fullName || '')
+  const [phone, setPhone] = useState(profile.phoneNumber || '')
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [phoneError, setPhoneError] = useState('')
   const router = useRouter()
 
-  const handleSaveName = async () => {
+  const phoneMissing = !profile.phoneNumber?.trim()
+
+  const startEditingContact = () => {
+    setName(profile.fullName || '')
+    setPhone(profile.phoneNumber || '')
+    setSaveError('')
+    setPhoneError('')
+    setEditingContact(true)
+  }
+
+  const cancelEditingContact = () => {
+    setEditingContact(false)
+    setSaveError('')
+    setPhoneError('')
+  }
+
+  const handleSaveContact = async () => {
     setSaving(true)
-    await updateProfile(name)
-    setEditingName(false)
+    setSaveError('')
+    setPhoneError('')
+    const result = await updateProfile({ fullName: name, phoneNumber: phone })
     setSaving(false)
+    if (result.error) {
+      setSaveError(result.error)
+      setPhoneError(result.fieldErrors?.phoneNumber || '')
+      return
+    }
+    setEditingContact(false)
     router.refresh()
   }
 
@@ -117,37 +146,24 @@ export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: 
             </span>
           </div>
           <div className="flex-1 min-w-0">
-            {editingName ? (
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="flex-1 px-3 py-1.5 border border-white/30 bg-white/10 backdrop-blur-sm rounded-lg text-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
-                  autoFocus
-                />
-                <button
-                  onClick={handleSaveName}
-                  disabled={saving}
-                  className="p-1.5 bg-white/20 text-white rounded-lg hover:bg-white/30 disabled:opacity-50"
-                >
-                  <Check className="w-4 h-4" />
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <p className="text-lg font-bold text-white truncate">
-                  {profile.fullName || 'Set your name'}
-                </p>
-                <button
-                  onClick={() => setEditingName(true)}
-                  className="text-white/60 hover:text-white"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              <p className="text-lg font-bold text-white truncate">
+                {profile.fullName || 'Set your name'}
+              </p>
+              <button
+                onClick={startEditingContact}
+                className="text-white/60 hover:text-white"
+                aria-label="Edit contact details"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            </div>
             <p className="text-sm text-white/70 truncate">{profile.email}</p>
+            <p className="text-sm text-white/70 truncate">
+              {profile.phoneNumber
+                ? formatPhoneForDisplay(profile.phoneNumber)
+                : 'No phone number yet'}
+            </p>
           </div>
         </div>
 
@@ -167,6 +183,133 @@ export function ProfileClient({ profile, stats, reportMapPoints, walkHistory }: 
             </p>
           </div>
         </div>
+      </div>
+
+      {phoneMissing && (
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-amber-800">Add a phone number to join walks</p>
+            <p className="text-sm text-amber-700">
+              Volunteers need a phone number so organisers can reach them in an emergency or at short notice.
+            </p>
+            {!editingContact && (
+              <button
+                onClick={startEditingContact}
+                className="text-sm font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900"
+              >
+                Add phone number
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Contact Details */}
+      <div className="bg-white rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Contact Details</h2>
+          {!editingContact && (
+            <button
+              onClick={startEditingContact}
+              className="text-sm font-medium text-green-700 hover:text-green-800"
+            >
+              Edit
+            </button>
+          )}
+        </div>
+
+        {editingContact ? (
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="profile-name" className="mb-1 block text-sm font-medium text-gray-700">
+                Full name
+              </label>
+              <input
+                id="profile-name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                autoComplete="name"
+              />
+            </div>
+            <div>
+              <label htmlFor="profile-phone" className="mb-1 block text-sm font-medium text-gray-700">
+                Phone number
+              </label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  id="profile-phone"
+                  type="tel"
+                  inputMode="tel"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(e.target.value)
+                    setPhoneError('')
+                    setSaveError('')
+                  }}
+                  placeholder="+65 9123 4567"
+                  className={`w-full rounded-lg border py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 ${
+                    phoneError
+                      ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
+                      : 'border-gray-300 focus:border-green-500 focus:ring-green-100'
+                  }`}
+                  autoComplete="tel"
+                  aria-invalid={Boolean(phoneError)}
+                  aria-describedby={phoneError ? 'profile-phone-error' : 'profile-phone-help'}
+                />
+              </div>
+              {phoneError ? (
+                <p id="profile-phone-error" className="mt-1 text-xs text-red-600">{phoneError}</p>
+              ) : (
+                <p id="profile-phone-help" className="mt-1 text-xs text-gray-400">
+                  Singapore numbers can be entered as 9123 4567. International numbers need a + prefix.
+                </p>
+              )}
+            </div>
+
+            {saveError && !phoneError && (
+              <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{saveError}</p>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={handleSaveContact}
+                disabled={saving}
+                className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+              >
+                <Check className="h-4 w-4" />
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                onClick={cancelEditingContact}
+                disabled={saving}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50"
+              >
+                <X className="h-4 w-4" />
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <dl className="grid gap-3 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-xs text-gray-400">Name</dt>
+              <dd className="mt-0.5 font-medium text-gray-900">{profile.fullName || 'Not set'}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-gray-400">Phone number</dt>
+              <dd className={`mt-0.5 font-medium ${phoneMissing ? 'text-amber-600' : 'text-gray-900'}`}>
+                {profile.phoneNumber ? formatPhoneForDisplay(profile.phoneNumber) : 'Not set'}
+                {profile.phoneVerifiedAt && (
+                  <span className="ml-2 text-xs font-normal text-green-600">Verified</span>
+                )}
+              </dd>
+            </div>
+          </dl>
+        )}
       </div>
 
       {/* Progress Section with Ring */}

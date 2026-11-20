@@ -11,11 +11,13 @@ import { EmptyState } from '@/components/ui/empty-state'
 import type { Enums } from '@/lib/types/database'
 import type { UserStatus } from '@/lib/auth/access-policy'
 import type { AdminUsersAnalyticsSnapshot } from '@/lib/admin-volunteer-analytics'
+import { formatPhoneForDisplay, hasPhone } from '@/lib/utils/phone'
 
 interface UserData {
   id: string
   email: string
   fullName: string | null
+  phoneNumber: string | null
   role: Enums<'user_role'>
   status: UserStatus
   createdAt: string
@@ -67,7 +69,8 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, 
     const normalized = query.trim().toLowerCase()
     const searched = !normalized ? users : users.filter((u) =>
       (u.fullName || '').toLowerCase().includes(normalized) ||
-      u.email.toLowerCase().includes(normalized)
+      u.email.toLowerCase().includes(normalized) ||
+      (u.phoneNumber || '').toLowerCase().includes(normalized)
     )
     const indicatorFiltered = indicatorFilter === 'ALL'
       ? searched
@@ -253,6 +256,11 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, 
                   <div className="min-w-0">
                     <p className="font-medium text-gray-900">{user.fullName || user.email}</p>
                     {user.fullName && <p className="truncate text-sm text-gray-500">{user.email}</p>}
+                    <p className="mt-1 text-xs text-gray-500">
+                      {hasPhone(user.phoneNumber)
+                        ? formatPhoneForDisplay(user.phoneNumber)
+                        : <span className={user.role === 'VOLUNTEER' ? 'text-amber-600' : 'text-gray-400'}>No phone number</span>}
+                    </p>
                     <p className="mt-1 text-xs text-gray-400">Created {new Date(user.createdAt).toLocaleDateString()}</p>
                     <div className="mt-2 flex items-center gap-2">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -263,6 +271,11 @@ function UsersContent({ users, currentPage, totalCount, pageSize, statusCounts, 
                         {user.status}
                       </span>
                       <span className="text-xs text-gray-400 capitalize">{user.role.toLowerCase()}</span>
+                      {user.role === 'VOLUNTEER' && !hasPhone(user.phoneNumber) && (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                          Missing phone
+                        </span>
+                      )}
                     </div>
                   </div>
 

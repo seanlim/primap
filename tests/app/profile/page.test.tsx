@@ -90,6 +90,9 @@ describe('ProfilePage', () => {
         { count: 1 },
         { count: 1 },
       ],
+      slot_attendance: [
+        { count: 2 },
+      ],
       app_settings: [
         { data: { required_walks_per_round: 4 } },
       ],
@@ -130,6 +133,7 @@ describe('ProfilePage', () => {
       expect.objectContaining({
         stats: expect.objectContaining({
           walksJoined: 2,
+          walksAttended: 2,
           draftsPending: 1,
           reportsSubmitted: 1,
           requiredWalks: 4,

@@ -111,6 +111,9 @@ export async function buildViewExportWorkbook(data: ViewExportData): Promise<Exc
     { header: 'Max Volunteers', key: 'maxVolunteers', width: 16 },
     { header: 'Joined Volunteers', key: 'joinedVolunteers', width: 18 },
     { header: 'Cancelled Volunteers', key: 'cancelledVolunteers', width: 18 },
+    { header: 'Attendance Present', key: 'attendancePresent', width: 18 },
+    { header: 'Attendance Absent', key: 'attendanceAbsent', width: 18 },
+    { header: 'Attendance Unrecorded', key: 'attendanceUnrecorded', width: 22 },
     { header: 'Observation Count', key: 'observationCount', width: 18 },
     { header: 'Sighting Count', key: 'sightingCount', width: 16 },
     { header: 'Incident Count', key: 'incidentCount', width: 16 },
@@ -170,6 +173,18 @@ export async function buildViewExportWorkbook(data: ViewExportData): Promise<Exc
     { header: 'Media Count', key: 'mediaCount', width: 14 },
     { header: 'Media Files', key: 'mediaFiles', width: 40, kind: 'path' },
   ], data.incidentRows)
+
+  addWorksheet(workbook, 'Attendance', [
+    { header: 'Round Name', key: 'roundName', width: 24 },
+    { header: 'Walk Date', key: 'walkDate', width: 16, kind: 'date' },
+    { header: 'Location', key: 'location', width: 24 },
+    { header: 'Volunteer Name', key: 'volunteerName', width: 22 },
+    { header: 'Volunteer Email', key: 'volunteerEmail', width: 26 },
+    { header: 'Attendance', key: 'attendance', width: 14 },
+    { header: 'Marked By Name', key: 'markedByName', width: 22 },
+    { header: 'Marked By Email', key: 'markedByEmail', width: 26 },
+    { header: 'Marked At', key: 'markedAt', width: 22, kind: 'datetime' },
+  ], data.attendanceRows)
 
   return await workbook.xlsx.writeBuffer()
 }

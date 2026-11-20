@@ -218,6 +218,7 @@ export async function createRound(data: {
   description?: string
   startDate: string
   endDate: string
+  minorWorkshopRequired?: boolean
 }) {
   const errors: string[] = []
   if (!data.name?.trim()) errors.push('Round name is required')
@@ -238,6 +239,7 @@ export async function createRound(data: {
       description: data.description,
       start_date: data.startDate,
       end_date: data.endDate,
+      minor_workshop_required: data.minorWorkshopRequired ?? false,
       status: 'DRAFT',
       created_by: userId,
     })
@@ -252,6 +254,7 @@ export async function updateRound(roundId: string, data: {
   description?: string
   startDate: string
   endDate: string
+  minorWorkshopRequired?: boolean
 }) {
   const errors: string[] = []
   if (!roundId) errors.push('Round ID is required')
@@ -273,6 +276,7 @@ export async function updateRound(roundId: string, data: {
       description: data.description,
       start_date: data.startDate,
       end_date: data.endDate,
+      minor_workshop_required: data.minorWorkshopRequired ?? false,
     })
     .eq('id', roundId)
 

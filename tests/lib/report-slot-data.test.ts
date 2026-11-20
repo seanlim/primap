@@ -238,6 +238,8 @@ describe('getSlotReportViewData', () => {
         email: 'self@example.com',
         attendance: 'PRESENT',
         attendanceMarkedAt: '2026-04-12T05:00:00Z',
+        requiresGuardian: false,
+        guardianPresent: null,
       },
     ])
     expect(result?.isAdmin).toBe(false)

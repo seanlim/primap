@@ -4,6 +4,7 @@ import { useRef, useState, useOptimistic, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { joinWalk, cancelWalk, getWalkLateCancellationStatus } from '@/lib/actions/walk-actions'
+import { saveRoundGuardianDetails } from '@/lib/actions/guardian-actions'
 import { MapPin, Calendar, Clock, Users } from 'lucide-react'
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog'
 import { Breadcrumb } from '@/components/ui/breadcrumb'
@@ -14,6 +15,7 @@ import type { JoinBlockInfo } from '@/lib/utils/walk-participation'
 interface WalkDetailProps {
   walk: {
     id: string
+    roundId: string
     locationName: string
     walkDate: string
     startTime: string
@@ -21,6 +23,7 @@ interface WalkDetailProps {
     maxVolunteers: number
     notes: string | null
     roundName: string
+    minorWorkshopRequired: boolean
     joinBlockedInfo: JoinBlockInfo | null
   }
   members: {
@@ -34,10 +37,39 @@ interface WalkDetailProps {
   currentUserId: string
   hasSubmittedReport: boolean
   missingPhone?: boolean
+  missingBirthMonth?: boolean
+  isMinor?: boolean
+  guardianDetails?: {
+    guardianName: string
+    guardianEmail: string
+    guardianPhone: string
+    accompanimentAcknowledged: boolean
+    workshopAttended: boolean
+  } | null
 }
 
-export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserId, hasSubmittedReport, missingPhone = false }: WalkDetailProps) {
+export function WalkDetailClient({
+  walk,
+  members,
+  isJoined,
+  isFull,
+  currentUserId,
+  hasSubmittedReport,
+  missingPhone = false,
+  missingBirthMonth = false,
+  isMinor = false,
+  guardianDetails = null,
+}: WalkDetailProps) {
   const [error, setError] = useState('')
+  const [guardianFormOpen, setGuardianFormOpen] = useState(
+    isMinor && !guardianDetails?.accompanimentAcknowledged
+  )
+  const [guardianName, setGuardianName] = useState(guardianDetails?.guardianName || '')
+  const [guardianEmail, setGuardianEmail] = useState(guardianDetails?.guardianEmail || '')
+  const [guardianPhone, setGuardianPhone] = useState(guardianDetails?.guardianPhone || '')
+  const [confirmsAccompaniment, setConfirmsAccompaniment] = useState(
+    Boolean(guardianDetails?.accompanimentAcknowledged)
+  )
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [lateCancellationActive, setLateCancellationActive] = useState(false)
   const [cancellationReason, setCancellationReason] = useState('')
@@ -74,13 +106,49 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
     startTransition(async () => {
       setOptimistic('join')
       const result = await joinWalk(walk.id)
-      if (result.error) {
+      if ('error' in result) {
         setError(result.error)
         setPendingAction(null)
       } else {
-        if (result.warning) {
+        if ('warning' in result && result.warning) {
           showToast(result.warning, 'info')
         }
+        router.refresh()
+      }
+    })
+  }
+
+  const handleSaveGuardianDetails = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setError('')
+    setPendingAction('join')
+    startTransition(async () => {
+      const saved = await saveRoundGuardianDetails(walk.roundId, {
+        guardianName,
+        guardianEmail,
+        guardianPhone,
+        confirmsAccompaniment,
+      })
+      if (saved.error) {
+        setError(saved.error)
+        setPendingAction(null)
+        return
+      }
+
+      if (walk.minorWorkshopRequired) {
+        setPendingAction(null)
+        setGuardianFormOpen(false)
+        showToast('Guardian details saved. An admin must confirm workshop attendance before you can join.', 'info')
+        router.refresh()
+        return
+      }
+
+      const result = await joinWalk(walk.id)
+      setPendingAction(null)
+      if ('error' in result) {
+        setError(result.error)
+      } else {
+        setGuardianFormOpen(false)
         router.refresh()
       }
     })
@@ -198,6 +266,111 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
                   A phone number is required so organisers can reach you in an emergency.
                 </p>
               </>
+            ) : missingBirthMonth ? (
+              <>
+                <Link
+                  href="/profile?birth_month=required"
+                  className="block w-full bg-amber-500 text-white py-3 px-4 rounded-xl hover:bg-amber-600 font-medium transition-colors text-center"
+                >
+                  Add birth month and year to join
+                </Link>
+                <p className="text-xs text-amber-700 text-center">
+                  Month and year are used to determine round-specific guardian requirements.
+                </p>
+              </>
+            ) : isMinor && guardianFormOpen ? (
+              <form onSubmit={handleSaveGuardianDetails} className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <div>
+                  <p className="text-sm font-semibold text-amber-900">Guardian details for this round</p>
+                  <p className="mt-1 text-xs text-amber-800">
+                    Your guardian will receive walk reminders and must accompany you on each walk.
+                  </p>
+                </div>
+                <label className="block text-xs font-medium text-gray-700">
+                  Guardian name
+                  <input
+                    value={guardianName}
+                    onChange={event => setGuardianName(event.target.value)}
+                    required
+                    autoComplete="name"
+                    className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-normal"
+                  />
+                </label>
+                <label className="block text-xs font-medium text-gray-700">
+                  Guardian email
+                  <input
+                    type="email"
+                    value={guardianEmail}
+                    onChange={event => setGuardianEmail(event.target.value)}
+                    required
+                    autoComplete="email"
+                    className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-normal"
+                  />
+                </label>
+                <label className="block text-xs font-medium text-gray-700">
+                  Guardian phone (optional)
+                  <input
+                    type="tel"
+                    value={guardianPhone}
+                    onChange={event => setGuardianPhone(event.target.value)}
+                    autoComplete="tel"
+                    placeholder="+65 9123 4567"
+                    className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-normal"
+                  />
+                </label>
+                <label className="flex items-start gap-2 text-xs text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={confirmsAccompaniment}
+                    onChange={event => setConfirmsAccompaniment(event.target.checked)}
+                    required
+                    className="mt-0.5 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                  />
+                  <span>I confirm these details are correct and this guardian will accompany me on every walk in this round.</span>
+                </label>
+                {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</p>}
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={isPending}
+                    className="flex-1 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {isJoining ? 'Saving…' : 'Save and join walk'}
+                  </button>
+                  {guardianDetails?.accompanimentAcknowledged && (
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => setGuardianFormOpen(false)}
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              </form>
+            ) : isMinor && walk.minorWorkshopRequired && !guardianDetails?.workshopAttended ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-center">
+                <p className="text-sm font-medium text-amber-900">Admin confirmation required</p>
+                <p className="mt-1 text-xs text-amber-800">Your guardian must attend the round workshop. An admin will confirm attendance before you can join a walk.</p>
+                {guardianDetails?.accompanimentAcknowledged && (
+                  <button
+                    type="button"
+                    onClick={() => setGuardianFormOpen(true)}
+                    className="mt-2 text-xs font-medium text-amber-900 underline"
+                  >
+                    Update guardian details
+                  </button>
+                )}
+              </div>
+            ) : isMinor && !guardianDetails?.accompanimentAcknowledged ? (
+              <button
+                type="button"
+                onClick={() => setGuardianFormOpen(true)}
+                className="w-full rounded-xl bg-amber-500 px-4 py-3 text-sm font-medium text-white hover:bg-amber-600"
+              >
+                Add guardian details to join
+              </button>
             ) : (
               <button
                 onClick={handleJoin}
@@ -205,6 +378,15 @@ export function WalkDetailClient({ walk, members, isJoined, isFull, currentUserI
                 className="w-full bg-green-600 text-white py-3 px-4 rounded-xl hover:bg-green-700 disabled:opacity-50 font-medium transition-colors"
               >
                 {isJoining ? 'Joining...' : walk.joinBlockedInfo?.label || 'Join Walk'}
+              </button>
+            )}
+            {isMinor && guardianDetails?.accompanimentAcknowledged && !guardianFormOpen && !walk.minorWorkshopRequired && (
+              <button
+                type="button"
+                onClick={() => setGuardianFormOpen(true)}
+                className="block w-full text-center text-xs font-medium text-gray-500 underline"
+              >
+                Update guardian details
               </button>
             )}
             {walk.joinBlockedInfo && (

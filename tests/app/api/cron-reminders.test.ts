@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 
 const mockSlotsResult = vi.fn()
 const mockMembersInResult = vi.fn()
+const mockGuardianRequirementsResult = vi.fn()
 const mockSettingsSingle = vi.fn()
 const mockWalkUpdateEq = vi.fn()
 
@@ -19,6 +20,12 @@ const membersChain = {
   in: vi.fn().mockReturnValue({ eq: mockMembersInResult }),
   eq: vi.fn().mockReturnThis(),
 }
+const guardianRequirementsChain = {
+  select: vi.fn().mockReturnThis(),
+  in: vi.fn((column: string) => column === 'round_id'
+    ? guardianRequirementsChain
+    : mockGuardianRequirementsResult()),
+}
 const settingsChain = {
   select: vi.fn().mockReturnValue({
     limit: vi.fn().mockReturnValue({
@@ -33,6 +40,7 @@ vi.mock('@/lib/supabase/admin', () => ({
       if (table === 'app_settings') return settingsChain
       if (table === 'walk_slots') return slotsChain
       if (table === 'slot_memberships') return membersChain
+      if (table === 'round_participation_requirements') return guardianRequirementsChain
       throw new Error(`Unexpected table ${table}`)
     }),
   })),
@@ -40,10 +48,11 @@ vi.mock('@/lib/supabase/admin', () => ({
 
 vi.mock('@/lib/email', () => ({
   sendWalkReminderEmail: vi.fn(),
+  sendGuardianWalkReminderEmail: vi.fn(),
 }))
 
 import { GET } from '@/app/api/cron/reminders/route'
-import { sendWalkReminderEmail } from '@/lib/email'
+import { sendGuardianWalkReminderEmail, sendWalkReminderEmail } from '@/lib/email'
 
 function makeRequest(path: string, headers?: Record<string, string>): NextRequest {
   return new NextRequest(`http://localhost:3000${path}`, {
@@ -60,6 +69,11 @@ describe('GET /api/cron/reminders', () => {
     slotsChain.lte.mockReturnThis()
     membersChain.select.mockReturnThis()
     membersChain.in.mockReturnValue({ eq: mockMembersInResult })
+    guardianRequirementsChain.select.mockReturnThis()
+    guardianRequirementsChain.in.mockImplementation((column: string) => column === 'round_id'
+      ? guardianRequirementsChain
+      : mockGuardianRequirementsResult())
+    mockGuardianRequirementsResult.mockResolvedValue({ data: [], error: null })
     mockSettingsSingle.mockResolvedValue({
       data: {
         reminder_send_weekday: 3,
@@ -193,6 +207,46 @@ describe('GET /api/cron/reminders', () => {
       { fullName: 'Bob', email: 'bob@test.com' },
     ])
     expect(mockWalkUpdateEq).toHaveBeenCalledWith('id', 'slot-1')
+  })
+
+  it('sends one privacy-safe guardian reminder for minors sharing a guardian email', async () => {
+    mockSlotsResult.mockResolvedValue({
+      data: [{
+        id: 'slot-1',
+        round_id: 'round-1',
+        walk_date: '2026-03-11',
+        start_time: '08:00',
+        location_name: 'Bukit Timah',
+        survey_rounds: { start_date: '2026-01-01' },
+      }],
+      error: null,
+    })
+    mockMembersInResult.mockResolvedValue({
+      data: [
+        { slot_id: 'slot-1', user_id: 'u1', profiles: { full_name: 'Alice', email: 'alice@test.com', birth_month: '2010-05-01' } },
+        { slot_id: 'slot-1', user_id: 'u2', profiles: { full_name: 'Bob', email: 'bob@test.com', birth_month: '2011-06-01' } },
+      ],
+      error: null,
+    })
+    mockGuardianRequirementsResult.mockResolvedValue({
+      data: [
+        { round_id: 'round-1', user_id: 'u1', guardian_name: 'Pat', guardian_email: 'pat@example.com' },
+        { round_id: 'round-1', user_id: 'u2', guardian_name: 'Pat', guardian_email: 'PAT@example.com' },
+      ],
+      error: null,
+    })
+
+    const response = await GET(makeRequest('/api/cron/reminders'))
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(body.emailsSent).toBe(3)
+    expect(sendGuardianWalkReminderEmail).toHaveBeenCalledTimes(1)
+    expect(sendGuardianWalkReminderEmail).toHaveBeenCalledWith('pat@example.com', 'Pat', ['Alice', 'Bob'], {
+      date: '2026-03-11',
+      time: '08:00',
+      location: 'Bukit Timah',
+    })
   })
 
   it('skips members without an email address', async () => {

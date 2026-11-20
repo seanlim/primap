@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { sendWalkReminderEmail } from '@/lib/email';
+import { sendGuardianWalkReminderEmail, sendWalkReminderEmail } from '@/lib/email';
 import {
   DEFAULT_REMINDER_SEND_TIME,
   DEFAULT_REMINDER_SEND_WEEKDAY,
@@ -12,6 +12,7 @@ import {
   getReminderCoverageWindow,
 } from '@/lib/utils/reminder-schedule';
 import { APP_TIME_ZONE } from '@/lib/utils/walk-participation';
+import { isMinorAtRoundStart } from '@/lib/utils/minor-status';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,7 +47,7 @@ export async function GET(req: NextRequest) {
 
   const { data: slots, error: slotsError } = await supabase
     .from('walk_slots')
-    .select('id, walk_date, start_time, location_name, reminder_sent_at')
+    .select('id, round_id, walk_date, start_time, location_name, reminder_sent_at, survey_rounds(start_date)')
     .gte('walk_date', window.startDate)
     .lte('walk_date', window.endDate)
     .is('reminder_sent_at', null);
@@ -69,7 +70,7 @@ export async function GET(req: NextRequest) {
   const slotIds = slots.map(s => s.id);
   const { data: allMembers, error: membersError } = await supabase
     .from('slot_memberships')
-    .select('slot_id, user_id, profiles:user_id(full_name, email)')
+    .select('slot_id, user_id, profiles:user_id(full_name, email, birth_month)')
     .in('slot_id', slotIds)
     .eq('status', 'ACTIVE');
 
@@ -77,6 +78,27 @@ export async function GET(req: NextRequest) {
     console.error('[Cron] Error fetching members:', membersError);
     return NextResponse.json({ error: membersError.message }, { status: 500 });
   }
+
+  const memberUserIds = [...new Set((allMembers || []).map(member => member.user_id))]
+  const roundIds = [...new Set(slots.map(slot => slot.round_id))]
+  const guardianRequirementsResult = memberUserIds.length > 0 && roundIds.length > 0
+    ? await supabase
+        .from('round_participation_requirements')
+        .select('round_id, user_id, guardian_name, guardian_email')
+        .in('round_id', roundIds)
+        .in('user_id', memberUserIds)
+    : { data: [], error: null }
+  if (guardianRequirementsResult.error) {
+    console.error('[Cron] Error fetching guardian contacts:', guardianRequirementsResult.error)
+    return NextResponse.json({ error: guardianRequirementsResult.error.message }, { status: 500 })
+  }
+
+  const guardianRequirementsByKey = new Map(
+    (guardianRequirementsResult.data ?? []).map(requirement => [
+      `${requirement.round_id}:${requirement.user_id}`,
+      requirement,
+    ])
+  )
 
   // Group members by slot_id
   const membersBySlot = new Map<string, typeof allMembers>();
@@ -90,6 +112,7 @@ export async function GET(req: NextRequest) {
 
   for (const slot of slots) {
     const members = membersBySlot.get(slot.id) || [];
+    const round = slot.survey_rounds as unknown as { start_date: string } | null
     const participants = members
       .map((member) => {
         const profile = member.profiles;
@@ -98,6 +121,7 @@ export async function GET(req: NextRequest) {
       })
       .filter((participant) => participant !== null);
 
+    const deliveredEmails = new Set<string>()
     for (const member of members) {
       const profile = member.profiles;
       if (profile?.email) {
@@ -112,7 +136,43 @@ export async function GET(req: NextRequest) {
           participants
         );
         emailCount++;
+        deliveredEmails.add(profile.email.trim().toLowerCase())
       }
+    }
+
+    const guardianRecipients = new Map<string, { email: string; name: string | null; volunteers: Set<string> }>()
+    for (const member of members) {
+      const profile = member.profiles
+      if (!profile || !isMinorAtRoundStart(profile.birth_month, round?.start_date)) continue
+      const requirement = guardianRequirementsByKey.get(`${slot.round_id}:${member.user_id}`)
+      const email = requirement?.guardian_email?.trim().toLowerCase()
+      if (!email || deliveredEmails.has(email)) continue
+
+      const existing = guardianRecipients.get(email)
+      const volunteerName = profile.full_name?.trim() || 'the volunteer'
+      if (existing) {
+        existing.volunteers.add(volunteerName)
+      } else {
+        guardianRecipients.set(email, {
+          email,
+          name: requirement?.guardian_name ?? null,
+          volunteers: new Set([volunteerName]),
+        })
+      }
+    }
+
+    for (const recipient of guardianRecipients.values()) {
+      await sendGuardianWalkReminderEmail(
+        recipient.email,
+        recipient.name,
+        [...recipient.volunteers],
+        {
+          date: slot.walk_date,
+          time: slot.start_time,
+          location: slot.location_name,
+        }
+      )
+      emailCount++
     }
 
     const { error: slotUpdateError } = await supabase

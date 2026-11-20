@@ -33,6 +33,7 @@ describe('ProfileClient', () => {
           avatarUrl: null,
           phoneNumber: '+6591234567',
           phoneVerifiedAt: null,
+          birthMonth: '2000-01-01',
           role: 'VOLUNTEER',
           status: 'ACTIVE',
           createdAt: '2026-01-01T00:00:00.000Z',
@@ -75,6 +76,7 @@ describe('ProfileClient', () => {
           avatarUrl: null,
           phoneNumber: '+6591234567',
           phoneVerifiedAt: null,
+          birthMonth: '2000-01-01',
           role: 'VOLUNTEER',
           status: 'ACTIVE',
           createdAt: '2026-01-01T00:00:00.000Z',
@@ -124,6 +126,7 @@ describe('ProfileClient', () => {
           avatarUrl: null,
           phoneNumber: null,
           phoneVerifiedAt: null,
+          birthMonth: '2000-01-01',
           role: 'VOLUNTEER',
           status: 'ACTIVE',
           createdAt: '2026-01-01T00:00:00.000Z',
@@ -146,6 +149,7 @@ describe('ProfileClient', () => {
       expect(updateProfile).toHaveBeenCalledWith({
         fullName: 'Volunteer One',
         phoneNumber: '9123 4567',
+        birthMonth: '2000-01',
       })
     })
   })
@@ -165,6 +169,7 @@ describe('ProfileClient', () => {
           avatarUrl: null,
           phoneNumber: null,
           phoneVerifiedAt: null,
+          birthMonth: '2000-01-01',
           role: 'VOLUNTEER',
           status: 'ACTIVE',
           createdAt: '2026-01-01T00:00:00.000Z',
